@@ -823,3 +823,86 @@ export function createCloudTexture(): THREE.CanvasTexture {
   return texture;
 }
 
+// 11. Heavy-Duty Crawler Tank Track Belt Texture (Continuous Chevron Grousers, Pins & Drive Lugs)
+export function createCrawlerTrackTexture(): {
+  map: THREE.CanvasTexture;
+  bumpMap: THREE.CanvasTexture;
+} {
+  const w = 512;
+  const h = 512;
+
+  const colorCanvas = document.createElement('canvas');
+  colorCanvas.width = w;
+  colorCanvas.height = h;
+  const ctx = colorCanvas.getContext('2d')!;
+
+  const bumpCanvas = document.createElement('canvas');
+  bumpCanvas.width = w;
+  bumpCanvas.height = h;
+  const bCtx = bumpCanvas.getContext('2d')!;
+
+  // Base vulcanized synthetic rubber compound
+  ctx.fillStyle = '#111418';
+  ctx.fillRect(0, 0, w, h);
+
+  bCtx.fillStyle = '#404040';
+  bCtx.fillRect(0, 0, w, h);
+
+  const numPads = 16;
+  const padH = h / numPads;
+
+  for (let i = 0; i < numPads; i++) {
+    const y = i * padH;
+
+    // Metallic link hinge pin seam (groove)
+    ctx.fillStyle = '#2d3748';
+    ctx.fillRect(0, y, w, 3);
+    bCtx.fillStyle = '#101010';
+    bCtx.fillRect(0, y, w, 4);
+
+    // Chevron Grouser (cleat) pad
+    const padMarginY = 4;
+    const padHeight = padH - 8;
+
+    // Outer rubber tread blocks with steel chevron
+    ctx.fillStyle = '#1e242c';
+    ctx.fillRect(16, y + padMarginY, w - 32, padHeight);
+
+    bCtx.fillStyle = '#d0d0d0'; // raised pad
+    bCtx.fillRect(16, y + padMarginY, w - 32, padHeight);
+
+    // Center sprocket drive guide horn / drive tooth slot
+    const midX = w / 2;
+    ctx.fillStyle = '#0a0d12';
+    ctx.fillRect(midX - 22, y + 2, 44, padH - 4);
+    bCtx.fillStyle = '#000000'; // deep slot
+    bCtx.fillRect(midX - 22, y + 2, 44, padH - 4);
+
+    // Dual steel guide horns (sprocket drive teeth pins)
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(midX - 28, y + 6, 8, padH - 12);
+    ctx.fillRect(midX + 20, y + 6, 8, padH - 12);
+    bCtx.fillStyle = '#ffffff';
+    bCtx.fillRect(midX - 28, y + 6, 8, padH - 12);
+    bCtx.fillRect(midX + 20, y + 6, 8, padH - 12);
+
+    // High-tensile steel grip cleats on chevron wings
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(36, y + padMarginY + 2, 70, 5);
+    ctx.fillRect(w - 106, y + padMarginY + 2, 70, 5);
+    bCtx.fillStyle = '#ffffff';
+    bCtx.fillRect(36, y + padMarginY + 2, 70, 5);
+    bCtx.fillRect(w - 106, y + padMarginY + 2, 70, 5);
+  }
+
+  const map = new THREE.CanvasTexture(colorCanvas);
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+
+  const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+  bumpMap.wrapS = THREE.RepeatWrapping;
+  bumpMap.wrapT = THREE.RepeatWrapping;
+
+  return { map, bumpMap };
+}
+

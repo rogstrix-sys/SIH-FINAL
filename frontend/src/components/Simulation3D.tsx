@@ -48,7 +48,8 @@ import {
   createTireTextures,
   createCadDimensionBadge,
   createSludgeFoamTexture,
-  createCloudTexture
+  createCloudTexture,
+  createCrawlerTrackTexture
 } from './simulationTextures';
 
 // Custom 3D Helical Curve for Coil Springs
@@ -177,6 +178,8 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const maceratorBladesRef = useRef<THREE.Mesh | null>(null);
   const roofBeaconRef = useRef<THREE.Mesh | null>(null);
   const levelSightFloatRef = useRef<THREE.Mesh | null>(null);
+  const trackBeltMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const lidarTurretRef = useRef<THREE.Mesh | null>(null);
   const streetLightBulbsRef = useRef<THREE.PointLight[]>([]);
   const weatherParticlesRef = useRef<THREE.Points | null>(null);
   const tireParticlesRef = useRef<THREE.Points | null>(null);
@@ -1211,127 +1214,140 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     chassisGroupRef.current = chassisGroup;
     vehicleGroup.add(chassisGroup);
 
-    // Boxed Ladder Chassis Frame with C-Channel Rails & Crossmembers
+    // Armored Faceted Rover Tub Chassis with High-Clearance Belly Skid Plates
     const chassisMat = new THREE.MeshStandardMaterial({
       color: isXRayMode ? 0x0284c7 : 0x0f172a,
-      metalness: 0.85,
-      roughness: 0.35,
+      metalness: 0.88,
+      roughness: 0.32,
       wireframe: isXRayMode
     });
     chassisMatRef.current = chassisMat;
-    const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.18, 2.2), chassisMat);
+
+    // Central Armored Monocoque Belly Tub (360mm ground clearance)
+    const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.20, 2.22), chassisMat);
     chassisMesh.castShadow = true;
     chassisMesh.receiveShadow = true;
     chassisGroup.add(chassisMesh);
 
-    // Twin Longitudinal Steel C-Channel Frame Rails
-    [-0.38, 0.38].forEach((rx) => {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 2.3), chassisMat);
-      rail.position.set(rx, -0.06, 0);
-      chassisGroup.add(rail);
-    });
-
-    // 4 Transverse Tubular Chassis Crossmembers
-    [-0.8, -0.2, 0.4, 0.9].forEach((cz) => {
-      const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.72, 8), chassisMat);
-      cross.rotation.z = Math.PI / 2;
-      cross.position.set(0, -0.06, cz);
-      chassisGroup.add(cross);
-    });
-
-    // Front & Rear Solid Live Axles with Cast Iron Pumpkin Gear Housings
-    [0.65, -0.65].forEach((az) => {
-      const axleTube = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.05, 12), chassisMat);
-      axleTube.rotation.z = Math.PI / 2;
-      axleTube.position.set(0, -0.06, az);
-      chassisGroup.add(axleTube);
-
-      const pumpkin = new THREE.Mesh(
-        new THREE.SphereGeometry(0.09, 16, 12),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.3 })
-      );
-      pumpkin.position.set(0, -0.06, az);
-      chassisGroup.add(pumpkin);
-    });
-
-    // Central 4WD Transfer Case & Front/Rear Drive Shafts
-    const tCase = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.18, 0.22),
-      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85 })
+    // Angled Front Belly Skid Plate (45° Approach Angle Deflector)
+    const frontSkid = new THREE.Mesh(
+      new THREE.BoxGeometry(0.98, 0.04, 0.38),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 })
     );
-    tCase.position.set(0, -0.06, 0);
-    chassisGroup.add(tCase);
+    frontSkid.rotation.x = -Math.PI / 4;
+    frontSkid.position.set(0, 0.02, 1.16);
+    chassisGroup.add(frontSkid);
 
-    [-0.32, 0.32].forEach((dsZ) => {
-      const dShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 8), galvanizedMat);
-      dShaft.rotation.x = Math.PI / 2;
-      dShaft.position.set(0, -0.06, dsZ);
-      chassisGroup.add(dShaft);
-    });
-
-    // Heavy-Duty Side Diamond-Plate Toolboxes
-    [-0.52, 0.52].forEach((tbx) => {
-      const tbox = new THREE.Mesh(
-        new THREE.BoxGeometry(0.20, 0.18, 0.45),
-        new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.25 })
-      );
-      tbox.position.set(tbx, 0.10, -0.25);
-      chassisGroup.add(tbox);
-    });
-
-    // Red 9kg ABC Chemical Fire Extinguisher in Bracket
-    const exting = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035, 0.035, 0.22, 12),
-      new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.3 })
+    // Angled Rear Belly Skid Plate (38° Departure Angle Deflector)
+    const rearSkid = new THREE.Mesh(
+      new THREE.BoxGeometry(0.98, 0.04, 0.36),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 })
     );
-    exting.position.set(0.46, 0.14, 0.15);
-    chassisGroup.add(exting);
+    rearSkid.rotation.x = Math.PI / 4.5;
+    rearSkid.position.set(0, 0.02, -1.14);
+    chassisGroup.add(rearSkid);
 
-    // Heavy-Duty Anti-Spray Rubber Mudflaps with Hazard Stripes
-    [[-0.52, 0.65], [0.52, 0.65], [-0.52, -0.65], [0.52, -0.65]].forEach(([mx, mz]) => {
-      const flap = new THREE.Mesh(
-        new THREE.BoxGeometry(0.18, 0.22, 0.015),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95 })
-      );
-      flap.position.set(mx, -0.12, mz - 0.15);
-      chassisGroup.add(flap);
+    // Heavy-Duty Tubular Rock Sliders / Lateral Rub Rails
+    [-0.56, 0.56].forEach((sx) => {
+      const slider = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 2.15, 12), galvanizedMat);
+      slider.rotation.x = Math.PI / 2;
+      slider.position.set(sx, -0.04, 0);
+      chassisGroup.add(slider);
+
+      // 4 Stanchion Brackets per side
+      [-0.8, -0.25, 0.25, 0.8].forEach((sz) => {
+        const standoff = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.04), chassisMat);
+        standoff.position.set(sx > 0 ? sx - 0.04 : sx + 0.04, -0.04, sz);
+        chassisGroup.add(standoff);
+      });
     });
 
-    // Heavy-Duty Front Bullbar Bumper (+Z = +1.15) with Recovery Winch & Tow D-Rings
+    // Dual Rear Hydraulic Rock Anchoring Spikes (Ground Claws for 42° Steep Slope Suction Locking)
+    [-0.42, 0.42].forEach((ax) => {
+      const anchorBracket = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.14, 0.16),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85 })
+      );
+      anchorBracket.position.set(ax, 0.04, -1.15);
+      chassisGroup.add(anchorBracket);
+
+      // Hydraulic Actuator Ram Cylinder
+      const ramCylinder = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.035, 0.32, 12),
+        new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 })
+      );
+      ramCylinder.rotation.x = -Math.PI / 3.8;
+      ramCylinder.position.set(ax, -0.06, -1.22);
+      chassisGroup.add(ramCylinder);
+
+      // Chrome Piston Shaft
+      const ramPiston = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.022, 0.022, 0.22, 12),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.98, roughness: 0.05 })
+      );
+      ramPiston.rotation.x = -Math.PI / 3.8;
+      ramPiston.position.set(ax, -0.16, -1.28);
+      chassisGroup.add(ramPiston);
+
+      // Hardened Tungsten Carbide Ground Anchor Spike / Claw Footpad
+      const clawSpike = new THREE.Mesh(
+        new THREE.ConeGeometry(0.05, 0.16, 8),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.95, roughness: 0.15 })
+      );
+      clawSpike.rotation.x = -Math.PI / 3.8 + Math.PI;
+      clawSpike.position.set(ax, -0.26, -1.34);
+      chassisGroup.add(clawSpike);
+    });
+
+    // Heavy-Duty Front Steel Bullbar Bumper (+Z = +1.18) with Recovery Winch & Tow D-Rings
     const bullbar = new THREE.Mesh(
-      new THREE.BoxGeometry(1.15, 0.24, 0.12),
-      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.25 })
+      new THREE.BoxGeometry(1.22, 0.26, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.25 })
     );
-    bullbar.position.set(0, 0.05, 1.15);
+    bullbar.position.set(0, 0.06, 1.18);
     chassisGroup.add(bullbar);
 
-    [-0.35, 0.35].forEach((sx) => {
+    [-0.38, 0.38].forEach((sx) => {
       const shackle = new THREE.Mesh(
-        new THREE.TorusGeometry(0.04, 0.012, 8, 16),
+        new THREE.TorusGeometry(0.045, 0.014, 8, 16),
         new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9 })
       );
-      shackle.position.set(sx, 0.04, 1.22);
+      shackle.position.set(sx, 0.05, 1.26);
       chassisGroup.add(shackle);
     });
 
-    // Winch Drum & Steel Cable Hook
+    // Planetary Gear Recovery Winch Drum & Steel Cable
     const winchDrum = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.06, 0.28, 16),
+      new THREE.CylinderGeometry(0.065, 0.065, 0.32, 16),
       new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.95, roughness: 0.2 })
     );
     winchDrum.rotation.z = Math.PI / 2;
-    winchDrum.position.set(0, 0.1, 1.23);
+    winchDrum.position.set(0, 0.12, 1.25);
     chassisGroup.add(winchDrum);
 
-    // Industrial Driver Cab (Emerald Green SIH Automotive Livery with Clearcoat)
+    // Front Bullbar Tubular Push Frame
+    const pushBarTop = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.85, 12), galvanizedMat);
+    pushBarTop.rotation.z = Math.PI / 2;
+    pushBarTop.position.set(0, 0.32, 1.22);
+    chassisGroup.add(pushBarTop);
+
+    [-0.38, 0.38].forEach((px) => {
+      const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.26, 12), galvanizedMat);
+      riser.position.set(px, 0.20, 1.20);
+      chassisGroup.add(riser);
+    });
+
+    // =========================================================================
+    // Rugged Alpine Exploration Rover Cab (Emerald Livery with Clearcoat)
+    // =========================================================================
     const cab = new THREE.Mesh(
-      new THREE.BoxGeometry(0.95, 0.65, 0.75),
+      new THREE.BoxGeometry(0.96, 0.64, 0.76),
       new THREE.MeshPhysicalMaterial({
         color: isXRayMode ? 0x06b6d4 : 0x059669,
-        metalness: 0.5,
-        roughness: 0.25,
-        clearcoat: 0.9,
-        clearcoatRoughness: 0.15,
+        metalness: 0.55,
+        roughness: 0.24,
+        clearcoat: 0.92,
+        clearcoatRoughness: 0.14,
         transparent: isXRayMode,
         opacity: isXRayMode ? 0.4 : 1.0
       })
@@ -1340,35 +1356,52 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     cab.castShadow = true;
     chassisGroup.add(cab);
 
-    // Front Chrome Bar Grille & SIH Emblem
-    const grille = new THREE.Mesh(
-      new THREE.BoxGeometry(0.72, 0.22, 0.02),
-      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.9, roughness: 0.4 })
+    // Angled Armored Cockpit Brow / Sun Visor
+    const cabBrow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.98, 0.06, 0.22),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.3 })
     );
-    grille.position.set(0, 0.28, 1.06);
+    cabBrow.position.set(0, 0.74, 0.84);
+    cabBrow.rotation.x = -0.18;
+    chassisGroup.add(cabBrow);
+
+    // Reinforced Chamfered Front Grille & High-Tensile Mesh
+    const grille = new THREE.Mesh(
+      new THREE.BoxGeometry(0.74, 0.24, 0.03),
+      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.92, roughness: 0.35 })
+    );
+    grille.position.set(0, 0.28, 1.07);
     chassisGroup.add(grille);
 
     for (let g = 0; g < 4; g++) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.018, 0.02), galvanizedMat);
-      bar.position.set(0, 0.20 + g * 0.05, 1.07);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.018, 0.02), galvanizedMat);
+      bar.position.set(0, 0.19 + g * 0.055, 1.085);
       chassisGroup.add(bar);
     }
 
     const sihEmblem = new THREE.Mesh(
-      new THREE.CircleGeometry(0.045, 16),
+      new THREE.CircleGeometry(0.048, 16),
       new THREE.MeshBasicMaterial({ color: 0x10b981 })
     );
-    sihEmblem.position.set(0, 0.28, 1.08);
+    sihEmblem.position.set(0, 0.28, 1.09);
     chassisGroup.add(sihEmblem);
 
-    // Lower Bumper Amber Fog Lights
-    [-0.42, 0.42].forEach((fx) => {
+    // Lower Bumper Amber Penetrating Fog / Rock Spotlights
+    [-0.44, 0.44].forEach((fx) => {
+      const fogBezel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.045, 0.04, 16),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+      );
+      fogBezel.rotation.x = Math.PI / 2;
+      fogBezel.position.set(fx, 0.06, 1.25);
+      chassisGroup.add(fogBezel);
+
       const fog = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12),
+        new THREE.CylinderGeometry(0.036, 0.036, 0.02, 16),
         new THREE.MeshBasicMaterial({ color: 0xf59e0b })
       );
       fog.rotation.x = Math.PI / 2;
-      fog.position.set(fx, 0.05, 1.21);
+      fog.position.set(fx, 0.06, 1.27);
       chassisGroup.add(fog);
     });
 
@@ -1378,64 +1411,65 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       transparent: true,
       roughness: 0.3
     });
-    [-0.485, 0.485].forEach((xPos) => {
+    [-0.486, 0.486].forEach((xPos) => {
       const doorDecal = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.24), decalMat);
       doorDecal.rotation.y = xPos > 0 ? Math.PI / 2 : -Math.PI / 2;
       doorDecal.position.set(xPos, 0.42, 0.68);
       chassisGroup.add(doorDecal);
     });
 
-    // Tinted Panoramic Windshield Glass
+    // Multi-Pane Ballistic Armored Windshield
     const windshield = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.8, 0.4),
+      new THREE.PlaneGeometry(0.82, 0.38),
       new THREE.MeshPhysicalMaterial({
         color: 0x38bdf8,
         transparent: true,
-        opacity: 0.6,
-        roughness: 0.08,
-        metalness: 0.9,
-        transmission: 0.55
+        opacity: 0.65,
+        roughness: 0.06,
+        metalness: 0.92,
+        transmission: 0.52
       })
     );
-    windshield.position.set(0, 0.48, 1.06);
-    windshield.rotation.x = -0.15;
+    windshield.position.set(0, 0.48, 1.07);
+    windshield.rotation.x = -0.16;
     chassisGroup.add(windshield);
 
-    // Articulated Windshield Wipers
+    // Heavy-Duty Articulated Windshield Wipers
     [-0.2, 0.2].forEach((wx) => {
       const wiper = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.008, 0.008, 0.25, 8),
+        new THREE.CylinderGeometry(0.008, 0.008, 0.26, 8),
         new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })
       );
       wiper.rotation.z = Math.PI / 4;
-      wiper.position.set(wx, 0.38, 1.07);
+      wiper.position.set(wx, 0.38, 1.08);
       chassisGroup.add(wiper);
     });
 
-    // Aerodynamic Side Mirrors with Chrome Faces
+    // Aerodynamic Armored Side Sensor / Camera Pods (replacing mirrors)
     [-0.56, 0.56].forEach((mx) => {
-      const mirrorArm = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.015, 0.015, 0.16, 8),
+      const podArm = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.016, 0.016, 0.16, 8),
         new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
       );
-      mirrorArm.rotation.z = mx > 0 ? Math.PI / 3 : -Math.PI / 3;
-      mirrorArm.position.set(mx * 0.9, 0.48, 0.85);
-      chassisGroup.add(mirrorArm);
+      podArm.rotation.z = mx > 0 ? Math.PI / 3 : -Math.PI / 3;
+      podArm.position.set(mx * 0.9, 0.48, 0.85);
+      chassisGroup.add(podArm);
 
-      const mirrorHead = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.12, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 })
+      const podHousing = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.10, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.25 })
       );
-      mirrorHead.position.set(mx, 0.52, 0.85);
-      chassisGroup.add(mirrorHead);
+      podHousing.position.set(mx, 0.52, 0.85);
+      chassisGroup.add(podHousing);
 
-      const mirrorGlass = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.06, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.98, roughness: 0.05 })
+      // Forward-facing wide optical aperture lens
+      const lens = new THREE.Mesh(
+        new THREE.CircleGeometry(0.024, 16),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.95, roughness: 0.05 })
       );
-      mirrorGlass.rotation.y = mx > 0 ? -Math.PI / 2 : Math.PI / 2;
-      mirrorGlass.position.set(mx + (mx > 0 ? -0.022 : 0.022), 0.52, 0.85);
-      chassisGroup.add(mirrorGlass);
+      lens.position.set(mx + (mx > 0 ? 0.031 : -0.031), 0.52, 0.89);
+      lens.rotation.y = mx > 0 ? Math.PI / 6 : -Math.PI / 6;
+      chassisGroup.add(lens);
     });
 
     // Cockpit Interior: Twin Contoured High-Back Bucket Seats with Headrests
@@ -1462,70 +1496,175 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       chassisGroup.add(headrest);
     });
 
-    // Steering Wheel & Glowing Digital HUD Console
-    const steeringWheel = new THREE.Mesh(
-      new THREE.TorusGeometry(0.1, 0.018, 8, 16),
+    // Off-Road Steering Yoke & Glowing Digital Tactical HUD Console
+    const steeringYoke = new THREE.Mesh(
+      new THREE.TorusGeometry(0.09, 0.016, 8, 16),
       new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 })
     );
-    steeringWheel.rotation.x = Math.PI / 3;
-    steeringWheel.position.set(-0.2, 0.42, 0.82);
-    chassisGroup.add(steeringWheel);
+    steeringYoke.rotation.x = Math.PI / 3;
+    steeringYoke.position.set(-0.2, 0.42, 0.82);
+    chassisGroup.add(steeringYoke);
 
     const hudGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.24, 0.10),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      new THREE.PlaneGeometry(0.26, 0.11),
+      new THREE.MeshBasicMaterial({ color: 0x06b6d4 })
     );
     hudGlow.rotation.x = -Math.PI / 4;
     hudGlow.position.set(-0.2, 0.40, 0.94);
     chassisGroup.add(hudGlow);
 
-    // Cab Roof: Pneumatic Train Air Horns & 5 Amber Clearance Marker LEDs
-    [-0.22, -0.14].forEach((hx) => {
-      const hornTube = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, 0.32, 12), galvanizedMat);
-      hornTube.rotation.x = Math.PI / 2;
-      hornTube.position.set(hx, 0.81, 0.68);
-      chassisGroup.add(hornTube);
+    // =========================================================================
+    // Tubular High-Strength Exoskeleton Roll Cage (ROPS) wrapping Cab & Tank
+    // =========================================================================
+    const cageMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.92,
+      roughness: 0.2
     });
 
-    for (let m = 0; m < 5; m++) {
-      const marker = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.02, 0.02),
-        new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+    // A-Pillar Upright Bars
+    [-0.50, 0.50].forEach((cx) => {
+      const aPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.72, 12), cageMat);
+      aPillar.position.set(cx, 0.45, 1.02);
+      aPillar.rotation.x = -0.16;
+      chassisGroup.add(aPillar);
+    });
+
+    // B-Pillar Central Arch Bars
+    [-0.50, 0.50].forEach((cx) => {
+      const bPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.68, 12), cageMat);
+      bPillar.position.set(cx, 0.48, 0.32);
+      chassisGroup.add(bPillar);
+    });
+
+    // Lateral Roof Halo Connecting Tubes
+    [-0.50, 0.50].forEach((cx) => {
+      const sideHalo = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.020, 0.74, 12), cageMat);
+      sideHalo.rotation.x = Math.PI / 2;
+      sideHalo.position.set(cx, 0.78, 0.67);
+      chassisGroup.add(sideHalo);
+    });
+
+    // Transverse Roof Bars
+    [0.34, 0.98].forEach((cz) => {
+      const crossHalo = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.020, 1.0, 12), cageMat);
+      crossHalo.rotation.z = Math.PI / 2;
+      crossHalo.position.set(0, 0.79, cz);
+      chassisGroup.add(crossHalo);
+    });
+
+    // Rear Tank Protector Hoops
+    [-0.50, 0.50].forEach((cx) => {
+      const rearLong = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.020, 1.45, 12), cageMat);
+      rearLong.rotation.x = Math.PI / 2;
+      rearLong.position.set(cx, 0.68, -0.42);
+      chassisGroup.add(rearLong);
+    });
+
+    // =========================================================================
+    // Autonomous Sensor Mast (360° LiDAR Puck, Stereo AI Cameras, GNSS RTK Dome)
+    // =========================================================================
+    const mastPylon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.032, 0.045, 0.22, 12),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+    );
+    mastPylon.position.set(0, 0.88, 0.68);
+    chassisGroup.add(mastPylon);
+
+    // Continuous 360-Degree Spinning LiDAR Puck Turret
+    const lidarPuck = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075, 0.075, 0.09, 20),
+      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.95, roughness: 0.15 })
+    );
+    lidarPuck.position.set(0, 1.02, 0.68);
+    chassisGroup.add(lidarPuck);
+    lidarTurretRef.current = lidarPuck;
+
+    // Glowing Green Laser Optical Ring on spinning LiDAR
+    const laserAperture = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.076, 0.076, 0.022, 20),
+      new THREE.MeshBasicMaterial({ color: 0x10b981 })
+    );
+    laserAperture.position.set(0, 0, 0);
+    lidarPuck.add(laserAperture);
+
+    // Forward and Rear Stereoscopic AI Depth Vision Cameras
+    [0.10, -0.10].forEach((camZ) => {
+      const camBar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, 0.045, 0.06),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
       );
-      marker.position.set(-0.30 + m * 0.15, 0.76, 0.82);
-      chassisGroup.add(marker);
+      camBar.position.set(0, 0.94, 0.68 + camZ);
+      chassisGroup.add(camBar);
+
+      // Dual stereoscopic optical lenses per bar
+      [-0.09, 0.09].forEach((lx) => {
+        const lens = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.016, 0.016, 0.012, 12),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+        );
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(lx, 0.94, 0.68 + camZ + (camZ > 0 ? 0.032 : -0.032));
+        chassisGroup.add(lens);
+      });
+    });
+
+    // GNSS RTK High-Precision Satellite Navigation Dome
+    const gnssBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.02, 16),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8 })
+    );
+    gnssBase.position.set(0.28, 0.81, 0.62);
+    chassisGroup.add(gnssBase);
+
+    const gnssDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.15 })
+    );
+    gnssDome.position.set(0.28, 0.82, 0.62);
+    chassisGroup.add(gnssDome);
+
+    // High-Intensity 12-LED Roof Brow Off-Road Light Bar
+    const lightBarHousing = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 0.05, 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.95, roughness: 0.2 })
+    );
+    lightBarHousing.position.set(0, 0.81, 0.98);
+    chassisGroup.add(lightBarHousing);
+
+    for (let led = 0; led < 12; led++) {
+      const emitter = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, 0.025, 0.015),
+        new THREE.MeshBasicMaterial({ color: isNightMode ? 0xfffae0 : 0xf8fafc })
+      );
+      emitter.position.set(-0.30 + led * 0.055, 0.81, 1.012);
+      chassisGroup.add(emitter);
     }
 
-    // Vertical Chrome Exhaust Stack behind Cab with Heat Shield & Curved Cap
-    const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.95, 16), galvanizedMat);
-    exhaust.position.set(0.38, 0.72, 0.28);
-    chassisGroup.add(exhaust);
+    // Dual Communication High-Frequency Whip Antennas
+    [-0.38, 0.38].forEach((ax) => {
+      const springBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.014, 0.014, 0.06, 8),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+      );
+      springBase.position.set(ax, 0.80, 0.38);
+      chassisGroup.add(springBase);
 
-    const exShield = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.045, 0.045, 0.65, 12, 1, true),
-      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9, wireframe: true })
-    );
-    exShield.position.set(0.38, 0.62, 0.28);
-    chassisGroup.add(exShield);
+      const whip = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.004, 0.008, 0.65, 8),
+        galvanizedMat
+      );
+      whip.rotation.x = -0.15;
+      whip.position.set(ax, 1.10, 0.34);
+      chassisGroup.add(whip);
+    });
 
-    const exCap = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.12, 12), galvanizedMat);
-    exCap.rotation.z = Math.PI / 4;
-    exCap.position.set(0.42, 1.20, 0.28);
-    chassisGroup.add(exCap);
-
-    // Cab Roof Emergency LED Strobe Beacon Bar
-    const beaconBar = new THREE.Mesh(
-      new THREE.BoxGeometry(0.65, 0.08, 0.14),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 })
-    );
-    beaconBar.position.set(0, 0.78, 0.68);
-    chassisGroup.add(beaconBar);
-
+    // Cab Roof Emergency LED Strobe Beacon
     const beacon = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.07, 0.1, 16),
+      new THREE.CylinderGeometry(0.06, 0.06, 0.08, 16),
       new THREE.MeshBasicMaterial({ color: isRolloverTriggered ? 0xef4444 : 0xf59e0b })
     );
-    beacon.position.set(0, 0.85, 0.68);
+    beacon.position.set(-0.28, 0.83, 0.62);
     chassisGroup.add(beacon);
     roofBeaconRef.current = beacon;
 
@@ -1991,154 +2130,295 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       chassisGroup.add(tailLight);
     });
 
-    // 10. Independent 4-Wheel Suspension Assemblies with Clean Axial Rotation Hubs
-    const wheelPositions = [
-      [-0.52, -0.06, 0.65], // FL
-      [-0.52, -0.06, -0.65], // RL
-      [0.52, -0.06, 0.65], // FR
-      [0.52, -0.06, -0.65] // RR
-    ];
+    // 10. Dual Heavy-Duty Continuous Caterpillar Tank Tracks (Extreme-Terrain Crawler Assemblies)
+    const trackOffsetsX = [-0.68, 0.68]; // Left & Right Tracks
     wheelsRef.current = [];
     suspensionSpringsRef.current = [];
     damperPistonsRef.current = [];
+    trackBeltMatsRef.current = [];
 
-    wheelPositions.forEach(([wx, wy, wz]) => {
-      const wheelAssembly = new THREE.Group();
-      wheelAssembly.position.set(wx, wy, wz);
-      vehicleGroup.add(wheelAssembly);
+    // Continuous 2D CatmullRom Curve profile defining track belt loop in Y-Z plane
+    const trackProfileCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0.22, -0.65), // upper rear run
+      new THREE.Vector3(0, 0.20, 0.0),   // upper mid sag
+      new THREE.Vector3(0, 0.22, 0.65),  // upper front run
+      new THREE.Vector3(0, 0.17, 0.88),  // front upper transition
+      new THREE.Vector3(0, 0.08, 1.04),  // front drive sprocket apex
+      new THREE.Vector3(0, -0.06, 0.98), // front approach incline
+      new THREE.Vector3(0, -0.18, 0.70), // front ground contact start
+      new THREE.Vector3(0, -0.18, 0.0),  // flat bottom ground contact
+      new THREE.Vector3(0, -0.18, -0.70),// rear ground contact end
+      new THREE.Vector3(0, -0.06, -0.98),// rear departure incline
+      new THREE.Vector3(0, 0.08, -1.04), // rear tensioner idler apex
+      new THREE.Vector3(0, 0.17, -0.88)  // rear upper transition
+    ], true, 'catmullrom', 0.12);
 
-      // Stationary Suspension Upright & A-Arm Wishbone
-      const aArm = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.012, 0.012, 0.28, 8),
+    const ribbonSampleCount = 56;
+    const trackPoints = trackProfileCurve.getPoints(ribbonSampleCount);
+    const trackRibbonWidth = 0.28;
+
+    trackOffsetsX.forEach((tx) => {
+      const trackModuleGroup = new THREE.Group();
+      trackModuleGroup.position.set(tx, -0.06, 0);
+      vehicleGroup.add(trackModuleGroup);
+
+      // Armored Track Longitudinal Bogie Beam
+      const bogieBeam = new THREE.Mesh(
+        new THREE.BoxGeometry(0.10, 0.16, 1.84),
         chassisMat
       );
-      aArm.rotation.z = wx > 0 ? Math.PI / 4 : -Math.PI / 4;
-      aArm.position.set(wx > 0 ? -0.1 : 0.1, 0.08, 0);
-      wheelAssembly.add(aArm);
+      bogieBeam.position.set(0, 0.04, 0);
+      bogieBeam.castShadow = true;
+      trackModuleGroup.add(bogieBeam);
 
-      // Telescoping Shock Absorber Damper
-      const damperBody = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.018, 0.018, 0.16, 12),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
+      // Front Sprocket Housing & Rear Tensioner Cylinder
+      const frontHousing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.12, 0.14, 16),
+        chassisMat
       );
-      damperBody.position.set(0, 0.18, 0);
-      wheelAssembly.add(damperBody);
+      frontHousing.rotation.z = Math.PI / 2;
+      frontHousing.position.set(0, 0.08, 0.86);
+      trackModuleGroup.add(frontHousing);
 
-      const damperPiston = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.012, 0.012, 0.18, 12),
-        new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.98, roughness: 0.08 })
+      const rearTensioner = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 0.28, 12),
+        galvanizedMat
       );
-      damperPiston.position.set(0, 0.10, 0);
-      wheelAssembly.add(damperPiston);
-      damperPistonsRef.current.push(damperPiston);
+      rearTensioner.rotation.x = Math.PI / 2;
+      rearTensioner.position.set(0, 0.08, -0.72);
+      trackModuleGroup.add(rearTensioner);
 
-      // Yellow Helical Coil Spring
-      const springGeo = new THREE.TubeGeometry(new HelixCurve(0.042, 0.032, 5), 36, 0.007, 8, false);
-      const springMat = new THREE.MeshStandardMaterial({
-        color: 0xfacc15,
-        metalness: 0.85,
-        roughness: 0.2
-      });
-      const spring = new THREE.Mesh(springGeo, springMat);
-      spring.position.set(0, 0.05, 0);
-      wheelAssembly.add(spring);
-      suspensionSpringsRef.current.push(spring);
+      // Front Toothed Drive Sprocket (Rotates dynamically around X axis with vehicle velocity)
+      const frontSprocketHub = new THREE.Group();
+      frontSprocketHub.position.set(0, 0.08, 0.86);
+      trackModuleGroup.add(frontSprocketHub);
+      wheelsRef.current.push(frontSprocketHub);
 
-      // Stationary Brake Caliper clamping the rotor
-      const brakeCaliper = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.08, 0.05),
-        new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.7, roughness: 0.3 })
+      const sprocketDisc = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.18, 0.22, 24),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.92, roughness: 0.2 })
       );
-      brakeCaliper.position.set(wx > 0 ? -0.07 : 0.07, 0.06, 0);
-      wheelAssembly.add(brakeCaliper);
+      sprocketDisc.rotation.z = Math.PI / 2;
+      sprocketDisc.castShadow = true;
+      frontSprocketHub.add(sprocketDisc);
 
-      // =======================================================================
-      // Rotating Wheel Hub Group: spins around clean X-axis with zero wobble!
-      // =======================================================================
-      const wheelHub = new THREE.Group();
-      wheelAssembly.add(wheelHub);
-      wheelsRef.current.push(wheelHub);
-
-      // Knobby All-Terrain Tire (oriented along X)
-      const tireGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.18, 24);
-      tireGeo.rotateZ(Math.PI / 2);
-      const tireMat = new THREE.MeshStandardMaterial({
-        map: tireTex.map,
-        bumpMap: tireTex.bumpMap,
-        bumpScale: 0.05,
-        roughness: 0.92,
-        metalness: 0.08
-      });
-      const tireMesh = new THREE.Mesh(tireGeo, tireMat);
-      tireMesh.castShadow = true;
-      wheelHub.add(tireMesh);
-
-      // 16 Aggressive 3D Mud-Terrain Rubber Tread Lugs on Perimeter
-      for (let g = 0; g < 16; g++) {
-        const angle = (g / 16) * Math.PI * 2;
-        const lugX = wx > 0 ? (g % 2 === 0 ? 0.04 : -0.04) : (g % 2 === 0 ? -0.04 : 0.04);
-        const lugY = Math.sin(angle) * 0.235;
-        const lugZ = Math.cos(angle) * 0.235;
-        const lugMesh = new THREE.Mesh(
-          new THREE.BoxGeometry(0.045, 0.032, 0.07),
-          new THREE.MeshStandardMaterial({ color: 0x0a0f1d, roughness: 0.95 })
+      // 12 Hardened Alloy Drive Teeth around perimeter
+      for (let t = 0; t < 12; t++) {
+        const ang = (t / 12) * Math.PI * 2;
+        const tooth = new THREE.Mesh(
+          new THREE.BoxGeometry(0.24, 0.045, 0.038),
+          new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.88, roughness: 0.25 })
         );
-        lugMesh.position.set(lugX, lugY, lugZ);
-        lugMesh.rotation.x = angle;
-        wheelHub.add(lugMesh);
+        tooth.position.set(0, Math.sin(ang) * 0.18, Math.cos(ang) * 0.18);
+        tooth.rotation.x = ang;
+        frontSprocketHub.add(tooth);
       }
 
-      // 5-Spoke Off-Road Alloy Rim with Emerald Accent
-      const rimGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.185, 16);
-      rimGeo.rotateZ(Math.PI / 2);
-      const rimMesh = new THREE.Mesh(
-        rimGeo,
-        new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.85, roughness: 0.2 })
+      // Sprocket Axle Hub Cap & Bolts
+      const frontCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.065, 0.065, 0.23, 16),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.95 })
       );
-      wheelHub.add(rimMesh);
+      frontCap.rotation.z = Math.PI / 2;
+      frontSprocketHub.add(frontCap);
 
-      // 12 Outer Perimeter Beadlock Hex Bolts
-      for (let b = 0; b < 12; b++) {
-        const bAngle = (b / 12) * Math.PI * 2;
-        const bX = wx > 0 ? 0.095 : -0.095;
-        const bY = Math.sin(bAngle) * 0.13;
-        const bZ = Math.cos(bAngle) * 0.13;
-        const boltMesh = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.007, 0.007, 0.012, 6),
-          galvanizedMat
-        );
-        boltMesh.rotation.z = Math.PI / 2;
-        boltMesh.position.set(bX, bY, bZ);
-        wheelHub.add(boltMesh);
-      }
+      // Rear Heavy Tensioner Idler Wheel (Rotates dynamically around X axis)
+      const rearIdlerHub = new THREE.Group();
+      rearIdlerHub.position.set(0, 0.08, -0.86);
+      trackModuleGroup.add(rearIdlerHub);
+      wheelsRef.current.push(rearIdlerHub);
 
-      // Center Hub Cap & Lug Nuts
-      const capGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.19, 12);
-      capGeo.rotateZ(Math.PI / 2);
-      const capMesh = new THREE.Mesh(
-        capGeo,
+      const idlerRim = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.18, 0.20, 24),
+        new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.88, roughness: 0.25 })
+      );
+      idlerRim.rotation.z = Math.PI / 2;
+      idlerRim.castShadow = true;
+      rearIdlerHub.add(idlerRim);
+
+      const idlerCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.06, 0.21, 16),
         new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
       );
-      wheelHub.add(capMesh);
+      idlerCap.rotation.z = Math.PI / 2;
+      rearIdlerHub.add(idlerCap);
 
-      for (let l = 0; l < 5; l++) {
-        const lugAngle = (l / 5) * Math.PI * 2;
-        const lugX = wx > 0 ? 0.096 : -0.096;
-        const lugY = Math.sin(lugAngle) * 0.08;
-        const lugZ = Math.cos(lugAngle) * 0.08;
-        const lugMesh = new THREE.Mesh(
-          new THREE.BoxGeometry(0.015, 0.018, 0.018),
-          galvanizedMat
+      // 4 Dual-Wheel Road Bogie Rollers on Articulated Trailing Arms
+      const bogieZs = [-0.55, -0.18, 0.18, 0.55];
+      bogieZs.forEach((bz, bIdx) => {
+        const bogieHub = new THREE.Group();
+        bogieHub.position.set(0, -0.06, bz);
+        trackModuleGroup.add(bogieHub);
+        wheelsRef.current.push(bogieHub);
+
+        // Dual Bogie Wheels (inner and outer discs with center gap for guide horns)
+        [-0.07, 0.07].forEach((bx) => {
+          const bogieWheel = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.12, 0.12, 0.08, 20),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.35 })
+          );
+          bogieWheel.rotation.z = Math.PI / 2;
+          bogieWheel.position.set(bx, 0, 0);
+          bogieHub.add(bogieWheel);
+
+          // Solid Vulcanized Heavy Rubber Tire Ring
+          const rubberRing = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.122, 0.122, 0.078, 20),
+            new THREE.MeshStandardMaterial({ color: 0x0a0f1d, roughness: 0.95 })
+          );
+          rubberRing.rotation.z = Math.PI / 2;
+          rubberRing.position.set(bx, 0, 0);
+          bogieHub.add(rubberRing);
+        });
+
+        // Articulated Swingarm connecting Bogie to Track Frame
+        const swingarm = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.05, 0.12),
+          chassisMat
         );
-        lugMesh.position.set(lugX, lugY, lugZ);
-        wheelHub.add(lugMesh);
+        swingarm.position.set(0, 0.05, bz);
+        trackModuleGroup.add(swingarm);
+
+        // Suspension Shock Absorber Coil & Damper (Hooked to the 4 main corner bogies for dynamic articulation)
+        if (bIdx === 0 || bIdx === 3) {
+          const suspAssembly = new THREE.Group();
+          suspAssembly.position.set(0, 0.06, bz);
+          trackModuleGroup.add(suspAssembly);
+
+          const springGeo = new THREE.TubeGeometry(new HelixCurve(0.038, 0.028, 5), 32, 0.006, 8, false);
+          const spring = new THREE.Mesh(
+            springGeo,
+            new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.85, roughness: 0.2 })
+          );
+          spring.position.set(0, 0.02, 0);
+          suspAssembly.add(spring);
+          suspensionSpringsRef.current.push(spring);
+
+          const damperPiston = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.012, 0.012, 0.16, 12),
+            new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.98, roughness: 0.08 })
+          );
+          damperPiston.position.set(0, 0.10, 0);
+          suspAssembly.add(damperPiston);
+          damperPistonsRef.current.push(damperPiston);
+        }
+      });
+
+      // 2 Top Return Rollers supporting upper track run
+      [-0.34, 0.34].forEach((rz) => {
+        const rollerHub = new THREE.Group();
+        rollerHub.position.set(0, 0.18, rz);
+        trackModuleGroup.add(rollerHub);
+        wheelsRef.current.push(rollerHub);
+
+        const rollerWheel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.065, 0.065, 0.20, 16),
+          new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9, roughness: 0.3 })
+        );
+        rollerWheel.rotation.z = Math.PI / 2;
+        rollerHub.add(rollerWheel);
+      });
+
+      // Construct Closed-Loop 3D Track Belt Ribbon Mesh
+      const posArray = new Float32Array(ribbonSampleCount * 2 * 3);
+      const uvArray = new Float32Array(ribbonSampleCount * 2 * 2);
+      const indices: number[] = [];
+
+      const hw = trackRibbonWidth / 2;
+      for (let i = 0; i < ribbonSampleCount; i++) {
+        const p = trackPoints[i];
+        const v = (i / ribbonSampleCount) * 4.0; // repeats 4 times around track loop
+
+        // Left vertex
+        posArray[i * 6] = -hw;
+        posArray[i * 6 + 1] = p.y;
+        posArray[i * 6 + 2] = p.z;
+        uvArray[i * 4] = 0;
+        uvArray[i * 4 + 1] = v;
+
+        // Right vertex
+        posArray[i * 6 + 3] = hw;
+        posArray[i * 6 + 4] = p.y;
+        posArray[i * 6 + 5] = p.z;
+        uvArray[i * 4 + 2] = 1;
+        uvArray[i * 4 + 3] = v;
+
+        const next = (i + 1) % ribbonSampleCount;
+        const i0 = i * 2;
+        const i1 = i * 2 + 1;
+        const i2 = next * 2;
+        const i3 = next * 2 + 1;
+
+        indices.push(i0, i1, i2);
+        indices.push(i1, i3, i2);
       }
 
-      // Ventilated Brake Disc Rotor
-      const rotorGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.015, 16);
-      rotorGeo.rotateZ(Math.PI / 2);
-      const brakeRotor = new THREE.Mesh(rotorGeo, galvanizedMat);
-      wheelHub.add(brakeRotor);
+      const trackBeltGeo = new THREE.BufferGeometry();
+      trackBeltGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      trackBeltGeo.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2));
+      trackBeltGeo.setIndex(indices);
+      trackBeltGeo.computeVertexNormals();
+
+      // PBR Crawler Track Texture with Vulcanized Cleats, Pins & Guide Slots
+      const trackTex = createCrawlerTrackTexture();
+      trackTex.map.wrapS = THREE.RepeatWrapping;
+      trackTex.map.wrapT = THREE.RepeatWrapping;
+      trackTex.bumpMap.wrapS = THREE.RepeatWrapping;
+      trackTex.bumpMap.wrapT = THREE.RepeatWrapping;
+
+      const trackMat = new THREE.MeshStandardMaterial({
+        map: trackTex.map,
+        bumpMap: trackTex.bumpMap,
+        bumpScale: 0.08,
+        roughness: 0.88,
+        metalness: 0.32,
+        side: THREE.DoubleSide
+      });
+      trackBeltMatsRef.current.push(trackMat);
+
+      const trackMesh = new THREE.Mesh(trackBeltGeo, trackMat);
+      trackMesh.castShadow = true;
+      trackMesh.receiveShadow = true;
+      trackModuleGroup.add(trackMesh);
+
+      // 22 3D Chevron Grouser Cleats around track loop for physical grip relief
+      for (let g = 0; g < 22; g++) {
+        const u = g / 22;
+        const pt = trackProfileCurve.getPointAt(u);
+        const tan = trackProfileCurve.getTangentAt(u).normalize();
+        const norm = new THREE.Vector3(1, 0, 0).cross(tan).normalize();
+
+        const cleatGroup = new THREE.Group();
+        cleatGroup.position.copy(pt);
+
+        const rotMat = new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), norm, tan);
+        cleatGroup.quaternion.setFromRotationMatrix(rotMat);
+
+        const cleat = new THREE.Mesh(
+          new THREE.BoxGeometry(0.26, 0.024, 0.038),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, metalness: 0.4 })
+        );
+        cleat.position.set(0, 0.012, 0);
+        cleatGroup.add(cleat);
+
+        // Center Guide Horn Tooth
+        const horn = new THREE.Mesh(
+          new THREE.ConeGeometry(0.016, 0.042, 4),
+          galvanizedMat
+        );
+        horn.position.set(0, -0.022, 0);
+        cleatGroup.add(horn);
+
+        trackModuleGroup.add(cleatGroup);
+      }
+
+      // Armored Track Mud/Rock Deflector Armor Skirt with Hazard Stripes
+      const skirt = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.14, 1.88),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.88, roughness: 0.3 })
+      );
+      skirt.position.set(tx > 0 ? 0.16 : -0.16, 0.22, 0);
+      trackModuleGroup.add(skirt);
     });
 
     // Center-of-Mass (CoM) Gyro Rings & Projection Laser Vector
@@ -2199,12 +2479,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     vehicleGroup.add(pyramidEdgeLines);
     rolloverPyramidEdgesRef.current = pyramidEdgeLines;
 
-    // Ground footprint perimeter line loop
+    // Ground footprint perimeter line loop (Track Contact Polygon)
     const footprintPts = [
-      new THREE.Vector3(-0.52, -0.28, 0.65), // FL
-      new THREE.Vector3(0.52, -0.28, 0.65),  // FR
-      new THREE.Vector3(0.52, -0.28, -0.65), // RR
-      new THREE.Vector3(-0.52, -0.28, -0.65) // RL
+      new THREE.Vector3(-0.68, -0.28, 0.80), // FL
+      new THREE.Vector3(0.68, -0.28, 0.80),  // FR
+      new THREE.Vector3(0.68, -0.28, -0.80), // RR
+      new THREE.Vector3(-0.68, -0.28, -0.80) // RL
     ];
     const footprintGeo = new THREE.BufferGeometry().setFromPoints(footprintPts);
     const footprintMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 3 });
@@ -2233,56 +2513,56 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       return sprite;
     };
 
-    // 1. Chassis Width: 1.40 m
-    const widthPts = [new THREE.Vector3(-0.7, 0.42, 1.15), new THREE.Vector3(0.7, 0.42, 1.15)];
+    // 1. Rover Track Gauge: 1.48 m
+    const widthPts = [new THREE.Vector3(-0.74, 0.42, 1.15), new THREE.Vector3(0.74, 0.42, 1.15)];
     const widthLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(widthPts), dimLineMat);
     cadDimensionsGroup.add(widthLine);
-    [-0.7, 0.7].forEach((tx) => {
+    [-0.74, 0.74].forEach((tx) => {
       const tick = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.12, 0.015), tickMat);
       tick.position.set(tx, 0.42, 1.15);
       cadDimensionsGroup.add(tick);
     });
-    const widthBadgeTex = createCadDimensionBadge('Chassis Width', '1.40 m', 'Ultra-Narrow Alley Standard');
+    const widthBadgeTex = createCadDimensionBadge('Track Outer Gauge', '1.48 m', 'Extreme-Mobility Rover Spec');
     const widthBadge = createBadgeSprite(widthBadgeTex, 0, 0.68, 1.15);
     cadDimensionsGroup.add(widthBadge);
 
-    // 2. Ground Clearance: 280 mm
-    const gcPts = [new THREE.Vector3(0.68, -0.28, 0.1), new THREE.Vector3(0.68, 0.0, 0.1)];
+    // 2. Belly Clearance: 360 mm
+    const gcPts = [new THREE.Vector3(0.82, -0.28, 0.1), new THREE.Vector3(0.82, 0.08, 0.1)];
     const gcLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(gcPts), dimLineMat);
     cadDimensionsGroup.add(gcLine);
-    [-0.28, 0.0].forEach((ty) => {
+    [-0.28, 0.08].forEach((ty) => {
       const tick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.015), tickMat);
-      tick.position.set(0.68, ty, 0.1);
+      tick.position.set(0.82, ty, 0.1);
       cadDimensionsGroup.add(tick);
     });
-    const gcBadgeTex = createCadDimensionBadge('Ground Clearance', '280 mm', 'High-Clearance Off-Road Spec');
-    const gcBadge = createBadgeSprite(gcBadgeTex, 0.78, -0.12, 0.1);
+    const gcBadgeTex = createCadDimensionBadge('Belly Clearance', '360 mm', 'Armored Skid Plate Standard');
+    const gcBadge = createBadgeSprite(gcBadgeTex, 0.94, -0.10, 0.1);
     cadDimensionsGroup.add(gcBadge);
 
-    // 3. Laden CoM Height: 0.42 m
-    const comPts = [new THREE.Vector3(-0.68, -0.28, -0.28), new THREE.Vector3(-0.68, 0.42, -0.28)];
+    // 3. Laden CoM Height: 0.36 m
+    const comPts = [new THREE.Vector3(-0.82, -0.28, -0.28), new THREE.Vector3(-0.82, 0.36, -0.28)];
     const comLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(comPts), dimLineMat);
     cadDimensionsGroup.add(comLine);
-    [-0.28, 0.42].forEach((ty) => {
+    [-0.28, 0.36].forEach((ty) => {
       const tick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.015), tickMat);
-      tick.position.set(-0.68, ty, -0.28);
+      tick.position.set(-0.82, ty, -0.28);
       cadDimensionsGroup.add(tick);
     });
-    const comBadgeTex = createCadDimensionBadge('Laden CoM Height', '0.42 m', 'Low-CoM Anti-Rollover Center');
-    const comBadge = createBadgeSprite(comBadgeTex, -0.78, 0.22, -0.28);
+    const comBadgeTex = createCadDimensionBadge('Laden CoM Height', '0.36 m', 'Low-CoM Anti-Rollover Center');
+    const comBadge = createBadgeSprite(comBadgeTex, -0.94, 0.18, -0.28);
     cadDimensionsGroup.add(comBadge);
 
-    // 4. Track Width: 1.10 m
-    const trackPts = [new THREE.Vector3(-0.52, -0.22, 0.65), new THREE.Vector3(0.52, -0.22, 0.65)];
+    // 4. Track Contact Length: 1.70 m
+    const trackPts = [new THREE.Vector3(-0.68, -0.22, 0.80), new THREE.Vector3(-0.68, -0.22, -0.80)];
     const trackLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(trackPts), dimLineMat);
     cadDimensionsGroup.add(trackLine);
-    [-0.52, 0.52].forEach((tx) => {
-      const tick = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.08, 0.015), tickMat);
-      tick.position.set(tx, -0.22, 0.65);
+    [-0.80, 0.80].forEach((tz) => {
+      const tick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.015), tickMat);
+      tick.position.set(-0.68, -0.22, tz);
       cadDimensionsGroup.add(tick);
     });
-    const trackBadgeTex = createCadDimensionBadge('Track Width', '1.10 m', 'Stout Mountain Footprint');
-    const trackBadge = createBadgeSprite(trackBadgeTex, 0, -0.18, 0.88);
+    const trackBadgeTex = createCadDimensionBadge('Ground Contact Length', '1.70 m', '18.4 kPa Low Ground Pressure');
+    const trackBadge = createBadgeSprite(trackBadgeTex, 0, -0.18, 0.96);
     cadDimensionsGroup.add(trackBadge);
 
     // Weather Particles (Snow / Rain)
@@ -2613,11 +2893,22 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             : (massKg * 9.81 * inclineSin * speedMs) / 1000 / 0.82;
         setActivePowerKw(Math.round(powerKw * 10) / 10);
 
-        // Rotate wheel hubs forward about their axle with ground velocity
+        // Rotate all drive sprockets, idlers, and bogie rollers forward about their axle with ground velocity
         if (driveMode !== 'parked' && driveMode !== 'desludge' && activeStressTest !== 'hill_brake') {
           wheelsRef.current.forEach((w) => {
             w.rotation.x -= delta * (vehicleSpeedKmh / 14) * 8.0;
           });
+
+          // Continuous caterpillar track belt texture scrolling with terrain speed
+          trackBeltMatsRef.current.forEach((mat) => {
+            if (mat.map) mat.map.offset.y -= delta * (vehicleSpeedKmh / 14) * 2.2;
+            if (mat.bumpMap) mat.bumpMap.offset.y -= delta * (vehicleSpeedKmh / 14) * 2.2;
+          });
+        }
+
+        // Autonomous 360-degree spinning LiDAR puck turret
+        if (lidarTurretRef.current) {
+          lidarTurretRef.current.rotation.y += delta * 12.0;
         }
 
         // =====================================================================
@@ -2762,10 +3053,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
         // Apex of Rollover Pyramid
         const apex = new THREE.Vector3(dynamicSurgeX, comY, dynamicSurgeZ);
-        const pFL = new THREE.Vector3(-0.52, -0.28, 0.65);
-        const pFR = new THREE.Vector3(0.52, -0.28, 0.65);
-        const pRR = new THREE.Vector3(0.52, -0.28, -0.65);
-        const pRL = new THREE.Vector3(-0.52, -0.28, -0.65);
+        const pFL = new THREE.Vector3(-0.68, -0.28, 0.80);
+        const pFR = new THREE.Vector3(0.68, -0.28, 0.80);
+        const pRR = new THREE.Vector3(0.68, -0.28, -0.80);
+        const pRL = new THREE.Vector3(-0.68, -0.28, -0.80);
 
         const pVerts = [
           apex.x, apex.y, apex.z, pFL.x, pFL.y, pFL.z, pFR.x, pFR.y, pFR.z,
@@ -2807,9 +3098,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           vGeo.setFromPoints([apex, new THREE.Vector3(projectedGroundX, groundPlaneY, projectedGroundZ)]);
         }
 
-        // Accurate Stability Margin to track boundary: 0.52m track width, 0.65m wheelbase from axle center
-        const normX = Math.abs(projectedGroundX) / 0.52;
-        const normZ = Math.abs(projectedGroundZ) / 0.65;
+        // Accurate Stability Margin to crawler track boundary: 0.68m track half-gauge, 0.80m contact length from center
+        const normX = Math.abs(projectedGroundX) / 0.68;
+        const normZ = Math.abs(projectedGroundZ) / 0.80;
         const maxNorm = Math.max(normX, normZ);
         const marginPct = Math.max(0, Math.min(100, Math.round((1 - maxNorm) * 100)));
         setStabilityMarginPct(marginPct);
@@ -2862,10 +3153,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             activeStressTest !== 'hill_brake';
 
           const wheelLocalOffsets = [
-            new THREE.Vector3(-0.52, -0.22, -0.65),
-            new THREE.Vector3(0.52, -0.22, -0.65),
-            new THREE.Vector3(-0.52, -0.22, 0.65),
-            new THREE.Vector3(0.52, -0.22, 0.65)
+            new THREE.Vector3(-0.68, -0.22, -0.85),
+            new THREE.Vector3(0.68, -0.22, -0.85),
+            new THREE.Vector3(-0.68, -0.22, 0.85),
+            new THREE.Vector3(0.68, -0.22, 0.85)
           ];
 
           if (isMoving && vehicleGroupRef.current) {
@@ -2942,11 +3233,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           camera.position.lerp(desludgeCamPos, 0.06);
           controls.target.lerp(summitTarget.clone().add(new THREE.Vector3(0, 0.6, 0)), 0.08);
         } else if (currentCam === 'wheel_axle') {
-          // Wheel/Axle Cam: Front-Left wheel wishbone & tire articulation
+          // Wheel/Axle Cam: Front-Left crawler drive sprocket & continuous track articulation
           const normal = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
-          const flWheel = pt.clone().add(normal.clone().multiplyScalar(0.55)).add(tangent.clone().multiplyScalar(0.65));
-          const camPos = flWheel.clone().add(normal.clone().multiplyScalar(0.95)).add(new THREE.Vector3(0, 0.45, 0)).add(tangent.clone().multiplyScalar(0.55));
-          const targetPos = flWheel.clone().add(new THREE.Vector3(0, 0.05, 0)).add(normal.clone().multiplyScalar(-0.15));
+          const flWheel = pt.clone().add(normal.clone().multiplyScalar(0.72)).add(tangent.clone().multiplyScalar(0.86));
+          const camPos = flWheel.clone().add(normal.clone().multiplyScalar(1.05)).add(new THREE.Vector3(0, 0.48, 0)).add(tangent.clone().multiplyScalar(0.55));
+          const targetPos = flWheel.clone().add(new THREE.Vector3(0, 0.08, 0)).add(normal.clone().multiplyScalar(-0.15));
           camera.position.lerp(camPos, 0.1);
           controls.target.lerp(targetPos, 0.12);
         } else if (currentCam === 'cinematic_drone') {
