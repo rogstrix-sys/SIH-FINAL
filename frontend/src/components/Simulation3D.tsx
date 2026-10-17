@@ -176,6 +176,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const pitLiquidRef = useRef<THREE.Mesh | null>(null);
   const maceratorBladesRef = useRef<THREE.Mesh | null>(null);
   const roofBeaconRef = useRef<THREE.Mesh | null>(null);
+  const levelSightFloatRef = useRef<THREE.Mesh | null>(null);
   const streetLightBulbsRef = useRef<THREE.PointLight[]>([]);
   const weatherParticlesRef = useRef<THREE.Points | null>(null);
   const tireParticlesRef = useRef<THREE.Points | null>(null);
@@ -345,7 +346,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     if (!container || !canvas) return;
 
     const width = container.clientWidth;
-    const height = container.clientHeight || 640;
+    const height = container.clientHeight || 820;
 
     // 1. Scene & Photorealistic Atmospheric Sky
     const scene = new THREE.Scene();
@@ -360,13 +361,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     scene.background = new THREE.Color(skyColorHex);
     scene.fog = new THREE.FogExp2(
       skyColorHex,
-      terrainPreset === 'aizawl' ? 0.02 : activeWeather === 'snow' ? 0.016 : 0.01
+      terrainPreset === 'aizawl' ? 0.012 : activeWeather === 'snow' ? 0.010 : 0.007
     );
 
-    // 2. Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.2, 380);
+    // 2. Camera with Expansive 700m Mountain Sightlines
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.2, 700);
     cameraRef.current = camera;
-    camera.position.set(0, 10, 22);
+    camera.position.set(0, 16, 42);
 
     // 3. Renderer with High Dynamic Range Lighting & Soft Shadows
     const renderer = new THREE.WebGLRenderer({
@@ -387,13 +388,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     controls.dampingFactor = 0.05;
     controls.maxPolarAngle = Math.PI / 2 + 0.02;
     controls.minDistance = 2.0;
-    controls.maxDistance = 90.0;
-    controls.target.set(0, 4, 0);
+    controls.maxDistance = 280.0;
+    controls.target.set(0, 8, 0);
 
-    // 5. Directional Sun, Sky Ambient & Rim Lights
+    // 5. Directional Sun, Sky Ambient & Rim Lights (Expanded Shadow Coverage for 165m World)
     const ambientLight = new THREE.AmbientLight(
       isNightMode ? 0x1e293b : 0xf8fafc,
-      isNightMode ? 0.35 : 0.82
+      isNightMode ? 0.38 : 0.86
     );
     scene.add(ambientLight);
     ambientLightRef.current = ambientLight;
@@ -401,26 +402,26 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const hemiLight = new THREE.HemisphereLight(
       isNightMode ? 0x1e3a8a : 0xbae6fd,
       isNightMode ? 0x080c14 : 0x1e293b,
-      isNightMode ? 0.25 : 0.65
+      isNightMode ? 0.28 : 0.68
     );
     scene.add(hemiLight);
     hemiLightRef.current = hemiLight;
 
     const sunLight = new THREE.DirectionalLight(
       isNightMode ? 0x60a5fa : 0xffedd5,
-      isNightMode ? 0.3 : 1.7
+      isNightMode ? 0.35 : 1.75
     );
-    sunLight.position.set(38, 58, 32);
+    sunLight.position.set(65, 95, 45);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.bias = -0.0003;
     sunLight.shadow.camera.near = 5;
-    sunLight.shadow.camera.far = 160;
-    sunLight.shadow.camera.left = -45;
-    sunLight.shadow.camera.right = 45;
-    sunLight.shadow.camera.top = 45;
-    sunLight.shadow.camera.bottom = -45;
+    sunLight.shadow.camera.far = 320;
+    sunLight.shadow.camera.left = -95;
+    sunLight.shadow.camera.right = 95;
+    sunLight.shadow.camera.top = 95;
+    sunLight.shadow.camera.bottom = -95;
     scene.add(sunLight);
     sunLightRef.current = sunLight;
 
@@ -431,14 +432,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
     // Procedural PBR Textures
     const asphaltTex = createAsphaltTextures();
-    asphaltTex.map.repeat.set(1, 14);
-    asphaltTex.bumpMap.repeat.set(1, 14);
-    asphaltTex.roughnessMap.repeat.set(1, 14);
+    asphaltTex.map.repeat.set(1, 36);
+    asphaltTex.bumpMap.repeat.set(1, 36);
+    asphaltTex.roughnessMap.repeat.set(1, 36);
 
     const rockTex = createRockTextures(terrainPreset);
-    rockTex.map.repeat.set(4, 4);
-    rockTex.bumpMap.repeat.set(4, 4);
-    rockTex.roughnessMap.repeat.set(4, 4);
+    rockTex.map.repeat.set(12, 12);
+    rockTex.bumpMap.repeat.set(12, 12);
+    rockTex.roughnessMap.repeat.set(12, 12);
 
     const stoneWallTex = createKathKuniStoneTexture();
     const tireTex = createTireTextures();
@@ -455,21 +456,26 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const slopeScaleY = baseSlopeFactor / refSlopeFactor;
 
     const roadWaypoints = [
-      new THREE.Vector3(0, 0.4 * slopeScaleY, 25), // Valley Base Station
-      new THREE.Vector3(-6.5, 2.8 * slopeScaleY, 14), // Turn 1: Forest sweep
-      new THREE.Vector3(-7.5, 5.6 * slopeScaleY, 3), // Hairpin 1: steep incline
-      new THREE.Vector3(5.5, 8.8 * slopeScaleY, -4), // Hairpin 2: Ridge traversal
-      new THREE.Vector3(7.0, 11.8 * slopeScaleY, -12), // Turn 2: Cliffside curve
-      new THREE.Vector3(1.5, 14.2 * slopeScaleY, -19), // Mountain village approach
-      new THREE.Vector3(0, 15.0 * slopeScaleY, -25) // Summit Septic Containment Vault
+      new THREE.Vector3(0, 0.4 * slopeScaleY, 52),      // Valley River Base Depot
+      new THREE.Vector3(-14.0, 3.2 * slopeScaleY, 38),  // Lower Forest sweep
+      new THREE.Vector3(-18.5, 6.8 * slopeScaleY, 22),  // Hairpin 1: 180° switchback
+      new THREE.Vector3(-4.0, 10.2 * slopeScaleY, 10),  // Ridge traversal 1
+      new THREE.Vector3(16.0, 14.0 * slopeScaleY, 0),   // Hairpin 2: mid-cliff switchback
+      new THREE.Vector3(18.5, 18.2 * slopeScaleY, -14), // Precipice shelf traversal
+      new THREE.Vector3(4.0, 22.0 * slopeScaleY, -26),  // Hairpin 3: high mountain switchback
+      new THREE.Vector3(-12.0, 25.5 * slopeScaleY, -36),// Upper pine forest sweep
+      new THREE.Vector3(-6.0, 28.2 * slopeScaleY, -46), // Mountain village approach
+      new THREE.Vector3(0, 29.5 * slopeScaleY, -52)     // Summit Septic Containment Vault
     ];
 
     const roadCurve = new THREE.CatmullRomCurve3(roadWaypoints, false, 'catmullrom', 0.15);
     roadCurveRef.current = roadCurve;
 
-    // 7. Photorealistic Mountain Road Bed with Integrated Markings & Continuous W-Beam Guardrails
-    const roadSegments = 260;
-    const roadWidth = 2.4;
+    // 7. Prominently Visible Mountain Road: Wide Asphalt (3.4m), Raised Stone Retaining Wall Embankment, Dual Gravel Shoulders, Cat-Eye Studs & W-Beam Crash Barriers
+    const roadSegments = 360;
+    const roadWidth = 3.4;
+    const shoulderWidth = 0.48;
+    const roadYOffset = 0.22;
     const curvePoints = roadCurve.getPoints(roadSegments);
 
     const roadGeo = new THREE.BufferGeometry();
@@ -477,6 +483,19 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const roadNorms: number[] = [];
     const roadUvs: number[] = [];
     const roadIdx: number[] = [];
+
+    // Outer Stone Retaining Wall Embankment (masonry wall supporting road above slope)
+    const embGeo = new THREE.BufferGeometry();
+    const embVerts: number[] = [];
+    const embNorms: number[] = [];
+    const embUvs: number[] = [];
+    const embIdx: number[] = [];
+
+    // Dual Gravel Road Shoulders
+    const shGeo = new THREE.BufferGeometry();
+    const shVerts: number[] = [];
+    const shNorms: number[] = [];
+    const shIdx: number[] = [];
 
     // Continuous W-Beam Steel Crash Barrier Ribbon
     const grGeo = new THREE.BufferGeometry();
@@ -503,8 +522,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       const up = new THREE.Vector3(0, 1, 0);
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
-      const roadYOffset = 0.12;
-
       const leftPt = pt.clone().add(normal.clone().multiplyScalar(roadWidth / 2));
       const rightPt = pt.clone().add(normal.clone().multiplyScalar(-roadWidth / 2));
 
@@ -514,8 +531,43 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       roadNorms.push(0, 1, 0, 0, 1, 0);
       roadUvs.push(0, t, 1, t);
 
+      // Outer Raised Stone Retaining Wall Embankment
+      const wallTop = leftPt.clone().setY(leftPt.y + roadYOffset);
+      const wallBottom = leftPt.clone().add(normal.clone().multiplyScalar(0.35)).setY(leftPt.y + roadYOffset - 0.65);
+      embVerts.push(wallTop.x, wallTop.y, wallTop.z);
+      embVerts.push(wallBottom.x, wallBottom.y, wallBottom.z);
+      embNorms.push(normal.x, 0.3, normal.z);
+      embNorms.push(normal.x, 0.3, normal.z);
+      embUvs.push(0, t * 18, 1, t * 18);
+
+      // Dual Gravel Road Shoulders
+      const outerShoulderEdge = leftPt.clone().add(normal.clone().multiplyScalar(shoulderWidth));
+      const innerShoulderEdge = rightPt.clone().add(normal.clone().multiplyScalar(-shoulderWidth));
+      shVerts.push(leftPt.x, leftPt.y + roadYOffset - 0.01, leftPt.z);
+      shVerts.push(outerShoulderEdge.x, outerShoulderEdge.y + roadYOffset - 0.03, outerShoulderEdge.z);
+      shVerts.push(rightPt.x, rightPt.y + roadYOffset - 0.01, rightPt.z);
+      shVerts.push(innerShoulderEdge.x, innerShoulderEdge.y + roadYOffset - 0.03, innerShoulderEdge.z);
+      shNorms.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
+
+      // Retroreflective Cat-Eye Road Studs along centerline every 4 segments
+      if (i % 4 === 0) {
+        const stud = new THREE.Mesh(
+          new THREE.BoxGeometry(0.12, 0.04, 0.12),
+          new THREE.MeshStandardMaterial({
+            color: 0xfbbf24,
+            roughness: 0.15,
+            metalness: 0.85,
+            emissive: 0x78350f,
+            emissiveIntensity: 0.45
+          })
+        );
+        stud.position.set(pt.x, pt.y + roadYOffset + 0.02, pt.z);
+        stud.rotation.y = Math.atan2(tangent.x, tangent.z);
+        mountainGroup.add(stud);
+      }
+
       // Corrugated W-Beam Crash Barrier (Profile heights along outer precipice edge)
-      const grEdge = leftPt.clone().add(normal.clone().multiplyScalar(0.14));
+      const grEdge = leftPt.clone().add(normal.clone().multiplyScalar(0.18));
       const grBaseY = grEdge.y + roadYOffset;
       const p0 = new THREE.Vector3(grEdge.x, grBaseY + 0.32, grEdge.z);
       const p1 = new THREE.Vector3(grEdge.x + normal.x * 0.04, grBaseY + 0.42, grEdge.z + normal.z * 0.04);
@@ -536,39 +588,77 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       grNorms.push(normal.x, 0, normal.z);
 
       // Concrete Drainage Gutter along inner cliff wall
-      const drainEdge = rightPt.clone().add(normal.clone().multiplyScalar(-0.02));
-      const drainBottom = drainEdge.clone().add(normal.clone().multiplyScalar(-0.16)).setY(drainEdge.y + roadYOffset - 0.14);
-      const drainWall = drainEdge.clone().add(normal.clone().multiplyScalar(-0.34)).setY(drainEdge.y + roadYOffset + 0.02);
+      const drainEdge = rightPt.clone().add(normal.clone().multiplyScalar(-0.04));
+      const drainBottom = drainEdge.clone().add(normal.clone().multiplyScalar(-0.18)).setY(drainEdge.y + roadYOffset - 0.16);
+      const drainWall = drainEdge.clone().add(normal.clone().multiplyScalar(-0.38)).setY(drainEdge.y + roadYOffset + 0.02);
 
       drainVerts.push(drainEdge.x, drainEdge.y + roadYOffset, drainEdge.z);
       drainVerts.push(drainBottom.x, drainBottom.y, drainBottom.z);
       drainVerts.push(drainWall.x, drainWall.y, drainWall.z);
 
-      // Guardrail Steel Posts every 8 segments (~2.2 meters)
-      if (i % 8 === 0) {
+      // Guardrail Steel Posts every 6 segments
+      if (i % 6 === 0) {
         const post = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 0.72, 0.08),
+          new THREE.BoxGeometry(0.08, 0.76, 0.08),
           galvanizedMat
         );
-        post.position.set(grEdge.x, grBaseY + 0.36, grEdge.z);
+        post.position.set(grEdge.x, grBaseY + 0.38, grEdge.z);
         post.castShadow = true;
         mountainGroup.add(post);
 
         // Retroreflective Delineator Tabs on Hairpins
-        if ((i > 40 && i < 110) || (i > 140 && i < 210)) {
+        if ((i > 65 && i < 115) || (i > 160 && i < 210) || (i > 245 && i < 290)) {
           const delineator = new THREE.Mesh(
-            new THREE.BoxGeometry(0.06, 0.12, 0.03),
-            new THREE.MeshBasicMaterial({ color: i % 16 === 0 ? 0xef4444 : 0xfacc15 })
+            new THREE.BoxGeometry(0.06, 0.14, 0.03),
+            new THREE.MeshBasicMaterial({ color: i % 12 === 0 ? 0xef4444 : 0xfacc15 })
           );
-          delineator.position.set(grEdge.x, grBaseY + 0.76, grEdge.z);
+          delineator.position.set(grEdge.x, grBaseY + 0.78, grEdge.z);
           mountainGroup.add(delineator);
         }
+      }
+
+      // Hairpin Curve Chevron Hazard Boards at apexes
+      const isHairpinApex = (i >= 76 && i <= 88 && i % 3 === 0) ||
+                            (i >= 174 && i <= 186 && i % 3 === 0) ||
+                            (i >= 258 && i <= 270 && i % 3 === 0);
+      if (isHairpinApex) {
+        const chevronBoard = new THREE.Mesh(
+          new THREE.BoxGeometry(0.85, 0.45, 0.03),
+          new THREE.MeshStandardMaterial({
+            color: 0xef4444,
+            roughness: 0.3,
+            metalness: 0.4
+          })
+        );
+        const chevPos = leftPt.clone().add(normal.clone().multiplyScalar(0.75)).setY(leftPt.y + roadYOffset + 0.9);
+        chevronBoard.position.set(chevPos.x, chevPos.y, chevPos.z);
+        chevronBoard.lookAt(pt);
+        mountainGroup.add(chevronBoard);
+
+        const chevArrow = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.55, 0.28),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        chevArrow.position.set(0, 0, 0.02);
+        chevronBoard.add(chevArrow);
       }
 
       if (i < roadSegments) {
         const v = i * 2;
         roadIdx.push(v, v + 1, v + 2);
         roadIdx.push(v + 1, v + 3, v + 2);
+
+        // Embankment Quads
+        const eV = i * 2;
+        embIdx.push(eV, eV + 1, eV + 2);
+        embIdx.push(eV + 1, eV + 3, eV + 2);
+
+        // Shoulders Quads
+        const sV = i * 4;
+        shIdx.push(sV, sV + 1, sV + 4);
+        shIdx.push(sV + 1, sV + 5, sV + 4);
+        shIdx.push(sV + 2, sV + 3, sV + 6);
+        shIdx.push(sV + 3, sV + 7, sV + 6);
 
         // Guardrail Ribbon Quads
         const grV = i * 5;
@@ -594,7 +684,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const roadMat = new THREE.MeshStandardMaterial({
       map: asphaltTex.map,
       bumpMap: asphaltTex.bumpMap,
-      bumpScale: 0.04,
+      bumpScale: 0.05,
       roughnessMap: asphaltTex.roughnessMap,
       roughness: 0.85,
       metalness: 0.12
@@ -602,6 +692,40 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const roadMesh = new THREE.Mesh(roadGeo, roadMat);
     roadMesh.receiveShadow = true;
     mountainGroup.add(roadMesh);
+
+    // Outer Stone Retaining Wall Embankment Mesh
+    embGeo.setAttribute('position', new THREE.Float32BufferAttribute(embVerts, 3));
+    embGeo.setAttribute('normal', new THREE.Float32BufferAttribute(embNorms, 3));
+    embGeo.setAttribute('uv', new THREE.Float32BufferAttribute(embUvs, 2));
+    embGeo.setIndex(embIdx);
+    const embMesh = new THREE.Mesh(
+      embGeo,
+      new THREE.MeshStandardMaterial({
+        map: stoneWallTex,
+        roughness: 0.88,
+        metalness: 0.15,
+        side: THREE.DoubleSide
+      })
+    );
+    embMesh.castShadow = true;
+    embMesh.receiveShadow = true;
+    mountainGroup.add(embMesh);
+
+    // Dual Gravel Road Shoulders Mesh
+    shGeo.setAttribute('position', new THREE.Float32BufferAttribute(shVerts, 3));
+    shGeo.setAttribute('normal', new THREE.Float32BufferAttribute(shNorms, 3));
+    shGeo.setIndex(shIdx);
+    const shMesh = new THREE.Mesh(
+      shGeo,
+      new THREE.MeshStandardMaterial({
+        color: 0x8a7f72,
+        roughness: 0.95,
+        metalness: 0.05,
+        side: THREE.DoubleSide
+      })
+    );
+    shMesh.receiveShadow = true;
+    mountainGroup.add(shMesh);
 
     // Guardrail Mesh
     grGeo.setAttribute('position', new THREE.Float32BufferAttribute(grVerts, 3));
@@ -629,9 +753,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
     // Roadside Grade & Mountain Warning Signs with Procedural Textures
     const signLocations = [
-      { t: 0.08, title: '28° STEEP INCLINE', sub: 'ENGAGE LOW GEAR 4WD', icon: 'slope' as const },
-      { t: 0.32, title: 'HAIRPIN BEND', sub: 'SOUND HORN · SLOW', icon: 'curve' as const },
-      { t: 0.65, title: 'SLOSH HAZARD ZONE', sub: 'DUAL BAFFLES ACTIVE', icon: 'hazard' as const }
+      { t: 0.06, title: '28° STEEP INCLINE', sub: 'ENGAGE LOW GEAR 4WD', icon: 'slope' as const },
+      { t: 0.24, title: 'HAIRPIN BEND 1', sub: 'SOUND HORN · SLOW', icon: 'curve' as const },
+      { t: 0.46, title: 'SLOSH HAZARD ZONE', sub: 'DUAL BAFFLES ACTIVE', icon: 'hazard' as const },
+      { t: 0.68, title: 'HAIRPIN BEND 2', sub: 'STEEP PRECIPICE', icon: 'curve' as const },
+      { t: 0.88, title: 'SUMMIT VILLAGE APPROACH', sub: 'SEPTIC PIT AHEAD', icon: 'slope' as const }
     ];
     signLocations.forEach((s) => {
       const pt = roadCurve.getPoint(s.t);
@@ -659,9 +785,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       mountainGroup.add(board);
     });
 
-    // Streetlamps with Night-Lighting along Switchback Curves
+    // Streetlamps with Night-Lighting along Switchback Curves (Expanded across 11 waypoints)
     streetLightBulbsRef.current = [];
-    const streetLampWaypoints = [0.18, 0.48, 0.78];
+    const streetLampWaypoints = [0.10, 0.26, 0.44, 0.62, 0.78, 0.92];
     streetLampWaypoints.forEach((sw) => {
       const lampPt = roadCurve.getPoint(sw);
       const lampTan = roadCurve.getTangent(sw).normalize();
@@ -698,14 +824,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       streetLightBulbsRef.current.push(bulb);
     });
 
-    // 8. Procedural Mountain Terrain with Geological Slope Shading & Road Depression Smoothing
-    const terrainSize = 85;
-    const terrainSegs = 95;
+    // 8. Procedural Mountain Terrain with Geological Slope Shading & Glacial Riverbed
+    const terrainSize = 165;
+    const terrainSegs = 140;
     const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegs, terrainSegs);
     terrainGeo.rotateX(-Math.PI / 2);
 
     const pos = terrainGeo.attributes.position;
-    const terrainElevationFactor = (baseSlopeFactor * 0.4);
+    const terrainElevationFactor = (baseSlopeFactor * 0.38);
 
     for (let i = 0; i < pos.count; i++) {
       const vx = pos.getX(i);
@@ -714,15 +840,23 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       let vy = -vz * terrainElevationFactor;
 
       const distFromCenter = Math.abs(vx);
-      if (distFromCenter > 5.5) {
-        const ridge = Math.sin(vx * 0.32) * Math.cos(vz * 0.28) * 4.2 + (distFromCenter - 5.5) * 0.95;
+      if (distFromCenter > 10.0) {
+        const ridge = Math.sin(vx * 0.18) * Math.cos(vz * 0.15) * 6.8 + (distFromCenter - 10.0) * 0.82;
         vy += Math.max(0, ridge);
+      }
+
+      // Valley Riverbed depression at Z > 46
+      if (vz > 46) {
+        const riverDist = Math.abs(vx - 2.0);
+        if (riverDist < 16.0) {
+          vy -= (16.0 - riverDist) * 0.28;
+        }
       }
 
       // Smooth terrain depression under the road curve to prevent clipping
       let minRoadDist = 999;
       let nearestRoadY = 0;
-      for (let k = 0; k < curvePoints.length; k += 4) {
+      for (let k = 0; k < curvePoints.length; k += 3) {
         const d = Math.hypot(vx - curvePoints[k].x, vz - curvePoints[k].z);
         if (d < minRoadDist) {
           minRoadDist = d;
@@ -730,8 +864,8 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         }
       }
 
-      if (minRoadDist < roadWidth * 1.5) {
-        const blend = minRoadDist / (roadWidth * 1.5);
+      if (minRoadDist < roadWidth * 1.35) {
+        const blend = minRoadDist / (roadWidth * 1.35);
         vy = nearestRoadY * (1 - blend) + vy * blend;
       }
 
@@ -753,7 +887,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       if (terrainPreset === 'aizawl') {
         // Lush monsoon vegetation on slopes; wet dark mud rock on cliffs
         if (ny < 0.72) {
-          // Steep cliff face
           r = 0.22; g = 0.18; b = 0.14;
         } else {
           r = 0.10; g = 0.28; b = 0.13;
@@ -765,21 +898,17 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         } else {
           r = 0.52; g = 0.48; b = 0.44;
         }
-        if (vy > 8.0 * slopeScaleY) {
-          // Summit glacial snow dusting
+        if (vy > 12.0 * slopeScaleY) {
           r = 0.88; g = 0.92; b = 0.96;
         }
       } else {
         // Shimla alpine temperate
         if (ny < 0.72) {
-          // Exposed craggy slate & limestone cliff strata
           r = 0.30; g = 0.33; b = 0.36;
         } else {
-          // Alpine grass shelf
           r = 0.18; g = 0.30; b = 0.19;
         }
-        if (vy > 13.0 * slopeScaleY) {
-          // Alpine peak snow line
+        if (vy > 20.0 * slopeScaleY) {
           r = 0.90; g = 0.93; b = 0.97;
         }
       }
@@ -803,12 +932,26 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     terrainMesh.receiveShadow = true;
     mountainGroup.add(terrainMesh);
 
-    // Distant Jagged Snowy Himalayan Ridge Silhouette Backdrop
-    for (let r = 0; r < 5; r++) {
-      const peakX = -32 + r * 16;
-      const peakZ = -45 - Math.abs(r - 2) * 4;
-      const peakH = 26 + (r % 3) * 6;
-      const peakR = 14 + (r % 2) * 4;
+    // Glacial Valley River Plane at Z > 48
+    const riverGeo = new THREE.PlaneGeometry(85, 26, 24, 8);
+    riverGeo.rotateX(-Math.PI / 2);
+    const riverMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      roughness: 0.08,
+      metalness: 0.85,
+      transparent: true,
+      opacity: 0.82
+    });
+    const riverMesh = new THREE.Mesh(riverGeo, riverMat);
+    riverMesh.position.set(0, -0.3, 56);
+    mountainGroup.add(riverMesh);
+
+    // Distant Jagged Snowy Himalayan Ridge Silhouette Backdrop (9 Massive Peaks across Horizon)
+    for (let r = 0; r < 9; r++) {
+      const peakX = -64 + r * 16;
+      const peakZ = -70 - Math.abs(r - 4) * 4;
+      const peakH = 34 + (r % 3) * 8;
+      const peakR = 18 + (r % 2) * 5;
 
       const peakGeo = new THREE.ConeGeometry(peakR, peakH, 5);
       const peakMat = new THREE.MeshStandardMaterial({
@@ -821,39 +964,40 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       mountainGroup.add(peakMesh);
 
       // White snow cap atop peak
-      const capGeo = new THREE.ConeGeometry(peakR * 0.45, peakH * 0.35, 5);
+      const capGeo = new THREE.ConeGeometry(peakR * 0.45, peakH * 0.38, 5);
       const capMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 });
       const capMesh = new THREE.Mesh(capGeo, capMat);
-      capMesh.position.set(peakX, peakH - peakH * 0.17 - 4, peakZ);
+      capMesh.position.set(peakX, peakH - peakH * 0.19 - 4, peakZ);
       capMesh.rotation.y = (r * Math.PI) / 4;
       mountainGroup.add(capMesh);
     }
 
     // Mountain Granite Boulders & Rock Scree
     const boulderCoords = [
-      [-6.5, 9], [6.2, 12], [-8.2, -2], [8.5, -8], [-5.2, -14], [5.8, -17]
+      [-12.5, 42], [14.0, 36], [-16.5, 20], [18.2, 12], [-8.2, -4], [16.5, -12],
+      [-14.2, -22], [12.8, -32], [-8.2, -44], [6.5, -48], [-4.0, 54], [8.0, 56]
     ];
     boulderCoords.forEach(([bx, bz]) => {
-      const bGeo = new THREE.DodecahedronGeometry(0.55 + Math.random() * 0.4, 1);
+      const bGeo = new THREE.DodecahedronGeometry(0.65 + Math.random() * 0.45, 1);
       const bMat = new THREE.MeshStandardMaterial({
         map: rockTex.map,
         roughness: 0.85,
         metalness: 0.15
       });
       const boulder = new THREE.Mesh(bGeo, bMat);
-      const by = -bz * terrainElevationFactor + 0.3;
+      const by = -bz * terrainElevationFactor + 0.35;
       boulder.position.set(bx, by, bz);
       boulder.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
       boulder.castShadow = true;
       mountainGroup.add(boulder);
     });
 
-    // Multi-tier Himalayan Blue Pine Trees (Pinus wallichiana)
+    // Multi-tier Himalayan Blue Pine Trees (Pinus wallichiana) - 24 Trees
     pineTreeGroupsRef.current = [];
     const pineTreeLocations = [
-      [-9, 16], [-10, 8], [-11, 0], [-8, -6],
-      [9, 14], [10, 5], [11, -5], [8, -14],
-      [-7, -18], [6, -20], [-5, 22], [5, 20]
+      [-16, 42], [-12, 32], [-22, 24], [-10, 14], [-24, 6], [-8, -4], [-18, -16], [-14, -28], [-18, -40], [-10, -48],
+      [14, 46], [18, 34], [10, 20], [22, 12], [14, 2], [24, -10], [12, -22], [20, -32], [8, -42], [14, -50],
+      [-4, 48], [4, 48], [-6, -52], [6, -52]
     ];
     pineTreeLocations.forEach(([tx, tz]) => {
       const tree = new THREE.Group();
@@ -862,32 +1006,32 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       const foliageMat = new THREE.MeshStandardMaterial({ color: foliageColor, roughness: 0.85 });
 
       // 3 Staggered Conical Foliage Tiers
-      const tier1 = new THREE.Mesh(new THREE.ConeGeometry(1.3, 1.4, 7), foliageMat);
-      tier1.position.y = 1.2;
+      const tier1 = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.5, 7), foliageMat);
+      tier1.position.y = 1.3;
       tier1.castShadow = true;
       tree.add(tier1);
 
-      const tier2 = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1.3, 7), foliageMat);
-      tier2.position.y = 1.9;
+      const tier2 = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.4, 7), foliageMat);
+      tier2.position.y = 2.1;
       tier2.castShadow = true;
       tree.add(tier2);
 
-      const tier3 = new THREE.Mesh(new THREE.ConeGeometry(0.65, 1.1, 7), foliageMat);
-      tier3.position.y = 2.6;
+      const tier3 = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.2, 7), foliageMat);
+      tier3.position.y = 2.9;
       tier3.castShadow = true;
       tree.add(tier3);
 
       // Trunk
       const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.12, 0.18, 0.8, 6),
+        new THREE.CylinderGeometry(0.14, 0.20, 0.9, 6),
         new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 })
       );
-      trunk.position.y = 0.4;
+      trunk.position.y = 0.45;
       tree.add(trunk);
 
-      const ty = -tz * terrainElevationFactor + (Math.abs(tx) > 6 ? (Math.abs(tx) - 6) * 0.85 : 0);
+      const ty = -tz * terrainElevationFactor + (Math.abs(tx) > 8 ? (Math.abs(tx) - 8) * 0.75 : 0);
       tree.position.set(tx, ty, tz);
-      tree.scale.setScalar(0.85 + Math.random() * 0.35);
+      tree.scale.setScalar(0.9 + Math.random() * 0.4);
       mountainGroup.add(tree);
       pineTreeGroupsRef.current.push(tree);
     });
@@ -897,7 +1041,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     cloudsGroupRef.current = cloudsGroup;
     mountainGroup.add(cloudsGroup);
 
-    const cloudGeo = new THREE.PlaneGeometry(18, 9);
+    const cloudGeo = new THREE.PlaneGeometry(24, 12);
     const cloudMat = new THREE.MeshBasicMaterial({
       map: cloudTex,
       transparent: true,
@@ -908,12 +1052,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     });
 
     const cloudCoords = [
-      { x: -28, y: 15 * slopeScaleY + 2, z: -32, ry: 0.1 },
-      { x: 19, y: 17 * slopeScaleY + 3, z: -26, ry: -0.2 },
-      { x: -12, y: 10 * slopeScaleY + 1, z: 6, ry: 0.15 },
-      { x: 22, y: 12 * slopeScaleY + 2, z: -6, ry: -0.1 },
-      { x: -6, y: 18 * slopeScaleY + 4, z: -40, ry: 0.05 },
-      { x: 14, y: 8 * slopeScaleY + 1, z: 19, ry: -0.15 }
+      { x: -38, y: 22 * slopeScaleY + 2, z: -45, ry: 0.1 },
+      { x: 28, y: 24 * slopeScaleY + 3, z: -35, ry: -0.2 },
+      { x: -18, y: 14 * slopeScaleY + 1, z: 12, ry: 0.15 },
+      { x: 32, y: 16 * slopeScaleY + 2, z: -10, ry: -0.1 },
+      { x: -10, y: 26 * slopeScaleY + 4, z: -55, ry: 0.05 },
+      { x: 20, y: 10 * slopeScaleY + 1, z: 32, ry: -0.15 }
     ];
 
     cloudCoords.forEach((cfg) => {
@@ -923,11 +1067,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       cloudsGroup.add(cloudMesh);
     });
 
-    // Vernacular Himalayan Kath-Kuni Hillside Cottages (Shimla / Manali Architecture)
+    // Vernacular Himalayan Kath-Kuni Hillside Cottages (5 Village Cottages)
     const houseCoords = [
-      { x: -9.8, z: 12, roofColor: '#b91c1c' },
-      { x: 9.5, z: 2, roofColor: '#1d4ed8' },
-      { x: -8.5, z: -10, roofColor: '#047857' }
+      { x: -14.5, z: 32, roofColor: '#b91c1c' },
+      { x: 12.0, z: 18, roofColor: '#1d4ed8' },
+      { x: -12.5, z: 2, roofColor: '#047857' },
+      { x: 15.0, z: -18, roofColor: '#b91c1c' },
+      { x: -10.0, z: -38, roofColor: '#d97706' }
     ];
     houseCoords.forEach((hc) => {
       const hGroup = new THREE.Group();
@@ -936,55 +1082,55 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
       // Level 1: Kath-Kuni Dressed Stone & Timber Foundation
       const stoneBase = new THREE.Mesh(
-        new THREE.BoxGeometry(3.2, 1.6, 2.6),
+        new THREE.BoxGeometry(3.4, 1.8, 2.8),
         new THREE.MeshStandardMaterial({ map: stoneWallTex, roughness: 0.85 })
       );
-      stoneBase.position.y = 0.8;
+      stoneBase.position.y = 0.9;
       stoneBase.castShadow = true;
       hGroup.add(stoneBase);
 
       // Level 2: Upper Living Floor (Cedar Wood Framing)
       const woodFloor = new THREE.Mesh(
-        new THREE.BoxGeometry(3.0, 1.4, 2.4),
+        new THREE.BoxGeometry(3.2, 1.5, 2.6),
         new THREE.MeshStandardMaterial({ color: 0x452311, roughness: 0.75 })
       );
-      woodFloor.position.y = 2.2;
+      woodFloor.position.y = 2.4;
       woodFloor.castShadow = true;
       hGroup.add(woodFloor);
 
       // Cantilevered Wooden Balcony / Veranda with Spindles
       const balcony = new THREE.Mesh(
-        new THREE.BoxGeometry(3.2, 0.12, 0.6),
+        new THREE.BoxGeometry(3.4, 0.14, 0.7),
         new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.8 })
       );
-      balcony.position.set(0, 1.6, 1.4);
+      balcony.position.set(0, 1.7, 1.5);
       hGroup.add(balcony);
 
       // Corrugated CGI Gabled Tin Roof
       const tinRoofTex = createCorrugatedTinTexture(hc.roofColor);
       const roof = new THREE.Mesh(
-        new THREE.ConeGeometry(2.6, 1.3, 4),
+        new THREE.ConeGeometry(2.8, 1.4, 4),
         new THREE.MeshStandardMaterial({ map: tinRoofTex, roughness: 0.5, metalness: 0.4 })
       );
       roof.rotation.y = Math.PI / 4;
-      roof.position.y = 3.4;
+      roof.position.y = 3.6;
       roof.castShadow = true;
       hGroup.add(roof);
 
       // Stone Chimney with Smoke Outlet
       const chimney = new THREE.Mesh(
-        new THREE.BoxGeometry(0.35, 1.0, 0.35),
+        new THREE.BoxGeometry(0.38, 1.1, 0.38),
         new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 })
       );
-      chimney.position.set(0.8, 3.8, 0.4);
+      chimney.position.set(0.9, 4.0, 0.4);
       hGroup.add(chimney);
 
       // Glowing Multi-paned Window
       const windowMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.65, 0.65),
+        new THREE.PlaneGeometry(0.7, 0.7),
         new THREE.MeshBasicMaterial({ color: isNightMode ? 0xfef08a : 0xfde047 })
       );
-      windowMesh.position.set(0, 2.2, 1.22);
+      windowMesh.position.set(0, 2.4, 1.32);
       hGroup.add(windowMesh);
 
       mountainGroup.add(hGroup);
@@ -1065,7 +1211,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     chassisGroupRef.current = chassisGroup;
     vehicleGroup.add(chassisGroup);
 
-    // Boxed Ladder Chassis Frame
+    // Boxed Ladder Chassis Frame with C-Channel Rails & Crossmembers
     const chassisMat = new THREE.MeshStandardMaterial({
       color: isXRayMode ? 0x0284c7 : 0x0f172a,
       metalness: 0.85,
@@ -1078,13 +1224,95 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     chassisMesh.receiveShadow = true;
     chassisGroup.add(chassisMesh);
 
-    // Heavy-Duty Front Bullbar Bumper (+Z = +1.15) with Recovery Winch
+    // Twin Longitudinal Steel C-Channel Frame Rails
+    [-0.38, 0.38].forEach((rx) => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 2.3), chassisMat);
+      rail.position.set(rx, -0.06, 0);
+      chassisGroup.add(rail);
+    });
+
+    // 4 Transverse Tubular Chassis Crossmembers
+    [-0.8, -0.2, 0.4, 0.9].forEach((cz) => {
+      const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.72, 8), chassisMat);
+      cross.rotation.z = Math.PI / 2;
+      cross.position.set(0, -0.06, cz);
+      chassisGroup.add(cross);
+    });
+
+    // Front & Rear Solid Live Axles with Cast Iron Pumpkin Gear Housings
+    [0.65, -0.65].forEach((az) => {
+      const axleTube = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.05, 12), chassisMat);
+      axleTube.rotation.z = Math.PI / 2;
+      axleTube.position.set(0, -0.06, az);
+      chassisGroup.add(axleTube);
+
+      const pumpkin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.09, 16, 12),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.3 })
+      );
+      pumpkin.position.set(0, -0.06, az);
+      chassisGroup.add(pumpkin);
+    });
+
+    // Central 4WD Transfer Case & Front/Rear Drive Shafts
+    const tCase = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.18, 0.22),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85 })
+    );
+    tCase.position.set(0, -0.06, 0);
+    chassisGroup.add(tCase);
+
+    [-0.32, 0.32].forEach((dsZ) => {
+      const dShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 8), galvanizedMat);
+      dShaft.rotation.x = Math.PI / 2;
+      dShaft.position.set(0, -0.06, dsZ);
+      chassisGroup.add(dShaft);
+    });
+
+    // Heavy-Duty Side Diamond-Plate Toolboxes
+    [-0.52, 0.52].forEach((tbx) => {
+      const tbox = new THREE.Mesh(
+        new THREE.BoxGeometry(0.20, 0.18, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.25 })
+      );
+      tbox.position.set(tbx, 0.10, -0.25);
+      chassisGroup.add(tbox);
+    });
+
+    // Red 9kg ABC Chemical Fire Extinguisher in Bracket
+    const exting = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, 0.22, 12),
+      new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.3 })
+    );
+    exting.position.set(0.46, 0.14, 0.15);
+    chassisGroup.add(exting);
+
+    // Heavy-Duty Anti-Spray Rubber Mudflaps with Hazard Stripes
+    [[-0.52, 0.65], [0.52, 0.65], [-0.52, -0.65], [0.52, -0.65]].forEach(([mx, mz]) => {
+      const flap = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 0.22, 0.015),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95 })
+      );
+      flap.position.set(mx, -0.12, mz - 0.15);
+      chassisGroup.add(flap);
+    });
+
+    // Heavy-Duty Front Bullbar Bumper (+Z = +1.15) with Recovery Winch & Tow D-Rings
     const bullbar = new THREE.Mesh(
       new THREE.BoxGeometry(1.15, 0.24, 0.12),
       new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.25 })
     );
     bullbar.position.set(0, 0.05, 1.15);
     chassisGroup.add(bullbar);
+
+    [-0.35, 0.35].forEach((sx) => {
+      const shackle = new THREE.Mesh(
+        new THREE.TorusGeometry(0.04, 0.012, 8, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9 })
+      );
+      shackle.position.set(sx, 0.04, 1.22);
+      chassisGroup.add(shackle);
+    });
 
     // Winch Drum & Steel Cable Hook
     const winchDrum = new THREE.Mesh(
@@ -1112,13 +1340,37 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     cab.castShadow = true;
     chassisGroup.add(cab);
 
-    // Cab Front Grille & SIH Emblem
+    // Front Chrome Bar Grille & SIH Emblem
     const grille = new THREE.Mesh(
       new THREE.BoxGeometry(0.72, 0.22, 0.02),
       new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.9, roughness: 0.4 })
     );
     grille.position.set(0, 0.28, 1.06);
     chassisGroup.add(grille);
+
+    for (let g = 0; g < 4; g++) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.018, 0.02), galvanizedMat);
+      bar.position.set(0, 0.20 + g * 0.05, 1.07);
+      chassisGroup.add(bar);
+    }
+
+    const sihEmblem = new THREE.Mesh(
+      new THREE.CircleGeometry(0.045, 16),
+      new THREE.MeshBasicMaterial({ color: 0x10b981 })
+    );
+    sihEmblem.position.set(0, 0.28, 1.08);
+    chassisGroup.add(sihEmblem);
+
+    // Lower Bumper Amber Fog Lights
+    [-0.42, 0.42].forEach((fx) => {
+      const fog = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12),
+        new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+      );
+      fog.rotation.x = Math.PI / 2;
+      fog.position.set(fx, 0.05, 1.21);
+      chassisGroup.add(fog);
+    });
 
     // Door Decals (Swachh Bharat Mission / SIH-26258) on Driver & Passenger Doors
     const decalMat = new THREE.MeshStandardMaterial({
@@ -1186,7 +1438,31 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       chassisGroup.add(mirrorGlass);
     });
 
-    // Cockpit Interior: Steering Wheel & Dashboard
+    // Cockpit Interior: Twin Contoured High-Back Bucket Seats with Headrests
+    [-0.22, 0.22].forEach((sx) => {
+      const seatBase = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.10, 0.30),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 })
+      );
+      seatBase.position.set(sx, 0.24, 0.62);
+      chassisGroup.add(seatBase);
+
+      const seatBack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.34, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 })
+      );
+      seatBack.position.set(sx, 0.44, 0.48);
+      chassisGroup.add(seatBack);
+
+      const headrest = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.10, 0.06),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b })
+      );
+      headrest.position.set(sx, 0.64, 0.48);
+      chassisGroup.add(headrest);
+    });
+
+    // Steering Wheel & Glowing Digital HUD Console
     const steeringWheel = new THREE.Mesh(
       new THREE.TorusGeometry(0.1, 0.018, 8, 16),
       new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 })
@@ -1194,6 +1470,48 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     steeringWheel.rotation.x = Math.PI / 3;
     steeringWheel.position.set(-0.2, 0.42, 0.82);
     chassisGroup.add(steeringWheel);
+
+    const hudGlow = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.24, 0.10),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    hudGlow.rotation.x = -Math.PI / 4;
+    hudGlow.position.set(-0.2, 0.40, 0.94);
+    chassisGroup.add(hudGlow);
+
+    // Cab Roof: Pneumatic Train Air Horns & 5 Amber Clearance Marker LEDs
+    [-0.22, -0.14].forEach((hx) => {
+      const hornTube = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, 0.32, 12), galvanizedMat);
+      hornTube.rotation.x = Math.PI / 2;
+      hornTube.position.set(hx, 0.81, 0.68);
+      chassisGroup.add(hornTube);
+    });
+
+    for (let m = 0; m < 5; m++) {
+      const marker = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.02, 0.02),
+        new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+      );
+      marker.position.set(-0.30 + m * 0.15, 0.76, 0.82);
+      chassisGroup.add(marker);
+    }
+
+    // Vertical Chrome Exhaust Stack behind Cab with Heat Shield & Curved Cap
+    const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.95, 16), galvanizedMat);
+    exhaust.position.set(0.38, 0.72, 0.28);
+    chassisGroup.add(exhaust);
+
+    const exShield = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.045, 0.65, 12, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9, wireframe: true })
+    );
+    exShield.position.set(0.38, 0.62, 0.28);
+    chassisGroup.add(exShield);
+
+    const exCap = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.12, 12), galvanizedMat);
+    exCap.rotation.z = Math.PI / 4;
+    exCap.position.set(0.42, 1.20, 0.28);
+    chassisGroup.add(exCap);
 
     // Cab Roof Emergency LED Strobe Beacon Bar
     const beaconBar = new THREE.Mesh(
@@ -1234,7 +1552,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     tankCylinder.castShadow = true;
     chassisGroup.add(tankCylinder);
 
-    // Tank Rounded End Caps
+    // Tank Welded Torispherical Dished Heads with Seam Rings
     [-tankLength / 2, tankLength / 2].forEach((zOffset) => {
       const capMesh = new THREE.Mesh(
         new THREE.SphereGeometry(tankRadius, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
@@ -1243,6 +1561,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       capMesh.rotation.x = zOffset > 0 ? -Math.PI / 2 : Math.PI / 2;
       capMesh.position.set(0, 0.46, -0.28 + zOffset);
       chassisGroup.add(capMesh);
+
+      const seam = new THREE.Mesh(
+        new THREE.TorusGeometry(tankRadius + 0.008, 0.012, 8, 32),
+        galvanizedMat
+      );
+      seam.position.set(0, 0.46, -0.28 + zOffset);
+      chassisGroup.add(seam);
     });
 
     // Reinforcing Steel Hoops with Tensioning Hex Bolts
@@ -1254,6 +1579,19 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       strap.position.set(0, 0.46, -0.28 + zOffset);
       chassisGroup.add(strap);
     });
+
+    // Top Cyclone Separator Dome & Stainless Steel Vacuum Piping
+    const cyclone = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.08, 0.22, 16),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 })
+    );
+    cyclone.position.set(0, 0.92, -0.15);
+    chassisGroup.add(cyclone);
+
+    const vacPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.65, 12), galvanizedMat);
+    vacPipe.rotation.x = Math.PI / 4;
+    vacPipe.position.set(0, 0.72, -0.55);
+    chassisGroup.add(vacPipe);
 
     // Top Intake Manifold with Vacuum Gauge & Pressure Relief Valve
     const manifold = new THREE.Mesh(
@@ -1270,6 +1608,70 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     gaugeMesh.rotation.x = Math.PI / 2;
     gaugeMesh.position.set(0, 0.98, -0.28);
     chassisGroup.add(gaugeMesh);
+
+    // Transparent Liquid Level Sight Glass Column with Floating Indicator Ball
+    const sightTube = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.42, 12),
+      new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, roughness: 0.05, transmission: 0.9 })
+    );
+    sightTube.position.set(0.40, 0.46, -0.28);
+    chassisGroup.add(sightTube);
+
+    [-0.22, 0.22].forEach((yOff) => {
+      const fitting = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.028, 0.028, 0.04, 8),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9 })
+      );
+      fitting.position.set(0.40, 0.46 + yOff, -0.28);
+      chassisGroup.add(fitting);
+    });
+
+    const sightFloat = new THREE.Mesh(
+      new THREE.SphereGeometry(0.016, 12, 8),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 })
+    );
+    sightFloat.position.set(0.40, 0.46, -0.28);
+    chassisGroup.add(sightFloat);
+    levelSightFloatRef.current = sightFloat;
+
+    // Rear 4-inch Discharge Gate Valve Assembly with Red Handwheel & Camlock
+    const valveBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.12, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 })
+    );
+    valveBody.position.set(0, 0.28, -0.28 - tankLength / 2 - 0.08);
+    chassisGroup.add(valveBody);
+
+    const handwheel = new THREE.Mesh(
+      new THREE.TorusGeometry(0.07, 0.012, 8, 16),
+      new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.7, roughness: 0.3 })
+    );
+    handwheel.position.set(0, 0.38, -0.28 - tankLength / 2 - 0.08);
+    handwheel.rotation.x = Math.PI / 2;
+    chassisGroup.add(handwheel);
+
+    const camlock = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.08, 16),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85, roughness: 0.2 })
+    );
+    camlock.rotation.x = Math.PI / 2;
+    camlock.position.set(0, 0.28, -0.28 - tankLength / 2 - 0.18);
+    chassisGroup.add(camlock);
+
+    // Twin Side Hose Storage Trays with Coiled 3" Flexible Suction Hoses
+    [-0.48, 0.48].forEach((xTray) => {
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, tankLength * 0.95), galvanizedMat);
+      tray.position.set(xTray, 0.28, -0.28);
+      chassisGroup.add(tray);
+
+      const coiledHose = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.045, tankLength * 0.9, 16),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 })
+      );
+      coiledHose.rotation.x = Math.PI / 2;
+      coiledHose.position.set(xTray, 0.34, -0.28);
+      chassisGroup.add(coiledHose);
+    });
 
     // Dual Internal Anti-Slosh Baffles
     const bafflesGroup = new THREE.Group();
@@ -1520,14 +1922,40 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       chassisGroup.add(legGroup);
     });
 
-    // Twin Projector LED Headlights (+Z = +1.15) & Volumetric Atmospheric Beam Cones
+    // Quad Projector LED Headlights (+Z = +1.15) & Volumetric Atmospheric Beam Cones
     headlightsLightRef.current = [];
     volumetricHeadlightsRef.current = [];
     [-0.35, 0.35].forEach((xPos) => {
-      const spotLight = new THREE.SpotLight(0xfff7ed, 3.2, 38, Math.PI / 5.5, 0.35, 1);
-      spotLight.position.set(xPos, 0.28, 1.15);
+      // Recessed Headlamp Housing
+      const housing = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, 0.14, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 })
+      );
+      housing.position.set(xPos, 0.28, 1.18);
+      chassisGroup.add(housing);
+
+      // Dual Projector LEDs per headlamp unit (Low beam + High beam)
+      [-0.05, 0.05].forEach((pOff, pIdx) => {
+        const lens = new THREE.Mesh(
+          new THREE.SphereGeometry(0.038, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        lens.rotation.x = -Math.PI / 2;
+        lens.position.set(xPos + pOff, 0.28, 1.21);
+        chassisGroup.add(lens);
+
+        const lensBezel = new THREE.Mesh(
+          new THREE.TorusGeometry(0.042, 0.008, 8, 16),
+          galvanizedMat
+        );
+        lensBezel.position.set(xPos + pOff, 0.28, 1.205);
+        chassisGroup.add(lensBezel);
+      });
+
+      const spotLight = new THREE.SpotLight(0xfff7ed, 3.4, 45, Math.PI / 5.2, 0.35, 1);
+      spotLight.position.set(xPos, 0.28, 1.18);
       const targetObj = new THREE.Object3D();
-      targetObj.position.set(xPos, -0.2, 12);
+      targetObj.position.set(xPos, -0.2, 14);
       chassisGroup.add(targetObj);
 
       spotLight.target = targetObj;
@@ -1535,27 +1963,20 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       chassisGroup.add(spotLight);
       headlightsLightRef.current.push(spotLight);
 
-      const lens = new THREE.Mesh(
-        new THREE.CircleGeometry(0.07, 16),
-        new THREE.MeshBasicMaterial({ color: 0xffffff })
-      );
-      lens.position.set(xPos, 0.28, 1.21);
-      chassisGroup.add(lens);
-
-      // Volumetric Atmospheric Light Cone (Narrow at lens r=0.07, wide spread ahead r=1.4)
-      const beamGeo = new THREE.CylinderGeometry(1.4, 0.07, 12.0, 24, 1, true);
+      // Volumetric Atmospheric Light Cone
+      const beamGeo = new THREE.CylinderGeometry(1.6, 0.08, 14.0, 24, 1, true);
       beamGeo.rotateX(Math.PI / 2);
       const beamMat = new THREE.MeshBasicMaterial({
         color: 0xfffae0,
         transparent: true,
-        opacity: isNightMode ? 0.28 : 0.08,
+        opacity: isNightMode ? 0.32 : 0.09,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
         depthWrite: false
       });
       const beamMesh = new THREE.Mesh(beamGeo, beamMat);
-      beamMesh.rotation.x = 0.042;
-      beamMesh.position.set(xPos, 0.28 - 0.22, 1.15 + 6.0);
+      beamMesh.rotation.x = 0.038;
+      beamMesh.position.set(xPos, 0.28 - 0.22, 1.18 + 7.0);
       chassisGroup.add(beamMesh);
       volumetricHeadlightsRef.current.push(beamMesh);
     });
@@ -1652,6 +2073,21 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       tireMesh.castShadow = true;
       wheelHub.add(tireMesh);
 
+      // 16 Aggressive 3D Mud-Terrain Rubber Tread Lugs on Perimeter
+      for (let g = 0; g < 16; g++) {
+        const angle = (g / 16) * Math.PI * 2;
+        const lugX = wx > 0 ? (g % 2 === 0 ? 0.04 : -0.04) : (g % 2 === 0 ? -0.04 : 0.04);
+        const lugY = Math.sin(angle) * 0.235;
+        const lugZ = Math.cos(angle) * 0.235;
+        const lugMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.045, 0.032, 0.07),
+          new THREE.MeshStandardMaterial({ color: 0x0a0f1d, roughness: 0.95 })
+        );
+        lugMesh.position.set(lugX, lugY, lugZ);
+        lugMesh.rotation.x = angle;
+        wheelHub.add(lugMesh);
+      }
+
       // 5-Spoke Off-Road Alloy Rim with Emerald Accent
       const rimGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.185, 16);
       rimGeo.rotateZ(Math.PI / 2);
@@ -1660,6 +2096,21 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.85, roughness: 0.2 })
       );
       wheelHub.add(rimMesh);
+
+      // 12 Outer Perimeter Beadlock Hex Bolts
+      for (let b = 0; b < 12; b++) {
+        const bAngle = (b / 12) * Math.PI * 2;
+        const bX = wx > 0 ? 0.095 : -0.095;
+        const bY = Math.sin(bAngle) * 0.13;
+        const bZ = Math.cos(bAngle) * 0.13;
+        const boltMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.007, 0.007, 0.012, 6),
+          galvanizedMat
+        );
+        boltMesh.rotation.z = Math.PI / 2;
+        boltMesh.position.set(bX, bY, bZ);
+        wheelHub.add(boltMesh);
+      }
 
       // Center Hub Cap & Lug Nuts
       const capGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.19, 12);
@@ -1920,7 +2371,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const handleResize = () => {
       if (!container || !renderer || !camera) return;
       const w = container.clientWidth;
-      const h = container.clientHeight || 640;
+      const h = container.clientHeight || 820;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -1967,11 +2418,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         // Stress Test Handling
         if (currentStress === 'hill_brake') {
           // Lock vehicle on 28° incline with hard braking deceleration
-          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, 0.42, 0.08);
+          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, 0.35, 0.08);
           stressTimerRef.current += delta;
         } else if (currentStress === 'hairpin_turn') {
           // Lock vehicle in apex of tight hairpin curve at 20 km/h
-          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, 0.285, 0.06);
+          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, 0.225, 0.06);
           stressTimerRef.current += delta;
         } else if (currentStress === 'freeze_surge') {
           // Sub-zero viscous progression
@@ -2028,6 +2479,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             if (vehicleTankLiquidRef.current) {
               const fillScale = 0.15 + progress * 0.85;
               vehicleTankLiquidRef.current.scale.y = fillScale;
+            }
+
+            // Real-time floating level indicator sphere inside sight glass
+            if (levelSightFloatRef.current) {
+              levelSightFloatRef.current.position.y = 0.46 - 0.16 + progress * 0.32;
             }
 
             // Real-time world positions of manhole and intake manifold
@@ -2105,6 +2561,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
           if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = false;
           if (vehicleTankLiquidRef.current) vehicleTankLiquidRef.current.scale.y = 1.0;
+          if (levelSightFloatRef.current) levelSightFloatRef.current.position.y = 0.46 + 0.16;
         }
 
         // Retract outriggers and suction arm back to travel position when not desludging
@@ -2730,12 +3187,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
     if (testType === 'hill_brake') {
       setDriveMode('manual');
-      pathProgressRef.current = 0.42;
+      pathProgressRef.current = 0.35;
       setVehicleSpeedKmh(0);
       setSlopeDeg(28.0);
     } else if (testType === 'hairpin_turn') {
       setDriveMode('manual');
-      pathProgressRef.current = 0.285;
+      pathProgressRef.current = 0.225;
       setVehicleSpeedKmh(20);
     } else if (testType === 'freeze_surge') {
       setDriveMode('auto_climb');
@@ -2924,7 +3381,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
       {/* 3D Viewport & Interactive HUD */}
       <div
-        className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl h-[650px]"
+        className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl h-[820px]"
         ref={containerRef}
       >
         <canvas ref={canvasRef} className="w-full h-full block cursor-grab active:cursor-grabbing" />

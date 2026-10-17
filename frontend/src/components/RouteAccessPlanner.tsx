@@ -170,12 +170,12 @@ export const RouteAccessPlanner: React.FC<RouteAccessPlannerProps> = ({
 
       {/* Map View & Route Constraints */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Leaflet Map Canvas */}
-        <div className="lg:col-span-2 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-inner flex flex-col h-[420px]">
-          <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex justify-between items-center text-xs">
-            <span className="font-semibold text-slate-300 flex items-center space-x-1.5">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Interactive Geographic Map (OpenStreetMap Tiles)</span>
+        {/* Leaflet Map Canvas - Expanded Height for Panoramic GIS View */}
+        <div className="lg:col-span-2 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col h-[560px]">
+          <div className="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex justify-between items-center text-xs">
+            <span className="font-semibold text-slate-200 flex items-center space-x-1.5">
+              <MapPin className="w-4 h-4 text-emerald-400" />
+              <span>Interactive Geographic Map (OpenStreetMap GIS View)</span>
             </span>
             <span className="text-[10px] text-slate-400 font-mono">
               GPS: 31.1048° N, 77.1734° E (Shimla Corridor)
