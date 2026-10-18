@@ -36,9 +36,25 @@ import {
   AlertTriangle,
   Video,
   Sparkles,
-  Box
+  Box,
+  Lock,
+  Unlock,
+  AlertOctagon,
+  HardHat,
+  Cog,
+  CheckCircle2
 } from 'lucide-react';
 import { SiteConditions, EquipmentRecommendation } from '../types';
+import {
+  PistonOperatingMode,
+  DEFAULT_COMPACTION_PARAMS
+} from '../types/sludgeCompaction';
+import {
+  calculateBoreAreaM2,
+  calculateCylinderForceKn,
+  calculateContactStrokeMm,
+  calculateDewateringState
+} from '../utils/sludgeCompactionModel';
 import {
   createAsphaltTextures,
   createRockTextures,
@@ -122,12 +138,30 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(false);
   const [showDimensions, setShowDimensions] = useState<boolean>(true);
   const [activeStressTest, setActiveStressTest] = useState<
-    'none' | 'hill_brake' | 'hairpin_turn' | 'freeze_surge'
+    'none' | 'hill_brake' | 'hairpin_turn' | 'freeze_surge' | 'muddy_traction' | 'narrow_alley'
   >('none');
   const [stabilityMarginPct, setStabilityMarginPct] = useState<number>(85);
   const [selectedCallout, setSelectedCallout] = useState<
-    'none' | 'tank' | 'baffles' | 'battery' | 'macerator' | 'outriggers' | 'suction_arm' | 'vault'
+    'none' | 'tank' | 'baffles' | 'battery' | 'macerator' | 'outriggers' | 'suction_arm' | 'vault' | 'piston'
   >('none');
+
+  // Worksite waypoint selection & multi-stage sequenced mission
+  const [selectedWorksite, setSelectedWorksite] = useState<'alley' | 'station' | 'summit'>('summit');
+  const [missionStage, setMissionStage] = useState<
+    'idle' | 'positioning' | 'stabilizing' | 'deploying_boom' | 'priming' | 'extracting' | 'settling' | 'compacting' | 'securing' | 'ready_to_travel'
+  >('idle');
+  const [isEStopActive, setIsEStopActive] = useState<boolean>(false);
+  const [interlockWarning, setInterlockWarning] = useState<string | null>(null);
+
+  // Hydraulic Sludge-Compaction Piston & Dewatering state
+  const [pistonMode, setPistonMode] = useState<PistonOperatingMode>('LOCKED');
+  const [pistonStrokeMm, setPistonStrokeMm] = useState<number>(0);
+  const [appliedPressureBar, setAppliedPressureBar] = useState<number>(0);
+  const [compactionForceKn, setCompactionForceKn] = useState<number>(0);
+  const [cakeVolumeL, setCakeVolumeL] = useState<number>(400);
+  const [filtrateVolumeL, setFiltrateVolumeL] = useState<number>(0);
+  const [compactionRatio, setCompactionRatio] = useState<number>(1.0);
+  const [isTransportLocked, setIsTransportLocked] = useState<boolean>(true);
 
   // Desludging operation sequence state
   const [desludgeStage, setDesludgeStage] = useState<'idle' | 'deploying' | 'pumping' | 'completed'>('idle');
@@ -207,13 +241,26 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const batteryCaseMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const foamTexRef = useRef<THREE.CanvasTexture | null>(null);
 
+  // Hydraulic Compaction Piston 3D References
+  const compactionPlatenRef = useRef<THREE.Group | null>(null);
+  const pistonRodRef = useRef<THREE.Mesh | null>(null);
+  const filtrateMeshRef = useRef<THREE.Mesh | null>(null);
+  const pistonLockPinsRef = useRef<THREE.Mesh[]>([]);
+  const pistonStatusLedRef = useRef<THREE.Mesh | null>(null);
+
+  // Worksite Waypoint 3D References
+  const alleyGroupRef = useRef<THREE.Group | null>(null);
+  const alleyManholeRef = useRef<THREE.Mesh | null>(null);
+  const serviceGroupRef = useRef<THREE.Group | null>(null);
+  const serviceManholeRef = useRef<THREE.Mesh | null>(null);
+
   // Dynamic chassis pitch & roll simulation refs
   const chassisPitchRef = useRef<number>(0);
   const chassisRollRef = useRef<number>(0);
   const fluidSloshAngleRef = useRef<number>(0);
   const droneOrbitAngleRef = useRef<number>(0);
   const stressTimerRef = useRef<number>(0);
-  const activeStressTestRef = useRef<'none' | 'hill_brake' | 'hairpin_turn' | 'freeze_surge'>('none');
+  const activeStressTestRef = useRef<'none' | 'hill_brake' | 'hairpin_turn' | 'freeze_surge' | 'muddy_traction' | 'narrow_alley'>('none');
   const showDimensionsRef = useRef<boolean>(true);
 
   // State synchronization refs to prevent WebGL context recreation on UI interactions
@@ -226,6 +273,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const hasLowComBatteryRef = useRef(hasLowComBattery);
   const isXRayModeRef = useRef(isXRayMode);
   const slopeDegRef = useRef(slopeDeg);
+  const selectedWorksiteRef = useRef(selectedWorksite);
+  const pistonModeRef = useRef<PistonOperatingMode>(pistonMode);
+  const pistonStrokeMmRef = useRef<number>(pistonStrokeMm);
+  const isTransportLockedRef = useRef<boolean>(isTransportLocked);
+  const isEStopActiveRef = useRef<boolean>(isEStopActive);
+  const interlockWarningTimeoutRef = useRef<any>(null);
 
   cameraModeRef.current = cameraMode;
   driveModeRef.current = driveMode;
@@ -238,6 +291,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   slopeDegRef.current = slopeDeg;
   activeStressTestRef.current = activeStressTest;
   showDimensionsRef.current = showDimensions;
+  selectedWorksiteRef.current = selectedWorksite;
+  pistonModeRef.current = pistonMode;
+  pistonStrokeMmRef.current = pistonStrokeMm;
+  isTransportLockedRef.current = isTransportLocked;
+  isEStopActiveRef.current = isEStopActive;
 
   // Vehicle progress tracking
   const pathProgressRef = useRef<number>(0.12);
@@ -1400,6 +1458,74 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     summitRoof.position.set(-3.4, 3.1, 0);
     summitGroup.add(summitRoof);
 
+    // Waypoint 1: Narrow Access Alley Worksites (t = 0.18)
+    const alleyPt = roadCurve.getPoint(0.18);
+    const alleyGroup = new THREE.Group();
+    alleyGroupRef.current = alleyGroup;
+    alleyGroup.position.set(alleyPt.x, alleyPt.y, alleyPt.z);
+    mountainGroup.add(alleyGroup);
+
+    // Stone Perimeter Flanking Walls (enforces 1.5m narrow sanitation clearance)
+    [-1.85, 1.85].forEach((wx) => {
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(0.35, 1.6, 7.0),
+        new THREE.MeshStandardMaterial({ map: stoneWallTex, roughness: 0.9 })
+      );
+      wall.position.set(wx, 0.8, 0);
+      wall.castShadow = true;
+      alleyGroup.add(wall);
+    });
+
+    // Alleyway Inspection Manhole Chamber on roadside shoulder
+    const alleyManhole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.45, 0.12, 20),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.25 })
+    );
+    alleyManhole.position.set(1.15, 0.24, 0);
+    alleyGroup.add(alleyManhole);
+    alleyManholeRef.current = alleyManhole;
+
+    // Narrow Access BRO Warning Marker Sign
+    const alleySign = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 0.6, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 })
+    );
+    alleySign.position.set(-1.85, 2.1, 0);
+    alleyGroup.add(alleySign);
+
+    // Waypoint 2: Roadside Service Area & Community Septic Vault (t = 0.42)
+    const servicePt = roadCurve.getPoint(0.42);
+    const serviceGroup = new THREE.Group();
+    serviceGroupRef.current = serviceGroup;
+    serviceGroup.position.set(servicePt.x, servicePt.y, servicePt.z);
+    mountainGroup.add(serviceGroup);
+
+    // Reinforced Concrete Service Apron
+    const serviceApron = new THREE.Mesh(
+      new THREE.BoxGeometry(4.2, 0.24, 8.0),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 })
+    );
+    serviceApron.position.set(2.8, 0.12, 0);
+    serviceApron.receiveShadow = true;
+    serviceGroup.add(serviceApron);
+
+    // Community Septic Access Manhole Cover
+    const serviceManhole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.50, 0.50, 0.14, 24),
+      new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 })
+    );
+    serviceManhole.position.set(2.6, 0.26, 0);
+    serviceGroup.add(serviceManhole);
+    serviceManholeRef.current = serviceManhole;
+
+    // Safety Stanchions & Warning Sign
+    const serviceSign = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.8, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+    );
+    serviceSign.position.set(4.2, 1.4, 0);
+    serviceGroup.add(serviceSign);
+
     // =========================================================================
     // 9. HIGH-FIDELITY 3D DESLUDGING VEHICLE ENGINEERING MODEL
     // Standard FRONT = +Z axis; Independent 4-Wheel Suspension & Dynamic Pitch/Roll
@@ -2124,6 +2250,188 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     foamMesh.position.set(0, 0.43, -0.28);
     tankFoamMeshRef.current = foamMesh;
     vehicleTankLiquidGroup.add(foamMesh);
+
+    // =========================================================================
+    // HYDRAULIC SLUDGE-COMPACTION PISTON & DEWATERING MECHANISM
+    // Vertical double-acting cylinder, chrome piston rod, anti-tilt guide columns,
+    // perforated platen, perimeter scraper seal, and mechanical retention lock pins.
+    // =========================================================================
+    const compactionGroup = new THREE.Group();
+    compactionGroup.position.set(0, 0, -0.28);
+    chassisGroup.add(compactionGroup);
+
+    // 1. Structural Overhead Mounting Truss / Saddle
+    const bridgeYoke = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 0.05, 0.18),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3 })
+    );
+    bridgeYoke.position.set(0, 0.90, 0);
+    compactionGroup.add(bridgeYoke);
+
+    [-0.34, 0.34].forEach((rx) => {
+      const yokeRiser = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.44, 0.16),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85 })
+      );
+      yokeRiser.position.set(rx, 0.68, 0);
+      compactionGroup.add(yokeRiser);
+    });
+
+    // 2. Heavy-Duty Hydraulic Cylinder Barrel (Ø120 mm Bore Class)
+    const hydCylBarrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.065, 0.065, 0.36, 24),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.88, roughness: 0.22 })
+    );
+    hydCylBarrel.position.set(0, 1.08, 0);
+    compactionGroup.add(hydCylBarrel);
+
+    // Cylinder End Gland Cap with High-Pressure Seal
+    const glandCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075, 0.075, 0.05, 24),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9 })
+    );
+    glandCap.position.set(0, 0.91, 0);
+    compactionGroup.add(glandCap);
+
+    // High-Pressure Hydraulic Fluid Ports & Steel Braided Lines
+    [-0.07, 0.07].forEach((px) => {
+      const portFitting = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.015, 0.04, 12),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.95 })
+      );
+      portFitting.rotation.z = Math.PI / 2;
+      portFitting.position.set(px, 1.14, 0);
+      compactionGroup.add(portFitting);
+
+      const hydLine = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.008, 0.008, 0.42, 8),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 })
+      );
+      hydLine.position.set(px * 1.5, 0.92, 0.08);
+      compactionGroup.add(hydLine);
+    });
+
+    // 3. Dual Vertical Chrome Guide Columns (Ø45 mm Class, Anti-Tilt Mechanism)
+    [-0.24, 0.24].forEach((gx) => {
+      const guideRod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.020, 0.020, 0.70, 16),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.98, roughness: 0.08 })
+      );
+      guideRod.position.set(gx, 0.60, 0);
+      compactionGroup.add(guideRod);
+    });
+
+    // 4. Moving Compaction Platen Assembly (moves from y=0.72 down to y=0.25)
+    const platenGroup = new THREE.Group();
+    platenGroup.position.set(0, 0.72, 0);
+    compactionGroup.add(platenGroup);
+    compactionPlatenRef.current = platenGroup;
+
+    // Rigid Structural Platen Plate (1.15m x 0.56m)
+    const platenMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56, 0.035, 1.15),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.25 })
+    );
+    platenMesh.position.y = 0;
+    platenGroup.add(platenMesh);
+
+    // Perforated Filter Mesh Underside
+    const perforatedMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 0.006, 1.14),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.92, roughness: 0.4 })
+    );
+    perforatedMesh.position.y = -0.018;
+    platenGroup.add(perforatedMesh);
+
+    // Polyurethane Perimeter Scraper / Wiper Seal Ring
+    const wiperSeal = new THREE.Mesh(
+      new THREE.BoxGeometry(0.575, 0.018, 1.165),
+      new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.5 })
+    );
+    wiperSeal.position.y = -0.005;
+    platenGroup.add(wiperSeal);
+
+    // Dual Bronze Guide Sleeve Bushings
+    [-0.24, 0.24].forEach((bx) => {
+      const bushing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.032, 0.032, 0.08, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9, roughness: 0.2 })
+      );
+      bushing.position.set(bx, 0.035, 0);
+      platenGroup.add(bushing);
+    });
+
+    // Twin Mechanical Retention Pin Locking Ear Brackets (for transport lock)
+    [-0.26, 0.26].forEach((lx) => {
+      const ear = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.09, 0.08),
+        galvanizedMat
+      );
+      ear.position.set(lx, 0.05, 0);
+      platenGroup.add(ear);
+
+      const earHole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.018, 0.018, 0.032, 12),
+        new THREE.MeshBasicMaterial({ color: 0x020617 })
+      );
+      earHole.rotation.z = Math.PI / 2;
+      earHole.position.set(lx, 0.065, 0);
+      platenGroup.add(earHole);
+    });
+
+    // 5. Guided Chrome Piston Rod (Ø60 mm Rod Class)
+    const hydPistonRod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.028, 0.028, 0.65, 20),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.98, roughness: 0.04 })
+    );
+    hydPistonRod.position.set(0, 0.92, 0);
+    compactionGroup.add(hydPistonRod);
+    pistonRodRef.current = hydPistonRod;
+
+    // 6. Mechanical Retention Lock Pins (Engage at Top Home Position)
+    pistonLockPinsRef.current = [];
+    [-0.32, 0.32].forEach((px, pIdx) => {
+      const pinHousing = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.06, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+      );
+      pinHousing.position.set(px, 0.785, 0);
+      compactionGroup.add(pinHousing);
+
+      const lockPin = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.015, 0.09, 12),
+        new THREE.MeshStandardMaterial({ color: 0x22c55e, metalness: 0.95, roughness: 0.1 })
+      );
+      lockPin.rotation.z = Math.PI / 2;
+      lockPin.position.set(pIdx === 0 ? -0.27 : 0.27, 0.785, 0);
+      compactionGroup.add(lockPin);
+      pistonLockPinsRef.current.push(lockPin);
+    });
+
+    // Safety Lock Status Dual Indicator LED Lamps on Overhead Bridge
+    const lockLed = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0x22c55e })
+    );
+    lockLed.position.set(0, 0.94, 0.10);
+    compactionGroup.add(lockLed);
+    pistonStatusLedRef.current = lockLed;
+
+    // 7. Dynamic Liquid Filtrate Pool Layer (Appears directly above platen during dewatering)
+    const filtrateGeo = new THREE.PlaneGeometry(0.53, 1.12);
+    filtrateGeo.rotateX(-Math.PI / 2);
+    const filtrateMat = new THREE.MeshPhysicalMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.0,
+      roughness: 0.08,
+      transmission: 0.82,
+      ior: 1.33
+    });
+    const filtrateMesh = new THREE.Mesh(filtrateGeo, filtrateMat);
+    filtrateMesh.position.set(0, 0.74, 0);
+    compactionGroup.add(filtrateMesh);
+    filtrateMeshRef.current = filtrateMesh;
 
     // Under-Chassis LiFePO4 Solid-State Battery Bank (Low-CoM, h = 0.15m)
     const batteryGroup = new THREE.Group();
@@ -2897,6 +3205,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         const currentDrive = driveModeRef.current;
         const currentSpeed = vehicleSpeedKmhRef.current;
 
+        // Active Worksite Target Determination
+        const currentWorksite = selectedWorksiteRef.current;
+        const targetWorksiteT = currentWorksite === 'alley' ? 0.18 : currentWorksite === 'station' ? 0.42 : 0.98;
+
         // Stress Test Handling
         if (currentStress === 'hill_brake') {
           // Lock vehicle on 28° incline with hard braking deceleration
@@ -2910,27 +3222,46 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           // Sub-zero viscous progression
           const speedFactor = (currentSpeed / 14) * 0.018;
           pathProgressRef.current = (pathProgressRef.current + delta * speedFactor) % 1;
-        } else if (currentDrive === 'auto_climb') {
-          const speedFactor = (currentSpeed / 14) * 0.026;
+        } else if (currentStress === 'muddy_traction') {
+          // Slippery mountain clay: crawler track grousers bite with 28 kPa contact pressure
+          const speedFactor = (currentSpeed / 14) * 0.014;
           pathProgressRef.current = (pathProgressRef.current + delta * speedFactor) % 1;
+        } else if (currentStress === 'narrow_alley') {
+          // Navigate tight 1.5m clearance alleyway at t=0.18
+          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, 0.18, 0.05);
+        } else if (currentDrive === 'auto_climb') {
+          // Transport Safety Interlock: Block travel if piston is unseated or unlocked
+          if (pistonStrokeMmRef.current > 5 || !isTransportLockedRef.current) {
+            setInterlockWarning('TRANSPORT INTERLOCK: Compaction piston must be in Top Home (0mm) position with Transport Lock Pins engaged before vehicle travel is permitted!');
+          } else {
+            const speedFactor = (currentSpeed / 14) * 0.026;
+            pathProgressRef.current = (pathProgressRef.current + delta * speedFactor) % 1;
+          }
         } else if (currentDrive === 'manual') {
-          pathProgressRef.current = Math.max(
-            0.01,
-            Math.min(0.99, pathProgressRef.current + manualThrottleRef.current * delta * 0.035)
-          );
+          // Transport Safety Interlock for manual throttle
+          if (pistonStrokeMmRef.current > 5 || !isTransportLockedRef.current) {
+            setInterlockWarning('TRANSPORT INTERLOCK: Compaction piston must be in Top Home (0mm) position with Transport Lock Pins engaged before vehicle travel is permitted!');
+          } else {
+            pathProgressRef.current = Math.max(
+              0.01,
+              Math.min(0.99, pathProgressRef.current + manualThrottleRef.current * delta * 0.035)
+            );
+          }
         } else if (currentDrive === 'desludge') {
-          // Park vehicle at Summit Vault (t = 0.98)
-          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, 0.98, 0.05);
+          // Park vehicle at active worksite manhole (Alley t=0.18, Station t=0.42, or Summit t=0.98)
+          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, targetWorksiteT, 0.05);
 
-          // Animate Desludging Cycle Sequence
+          // Full-Scale Sequenced Worksite Mission (Stabilize -> Deploy -> Prime -> Extract -> Settle -> Compact -> Secure)
           desludgeTimerRef.current += delta;
-          if (desludgeTimerRef.current < 2.0) {
+          const missionT = desludgeTimerRef.current;
+
+          if (missionT < 2.5) {
+            // 1. Stabilize & Deploy Outriggers + Articulated Suction Arm
+            setMissionStage('stabilizing');
             setDesludgeStage('deploying');
-            // Outriggers extend downward with hydraulic clamp
             outriggersRef.current.forEach((jack) => {
               jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.28, 0.08);
             });
-            // Suction arm uncoils toward vault manhole
             if (suctionArmRef.current) {
               suctionArmRef.current.rotation.x = THREE.MathUtils.lerp(
                 suctionArmRef.current.rotation.x,
@@ -2938,64 +3269,78 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 0.08
               );
             }
-          } else if (desludgeTimerRef.current < 12.0) {
+          } else if (missionT < 4.5) {
+            // 2. Priming Pump & High-Torque Macerator
+            setMissionStage('priming');
+            if (maceratorBladesRef.current) {
+              maceratorBladesRef.current.rotation.z += delta * 18;
+            }
+          } else if (missionT < 12.5) {
+            // 3. Suction Extraction Transfer Cycle
+            setMissionStage('extracting');
             setDesludgeStage('pumping');
-            const progress = (desludgeTimerRef.current - 2.0) / 10.0;
-            const pct = Math.min(100, Math.round(progress * 100));
+            const extractProgress = (missionT - 4.5) / 8.0;
+            const pct = Math.min(100, Math.round(extractProgress * 100));
             setDesludgeProgressPct(pct);
             const currentPumpedLiters = Math.round((pct / 100) * 400);
             setPumpedVolumeLiters(currentPumpedLiters);
 
-            // Spin macerator cutter blades rapidly
+            // Spin macerator blades
             if (maceratorBladesRef.current) {
               maceratorBladesRef.current.rotation.z += delta * 26;
             }
 
-            // Sludge in septic pit drops down
-            if (pitLiquidRef.current) {
-              pitLiquidRef.current.scale.y = Math.max(0.1, 1 - progress * 0.7);
-              pitLiquidRef.current.position.y = -0.6 - progress * 0.35;
+            // Pit sludge level drops
+            if (pitLiquidRef.current && currentWorksite === 'summit') {
+              pitLiquidRef.current.scale.y = Math.max(0.1, 1 - extractProgress * 0.7);
+              pitLiquidRef.current.position.y = -0.6 - extractProgress * 0.35;
             }
 
-            // Sludge inside vehicle holding tank fills up!
+            // Vehicle tank sludge fills up
             if (vehicleTankLiquidRef.current) {
-              const fillScale = 0.15 + progress * 0.85;
+              const fillScale = 0.15 + extractProgress * 0.85;
               vehicleTankLiquidRef.current.scale.y = fillScale;
             }
 
-            // Real-time floating level indicator sphere inside sight glass
+            // Level sight float rises
             if (levelSightFloatRef.current) {
-              levelSightFloatRef.current.position.y = 0.46 - 0.16 + progress * 0.32;
+              levelSightFloatRef.current.position.y = 0.46 - 0.16 + extractProgress * 0.32;
             }
 
-            // Real-time world positions of manhole and intake manifold
-            const summitStationPt = summitGroupRef.current
+            // World coordinates of active worksite manhole and vehicle intake manifold
+            let activeWorksitePt = summitGroupRef.current
               ? summitGroupRef.current.localToWorld(new THREE.Vector3(0, 0.25, 0))
               : roadCurveRef.current.getPoint(0.98).clone().add(new THREE.Vector3(0, 0.25, 0));
+
+            if (currentWorksite === 'alley' && alleyManholeRef.current) {
+              activeWorksitePt = alleyManholeRef.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0));
+            } else if (currentWorksite === 'station' && serviceManholeRef.current) {
+              activeWorksitePt = serviceManholeRef.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0));
+            }
+
             const manifoldPt = vehicleGroupRef.current
               ? vehicleGroupRef.current.localToWorld(new THREE.Vector3(0, 0.55, -1.02))
-              : summitStationPt.clone().add(new THREE.Vector3(0, 0.98, -1.28));
+              : activeWorksitePt.clone().add(new THREE.Vector3(0, 0.98, -1.28));
 
             const dynamicHoseCurve = new THREE.CatmullRomCurve3([
-              summitStationPt,
-              summitStationPt.clone().lerp(manifoldPt, 0.35).add(new THREE.Vector3(0, 0.55, 0)),
-              summitStationPt.clone().lerp(manifoldPt, 0.70).add(new THREE.Vector3(0, 0.35, 0)),
+              activeWorksitePt,
+              activeWorksitePt.clone().lerp(manifoldPt, 0.35).add(new THREE.Vector3(0, 0.55, 0)),
+              activeWorksitePt.clone().lerp(manifoldPt, 0.70).add(new THREE.Vector3(0, 0.35, 0)),
               manifoldPt
             ]);
 
-            // Update physical flexible suction hose tube
-            if (suctionHoseTubeRef.current && (!suctionHoseTubeRef.current.visible || desludgeTimerRef.current < 2.5)) {
+            // Physical suction hose tube
+            if (suctionHoseTubeRef.current) {
               suctionHoseTubeRef.current.geometry.dispose();
               suctionHoseTubeRef.current.geometry = new THREE.TubeGeometry(dynamicHoseCurve, 24, 0.038, 8, false);
               suctionHoseTubeRef.current.visible = true;
             }
 
-            // Pumping Flow Stream Particles VFX along flexible hose
+            // Flow Particles VFX
             if (suctionFlowPointsRef.current) {
               suctionFlowPointsRef.current.visible = true;
               const fGeo = suctionFlowPointsRef.current.geometry;
               const fPos = fGeo.attributes.position.array as Float32Array;
-
               for (let i = 0; i < 120; i++) {
                 const curOffset = ((i / 120) + elapsed * 1.8) % 1.0;
                 const ptOnCurve = dynamicHoseCurve.getPoint(curOffset);
@@ -3006,47 +3351,176 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               fGeo.attributes.position.needsUpdate = true;
             }
 
-            // Pulse & animate aerated foam froth
-            if (foamTexRef.current) {
-              foamTexRef.current.offset.y = (foamTexRef.current.offset.y + delta * 0.25) % 1.0;
-            }
-            if (tankFoamMeshRef.current) {
-              tankFoamMeshRef.current.scale.set(
-                1.0 + Math.sin(elapsed * 14) * 0.04,
-                1,
-                1.0 + Math.cos(elapsed * 12) * 0.04
-              );
-              (tankFoamMeshRef.current.material as THREE.MeshStandardMaterial).opacity =
-                0.55 + Math.sin(elapsed * 8) * 0.2;
-            }
-
-            // Audio: pump sound activates
+            // Pump audio
             if (pumpGainRef.current) {
               pumpGainRef.current.gain.setValueAtTime(0.2, audioCtxRef.current?.currentTime || 0);
             }
-          } else {
-            setDesludgeStage('completed');
-            if (suctionHoseTubeRef.current) {
-              suctionHoseTubeRef.current.visible = false;
-            }
-            if (suctionFlowPointsRef.current) {
-              suctionFlowPointsRef.current.visible = false;
-            }
+          } else if (missionT < 14.5) {
+            // 4. Settling Rest Phase (Pump disengaged, heavy solids settling)
+            setMissionStage('settling');
+            if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
             if (pumpGainRef.current) {
               pumpGainRef.current.gain.setValueAtTime(0, audioCtxRef.current?.currentTime || 0);
+            }
+          } else if (missionT < 23.5) {
+            // 5. Hydraulic Compaction & Dewatering Phase
+            setMissionStage('compacting');
+            setPistonMode('EXTENDING');
+            isTransportLockedRef.current = false;
+            const compProgress = (missionT - 14.5) / 9.0;
+            pistonStrokeMmRef.current = Math.min(520, Math.round(compProgress * 520));
+          } else if (missionT < 28.0) {
+            // 6. Platen Retraction & Mechanical Transport Retention Locking
+            setMissionStage('securing');
+            setPistonMode('RETRACTING');
+            const secProgress = (missionT - 23.5) / 4.5;
+            pistonStrokeMmRef.current = Math.max(0, Math.round(520 * (1 - secProgress)));
+            if (pistonStrokeMmRef.current === 0) {
+              isTransportLockedRef.current = true;
+              setPistonMode('LOCKED');
+            }
+          } else {
+            // 7. Worksite Mission Complete & Transport Readiness Confirmed
+            setMissionStage('ready_to_travel');
+            setDesludgeStage('completed');
+            if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = false;
+            if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
+            // Stow outriggers & boom
+            outriggersRef.current.forEach((jack) => {
+              jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.06, 0.08);
+            });
+            if (suctionArmRef.current) {
+              suctionArmRef.current.rotation.x = THREE.MathUtils.lerp(suctionArmRef.current.rotation.x, 0.0, 0.08);
             }
           }
         }
 
-        // Hide flow particles & tube when not pumping
-        if (currentDrive !== 'desludge') {
+        // Hide flow particles & tube when not actively extracting
+        if (currentDrive !== 'desludge' || (desludgeTimerRef.current >= 12.5)) {
           if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
-          if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = false;
-          if (vehicleTankLiquidRef.current) vehicleTankLiquidRef.current.scale.y = 1.0;
-          if (levelSightFloatRef.current) levelSightFloatRef.current.position.y = 0.46 + 0.16;
+          if (suctionHoseTubeRef.current && currentDrive !== 'desludge') suctionHoseTubeRef.current.visible = false;
         }
 
-        // Retract outriggers and suction arm back to travel position when not desludging
+        // Manual Piston Mode Execution (Outside Auto Mission Sequence)
+        if (currentDrive !== 'desludge') {
+          const curPistonMode = pistonModeRef.current;
+          if (curPistonMode === 'EXTENDING') {
+            if (currentDrive !== 'parked') {
+              setInterlockWarning('MOTION INTERLOCK: Compaction piston cannot extend while vehicle is in motion!');
+              pistonModeRef.current = 'HOLD';
+              setPistonMode('HOLD');
+            } else {
+              isTransportLockedRef.current = false;
+              pistonStrokeMmRef.current = Math.min(600, pistonStrokeMmRef.current + delta * 35);
+              if (pistonStrokeMmRef.current >= 600) {
+                pistonModeRef.current = 'HOLD';
+                setPistonMode('HOLD');
+              }
+            }
+          } else if (curPistonMode === 'RETRACTING') {
+            pistonStrokeMmRef.current = Math.max(0, pistonStrokeMmRef.current - delta * 60);
+            if (pistonStrokeMmRef.current <= 0) {
+              pistonModeRef.current = 'HOME';
+              setPistonMode('HOME');
+            }
+          } else if (curPistonMode === 'LOCKED') {
+            pistonStrokeMmRef.current = 0;
+            isTransportLockedRef.current = true;
+          }
+        }
+
+        // =====================================================================
+        // COMPACTION KINEMATICS & DEWATERING 3D MESH ARTICULATION
+        // =====================================================================
+        const strokeMm = pistonStrokeMmRef.current;
+        const strokeRatio = strokeMm / 600;
+
+        // Dewatering physics calculations via sludgeCompactionModel
+        const dewateringResult = calculateDewateringState(
+          strokeMm,
+          0, // Contact occurs at top of loaded sludge bed
+          400, // Initial 400L septage
+          DEFAULT_COMPACTION_PARAMS
+        );
+
+        // Update Compaction Platen Vertical Position (y: 0.72 -> 0.25)
+        if (compactionPlatenRef.current) {
+          compactionPlatenRef.current.position.y = 0.72 - strokeRatio * 0.47;
+        }
+
+        // Update Guided Chrome Piston Rod Extension
+        if (pistonRodRef.current) {
+          pistonRodRef.current.position.y = 0.92 - strokeRatio * 0.235;
+          pistonRodRef.current.scale.y = 1.0 + strokeRatio * 0.75;
+        }
+
+        // Update Expressed Translucent Liquid Filtrate Layer
+        if (filtrateMeshRef.current) {
+          if (strokeMm > 25) {
+            filtrateMeshRef.current.visible = true;
+            filtrateMeshRef.current.position.y = 0.72 - strokeRatio * 0.47 + 0.025;
+            (filtrateMeshRef.current.material as THREE.MeshPhysicalMaterial).opacity = Math.min(
+              0.85,
+              0.25 + strokeRatio * 0.60
+            );
+          } else {
+            filtrateMeshRef.current.visible = false;
+            (filtrateMeshRef.current.material as THREE.MeshPhysicalMaterial).opacity = 0;
+          }
+        }
+
+        // Update Sludge Bed Compression underneath platen
+        if (vehicleTankLiquidRef.current && currentDrive !== 'desludge') {
+          const compScale = Math.max(0.40, 1.0 - strokeRatio * 0.42);
+          vehicleTankLiquidRef.current.scale.y = compScale;
+          vehicleTankLiquidRef.current.position.y = -(strokeRatio * 0.12);
+        }
+
+        // Update Mechanical Transport Retention Lock Pins
+        if (pistonLockPinsRef.current.length === 2) {
+          const isLocked = isTransportLockedRef.current;
+          const targetL = isLocked ? -0.25 : -0.32;
+          const targetR = isLocked ? 0.25 : 0.32;
+          pistonLockPinsRef.current[0].position.x = THREE.MathUtils.lerp(
+            pistonLockPinsRef.current[0].position.x,
+            targetL,
+            0.15
+          );
+          pistonLockPinsRef.current[1].position.x = THREE.MathUtils.lerp(
+            pistonLockPinsRef.current[1].position.x,
+            targetR,
+            0.15
+          );
+        }
+
+        // Update Safety Lock Status LED
+        if (pistonStatusLedRef.current) {
+          const ledMat = pistonStatusLedRef.current.material as THREE.MeshBasicMaterial;
+          if (isTransportLockedRef.current) {
+            ledMat.color.setHex(0x22c55e); // Green: locked & transit-ready
+          } else if (pistonModeRef.current === 'EXTENDING' || missionStage === 'compacting') {
+            ledMat.color.setHex(0xf59e0b); // Amber: compacting
+          } else if (pistonModeRef.current === 'RETRACTING' || missionStage === 'securing') {
+            ledMat.color.setHex(0xa855f7); // Purple: retracting
+          } else {
+            ledMat.color.setHex(0xef4444); // Red: unlocked/holding
+          }
+        }
+
+        // Periodic Throttle Sync to React State for Telemetry HUD (every ~100ms)
+        if (Math.round(elapsed * 10) % 2 === 0) {
+          setPistonStrokeMm(Math.round(strokeMm));
+          setAppliedPressureBar(dewateringResult.hydraulicPressureBar);
+          setCompactionForceKn(
+            Math.round(calculateCylinderForceKn(dewateringResult.hydraulicPressureBar, DEFAULT_COMPACTION_PARAMS.boreDiameterMm) * 10) / 10
+          );
+          setCakeVolumeL(Math.round(dewateringResult.cakeVolumeL));
+          setFiltrateVolumeL(Math.round(dewateringResult.filtrateVolumeL));
+          setCompactionRatio(dewateringResult.compactionRatio);
+          setIsTransportLocked(isTransportLockedRef.current);
+        }
+
+        // Retract outriggers and suction arm back to travel position when not in mission
         if (driveMode !== 'desludge') {
           outriggersRef.current.forEach((jack) => {
             jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.06, 0.08);
@@ -3719,7 +4193,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   };
 
   // Interactive 1-Click Stress Test Trigger Handlers
-  const runStressTest = (testType: 'none' | 'hill_brake' | 'hairpin_turn' | 'freeze_surge') => {
+  const runStressTest = (
+    testType: 'none' | 'hill_brake' | 'hairpin_turn' | 'freeze_surge' | 'muddy_traction' | 'narrow_alley'
+  ) => {
     setActiveStressTest(testType);
     activeStressTestRef.current = testType;
     stressTimerRef.current = 0;
@@ -3739,20 +4215,100 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       setActiveWeather('snow');
       setSlopeDeg(30.0);
       setVehicleSpeedKmh(12);
+    } else if (testType === 'muddy_traction') {
+      setDriveMode('auto_climb');
+      setActiveWeather('rain');
+      setSlopeDeg(26.0);
+      setVehicleSpeedKmh(10);
+    } else if (testType === 'narrow_alley') {
+      setSelectedWorksite('alley');
+      selectedWorksiteRef.current = 'alley';
+      pathProgressRef.current = 0.18;
+      setDriveMode('parked');
+      setCameraMode('chase');
     } else {
       setDriveMode('auto_climb');
       setVehicleSpeedKmh(14);
     }
   };
 
-  // Launch Full Automated Desludging Mission
-  const startDesludgingMission = () => {
+  // Launch Full Automated Desludging Mission at target worksite
+  const startDesludgingMission = (worksite: 'alley' | 'station' | 'summit' = selectedWorksite) => {
     runStressTest('none');
+    setSelectedWorksite(worksite);
+    selectedWorksiteRef.current = worksite;
     setDriveMode('desludge');
     setCameraMode('desludge');
     desludgeTimerRef.current = 0;
     setDesludgeStage('deploying');
+    setMissionStage('stabilizing');
     setDesludgeProgressPct(0);
+    setInterlockWarning(null);
+    setIsEStopActive(false);
+  };
+
+  // Emergency Stop Trigger
+  const triggerEmergencyStop = () => {
+    setIsEStopActive(true);
+    isEStopActiveRef.current = true;
+    setDriveMode('parked');
+    driveModeRef.current = 'parked';
+    setVehicleSpeedKmh(0);
+    setPistonMode('HOLD');
+    pistonModeRef.current = 'HOLD';
+    setInterlockWarning('EMERGENCY STOP ENGAGED: All drive motors, vacuum pumps, and hydraulic compaction actuators halted.');
+  };
+
+  const resumeFromEStop = () => {
+    setIsEStopActive(false);
+    isEStopActiveRef.current = false;
+    setInterlockWarning(null);
+  };
+
+  // Manual Piston Handlers with Interlocks
+  const handleExtendPiston = () => {
+    if (driveMode !== 'parked' && driveMode !== 'desludge') {
+      setInterlockWarning('MOTION INTERLOCK: Compaction piston operation blocked while vehicle is in motion!');
+      return;
+    }
+    if (desludgeStage === 'pumping') {
+      setInterlockWarning('SUCTION INTERLOCK: Cannot compact sludge bed during active vacuum extraction!');
+      return;
+    }
+    setInterlockWarning(null);
+    setPistonMode('EXTENDING');
+    pistonModeRef.current = 'EXTENDING';
+  };
+
+  const handleRetractPiston = () => {
+    setInterlockWarning(null);
+    setPistonMode('RETRACTING');
+    pistonModeRef.current = 'RETRACTING';
+  };
+
+  const handleHoldPiston = () => {
+    setPistonMode('HOLD');
+    pistonModeRef.current = 'HOLD';
+  };
+
+  const handleLockTransportPins = () => {
+    if (pistonStrokeMm > 5) {
+      setInterlockWarning('LOCK INTERLOCK: Piston platen must be fully returned to Top Home (0mm) before transport retention pin can engage!');
+      return;
+    }
+    setInterlockWarning(null);
+    setPistonMode('LOCKED');
+    pistonModeRef.current = 'LOCKED';
+    setIsTransportLocked(true);
+    isTransportLockedRef.current = true;
+  };
+
+  const handleWorksiteSelect = (ws: 'alley' | 'station' | 'summit') => {
+    setSelectedWorksite(ws);
+    selectedWorksiteRef.current = ws;
+    const targetT = ws === 'alley' ? 0.18 : ws === 'station' ? 0.42 : 0.98;
+    pathProgressRef.current = targetT;
+    setCameraMode(ws === 'summit' ? 'desludge' : 'tank');
   };
 
   return (
@@ -3940,6 +4496,25 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         </div>
       </div>
 
+      {/* Safety Interlock & E-Stop Alert Banner */}
+      {interlockWarning && (
+        <div className="p-3 bg-rose-950/90 border border-rose-500 rounded-lg text-xs font-mono text-rose-200 flex items-center justify-between shadow-xl animate-pulse">
+          <div className="flex items-center space-x-2">
+            <AlertOctagon className="w-5 h-5 text-rose-400 shrink-0" />
+            <span className="font-bold">{interlockWarning}</span>
+          </div>
+          <button
+            onClick={() => {
+              setInterlockWarning(null);
+              if (isEStopActive) resumeFromEStop();
+            }}
+            className="px-2.5 py-1 bg-rose-900 hover:bg-rose-800 text-rose-100 rounded text-[11px] font-bold"
+          >
+            {isEStopActive ? 'Reset E-Stop' : 'Dismiss'}
+          </button>
+        </div>
+      )}
+
       {/* 3D Viewport & Interactive HUD */}
       <div
         className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl h-[820px]"
@@ -3948,11 +4523,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         <canvas ref={canvasRef} className="w-full h-full block cursor-grab active:cursor-grabbing" />
 
         {/* Top-Right Telemetry & Sensor HUD */}
-        <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-lg p-3 text-xs shadow-xl w-64 pointer-events-auto">
+        <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-lg p-3 text-xs shadow-xl w-72 pointer-events-auto">
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
             <span className="font-bold text-white flex items-center space-x-1.5">
               <Gauge className="w-4 h-4 text-emerald-400" />
-              <span>Ascent Telemetry</span>
+              <span>Machine & Ascent Telemetry</span>
             </span>
             <span className="text-[10px] bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded font-mono border border-emerald-800">
               60 FPS
@@ -3967,6 +4542,16 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             <div className="flex justify-between">
               <span className="text-slate-400">Ground Speed:</span>
               <span className="text-emerald-400 font-bold">{vehicleSpeedKmh} km/h</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Target Worksite:</span>
+              <span className="text-cyan-400 font-bold uppercase">
+                {selectedWorksite === 'alley'
+                  ? 'Narrow Alley (0.18)'
+                  : selectedWorksite === 'station'
+                  ? 'Service Station (0.42)'
+                  : 'Summit Vault (0.98)'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Payload Volume:</span>
@@ -4008,6 +4593,62 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 {stabilityMarginPct}%
               </span>
             </div>
+
+            {/* Hydraulic Sludge-Compaction & Dewatering Telemetry */}
+            <div className="pt-2 mt-2 border-t border-slate-800 space-y-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center space-x-1">
+                  <Cog className="w-3 h-3 text-emerald-400" />
+                  <span>Compaction Piston</span>
+                </span>
+                <span
+                  className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                    isTransportLocked
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                      : 'bg-amber-950 text-amber-400 border border-amber-800 animate-pulse'
+                  }`}
+                >
+                  {isTransportLocked ? 'PIN LOCKED' : 'UNLOCKED'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Piston Stroke:</span>
+                <span className="text-white font-bold">
+                  {pistonStrokeMm} mm / 600 mm ({((pistonStrokeMm / 600) * 100).toFixed(0)}%)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Hydraulic Pressure:</span>
+                <span className="text-cyan-400 font-bold">{appliedPressureBar.toFixed(1)} bar / 180 bar</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Compaction Thrust:</span>
+                <span className="text-amber-400 font-bold">{compactionForceKn.toFixed(1)} kN</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Cake / Filtrate Vol:</span>
+                <span className="text-slate-200">
+                  {cakeVolumeL}L cake · {filtrateVolumeL}L filtrate
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Compaction Ratio:</span>
+                <span className="text-emerald-400 font-bold">
+                  {compactionRatio.toFixed(2)}× ({((1 - cakeVolumeL / 400) * 100).toFixed(1)}% red.)
+                </span>
+              </div>
+              <div className="flex justify-between pt-0.5">
+                <span className="text-slate-400">Transport Interlock:</span>
+                <span
+                  className={`font-bold ${
+                    isTransportLocked ? 'text-emerald-400' : 'text-rose-400 animate-pulse'
+                  }`}
+                >
+                  {isTransportLocked ? 'READY (SAFE)' : 'BLOCKED (INTERLOCK)'}
+                </span>
+              </div>
+            </div>
+
             {activeStressTest !== 'none' && (
               <div className="mt-1.5 pt-1.5 border-t border-slate-800">
                 <span className="text-[10px] text-amber-400 font-bold block">
@@ -4022,6 +4663,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                     ? hasBaffles
                       ? 'Ix = I0/9 · Safe lateral vector'
                       : 'WARNING: Fluid tilting outward!'
+                    : activeStressTest === 'muddy_traction'
+                    ? '28 kPa Ground Pressure · Cleats bit into clay'
+                    : activeStressTest === 'narrow_alley'
+                    ? '1.4m Machine Width cleared 1.5m alley passage'
                     : '1400 cP Viscous Damping · PMAC 11.4 kW'}
                 </span>
               </div>
@@ -4030,14 +4675,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         </div>
 
         {/* Top-Center Interactive 1-Click Engineering Stress Scenarios Bar */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-lg p-2 text-xs shadow-xl pointer-events-auto flex items-center space-x-2 z-10">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-lg p-2 text-xs shadow-xl pointer-events-auto flex items-center space-x-2 z-10 max-w-2xl overflow-x-auto">
           <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1 pl-1 pr-1 font-mono">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden md:inline">Stress Tests:</span>
           </span>
           <button
             onClick={() => runStressTest(activeStressTest === 'hill_brake' ? 'none' : 'hill_brake')}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 shrink-0 ${
               activeStressTest === 'hill_brake'
                 ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -4048,7 +4693,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           </button>
           <button
             onClick={() => runStressTest(activeStressTest === 'hairpin_turn' ? 'none' : 'hairpin_turn')}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 shrink-0 ${
               activeStressTest === 'hairpin_turn'
                 ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -4059,7 +4704,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           </button>
           <button
             onClick={() => runStressTest(activeStressTest === 'freeze_surge' ? 'none' : 'freeze_surge')}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 shrink-0 ${
               activeStressTest === 'freeze_surge'
                 ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -4068,10 +4713,32 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           >
             <span>Sub-Zero Freeze Surge</span>
           </button>
+          <button
+            onClick={() => runStressTest(activeStressTest === 'muddy_traction' ? 'none' : 'muddy_traction')}
+            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 shrink-0 ${
+              activeStressTest === 'muddy_traction'
+                ? 'bg-amber-700 text-white shadow-lg shadow-amber-700/30'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+            title="Simulates low-traction muddy mountain slope to test rubber track crawler cleats"
+          >
+            <span>Muddy Ground</span>
+          </button>
+          <button
+            onClick={() => runStressTest(activeStressTest === 'narrow_alley' ? 'none' : 'narrow_alley')}
+            className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center space-x-1 shrink-0 ${
+              activeStressTest === 'narrow_alley'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+            title="Positions vehicle at Waypoint 1 (Narrow 1.5m clearance alleyway)"
+          >
+            <span>Narrow Alley (1.5m)</span>
+          </button>
           {activeStressTest !== 'none' && (
             <button
               onClick={() => runStressTest('none')}
-              className="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-400 hover:text-white transition"
+              className="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-400 hover:text-white transition shrink-0"
               title="Reset to Standard Ascent"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -4107,10 +4774,63 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </span>
           </div>
 
-          {/* Drive Mode Buttons */}
+          {/* Worksite Destination Waypoint Selector */}
+          <div className="pt-1">
+            <div className="flex items-center justify-between text-[11px] mb-1 font-mono">
+              <span className="text-slate-400">Worksite Waypoint:</span>
+              <span className="text-cyan-400 font-bold uppercase">
+                {selectedWorksite === 'alley' ? 'Narrow Alley (t=0.18)' : selectedWorksite === 'station' ? 'Service Bay (t=0.42)' : 'Summit Pit (t=0.98)'}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                onClick={() => handleWorksiteSelect('alley')}
+                className={`py-1 px-1.5 rounded text-[10px] font-bold transition flex items-center justify-center space-x-1 ${
+                  selectedWorksite === 'alley'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+                title="Narrow access alleyway worksite (t = 0.18)"
+              >
+                <span>Alley (0.18)</span>
+              </button>
+              <button
+                onClick={() => handleWorksiteSelect('station')}
+                className={`py-1 px-1.5 rounded text-[10px] font-bold transition flex items-center justify-center space-x-1 ${
+                  selectedWorksite === 'station'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+                title="Roadside service layby sanitation vault (t = 0.42)"
+              >
+                <span>Station (0.42)</span>
+              </button>
+              <button
+                onClick={() => handleWorksiteSelect('summit')}
+                className={`py-1 px-1.5 rounded text-[10px] font-bold transition flex items-center justify-center space-x-1 ${
+                  selectedWorksite === 'summit'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+                title="Summit Kath-Kuni cottage septic pit (t = 0.98)"
+              >
+                <span>Summit (0.98)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Drive & Mission Mode Action Buttons */}
           <div className="flex items-center space-x-1.5">
             <button
-              onClick={() => setDriveMode(driveMode === 'auto_climb' ? 'parked' : 'auto_climb')}
+              onClick={() => {
+                if (driveMode !== 'auto_climb') {
+                  if (pistonStrokeMm > 5 || !isTransportLocked) {
+                    setInterlockWarning('TRANSPORT INTERLOCK: Compaction piston must be at 0mm (Home) and Transport Pin locked before travel!');
+                    return;
+                  }
+                }
+                setDriveMode(driveMode === 'auto_climb' ? 'parked' : 'auto_climb');
+              }}
               className={`flex-1 py-1.5 rounded font-bold text-xs flex items-center justify-center space-x-1.5 transition ${
                 driveMode === 'auto_climb'
                   ? 'bg-amber-600 hover:bg-amber-500 text-white'
@@ -4122,20 +4842,28 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </button>
 
             <button
-              onClick={startDesludgingMission}
+              onClick={() => startDesludgingMission(selectedWorksite)}
               className={`flex-1 py-1.5 rounded font-bold text-xs flex items-center justify-center space-x-1 transition ${
                 driveMode === 'desludge'
                   ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
                   : 'bg-slate-800 text-cyan-300 hover:bg-slate-700'
               }`}
-              title="Deploy Outriggers & Unfurl Suction Hose to Desludge Pit"
+              title="Execute full 7-stage desludging & dewatering mission"
             >
               <Droplet className="w-3.5 h-3.5" />
-              <span>Desludge Pit</span>
+              <span>Mission Demo</span>
             </button>
 
             <button
-              onClick={() => setDriveMode('manual')}
+              onClick={() => {
+                if (driveMode !== 'manual') {
+                  if (pistonStrokeMm > 5 || !isTransportLocked) {
+                    setInterlockWarning('TRANSPORT INTERLOCK: Compaction piston must be at 0mm (Home) and Transport Pin locked before travel!');
+                    return;
+                  }
+                }
+                setDriveMode('manual');
+              }}
               className={`px-2.5 py-1.5 rounded font-semibold text-xs transition ${
                 driveMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
@@ -4144,35 +4872,211 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </button>
           </div>
 
-          {/* Desludging Operation Progress Modal/Card */}
+          {/* Full-Scale Sequenced Desludging & Compaction Operation Modal Card */}
           {driveMode === 'desludge' && (
             <div className="p-2.5 bg-slate-950 border border-cyan-800/60 rounded-lg space-y-2">
               <div className="flex items-center justify-between text-[11px] font-mono">
                 <span className="text-cyan-400 font-bold flex items-center space-x-1">
-                  <Droplet className="w-3.5 h-3.5 animate-bounce" />
+                  <Droplet className="w-3.5 h-3.5 animate-bounce text-cyan-400" />
                   <span>
-                    {desludgeStage === 'deploying'
-                      ? 'Deploying Stabilizers & Hose...'
-                      : desludgeStage === 'pumping'
-                      ? 'Pumping Viscous Sludge...'
-                      : 'Extraction Complete!'}
+                    {missionStage === 'stabilizing'
+                      ? 'Stage 1/7: Deploying Outriggers & Boom...'
+                      : missionStage === 'priming'
+                      ? 'Stage 2/7: Priming Macerator Pump...'
+                      : missionStage === 'extracting'
+                      ? `Stage 3/7: Vacuum Transferring Sludge (${pumpedVolumeLiters}L)...`
+                      : missionStage === 'settling'
+                      ? 'Stage 4/7: Settling Period (Bed Clarification)...'
+                      : missionStage === 'compacting'
+                      ? `Stage 5/7: Compaction Platen Pressing (${pistonStrokeMm}mm · ${appliedPressureBar.toFixed(0)} bar)...`
+                      : missionStage === 'securing'
+                      ? 'Stage 6/7: Retracting Platen & Engaging Lock Pins...'
+                      : 'Stage 7/7: Desludging & Dewatering Complete!'}
                   </span>
                 </span>
                 <span className="text-white font-bold">{desludgeProgressPct}%</span>
               </div>
               <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-300"
-                  style={{ width: `${desludgeProgressPct}%` }}
+                  className="h-full bg-gradient-to-r from-cyan-500 via-emerald-400 to-amber-400 transition-all duration-300"
+                  style={{
+                    width: `${
+                      missionStage === 'stabilizing'
+                        ? 14
+                        : missionStage === 'priming'
+                        ? 28
+                        : missionStage === 'extracting'
+                        ? 28 + (desludgeProgressPct * 0.3)
+                        : missionStage === 'settling'
+                        ? 60
+                        : missionStage === 'compacting'
+                        ? 60 + ((pistonStrokeMm / 520) * 25)
+                        : missionStage === 'securing'
+                        ? 88
+                        : 100
+                    }%`
+                  }}
                 />
               </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>Transferred: {pumpedVolumeLiters}L / 400L</span>
-                <span>Vacuum: -0.78 bar</span>
-                <span>Flow: 82 L/min</span>
+              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300 font-mono">
+                <div>Sludge Cake: <span className="text-amber-400 font-bold">{cakeVolumeL} L</span></div>
+                <div>Filtrate Sheen: <span className="text-cyan-400 font-bold">{filtrateVolumeL} L</span></div>
+                <div>Compaction Thrust: <span className="text-white font-bold">{compactionForceKn.toFixed(1)} kN</span></div>
+                <div>Volume Red.: <span className="text-emerald-400 font-bold">{compactionRatio.toFixed(2)}×</span></div>
               </div>
             </div>
           )}
+
+          {/* Hydraulic Sludge-Compaction Piston Dedicated Control Box */}
+          <div className="p-2.5 bg-slate-950/90 border border-slate-700/80 rounded-lg space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-mono">
+              <span className="font-bold text-white flex items-center space-x-1">
+                <Cog className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Hydraulic Compaction Piston</span>
+              </span>
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                  pistonMode === 'LOCKED'
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                    : pistonMode === 'EXTENDING'
+                    ? 'bg-amber-950 text-amber-300 border border-amber-700 animate-pulse'
+                    : pistonMode === 'RETRACTING'
+                    ? 'bg-purple-950 text-purple-300 border border-purple-700'
+                    : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                {pistonMode}
+              </span>
+            </div>
+
+            {/* Piston Action Buttons */}
+            <div className="grid grid-cols-4 gap-1">
+              <button
+                onClick={handleExtendPiston}
+                className={`py-1 px-1 rounded text-[10px] font-bold transition flex items-center justify-center space-x-0.5 ${
+                  pistonMode === 'EXTENDING'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-amber-400 hover:bg-slate-700'
+                }`}
+                title="Extend hydraulic compaction cylinder into sludge bed"
+              >
+                <span>Extend</span>
+              </button>
+              <button
+                onClick={handleRetractPiston}
+                className={`py-1 px-1 rounded text-[10px] font-bold transition flex items-center justify-center space-x-0.5 ${
+                  pistonMode === 'RETRACTING'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-purple-400 hover:bg-slate-700'
+                }`}
+                title="Retract piston platen up to Top Home position"
+              >
+                <span>Retract</span>
+              </button>
+              <button
+                onClick={handleHoldPiston}
+                className={`py-1 px-1 rounded text-[10px] font-bold transition flex items-center justify-center space-x-0.5 ${
+                  pistonMode === 'HOLD'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+                title="Hold hydraulic cylinder at current stroke depth"
+              >
+                <span>Hold</span>
+              </button>
+              <button
+                onClick={handleLockTransportPins}
+                className={`py-1 px-1 rounded text-[10px] font-bold transition flex items-center justify-center space-x-0.5 ${
+                  isTransportLocked
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-emerald-400 hover:bg-slate-700'
+                }`}
+                title="Engage mechanical retention lock pins for transport"
+              >
+                <Lock className="w-2.5 h-2.5 mr-0.5" />
+                <span>Lock</span>
+              </button>
+            </div>
+
+            {/* Stroke Depth Indicator / Slider */}
+            <div>
+              <div className="flex justify-between text-[10px] font-mono text-slate-400 mb-0.5">
+                <span>Piston Stroke:</span>
+                <span className="text-white font-bold">{pistonStrokeMm} mm / 600 mm</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="600"
+                step="5"
+                value={pistonStrokeMm}
+                onChange={(e) => {
+                  if (driveMode !== 'parked') {
+                    setInterlockWarning('MOTION INTERLOCK: Cannot manually adjust piston while vehicle is moving.');
+                    return;
+                  }
+                  const val = parseInt(e.target.value);
+                  setPistonStrokeMm(val);
+                  pistonStrokeMmRef.current = val;
+                  if (val > 0) {
+                    setIsTransportLocked(false);
+                    isTransportLockedRef.current = false;
+                    setPistonMode('HOLD');
+                    pistonModeRef.current = 'HOLD';
+                  } else {
+                    setPistonMode('HOME');
+                    pistonModeRef.current = 'HOME';
+                  }
+                }}
+                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+              />
+            </div>
+
+            <div className="flex justify-between text-[10px] font-mono pt-1 border-t border-slate-800">
+              <span className="text-slate-400">Pressure / Force:</span>
+              <span className="text-cyan-400 font-bold">{appliedPressureBar.toFixed(0)} bar · {compactionForceKn.toFixed(0)} kN</span>
+            </div>
+          </div>
+
+          {/* Safety E-Stop Button */}
+          <div className="pt-1">
+            <button
+              onClick={isEStopActive ? resumeFromEStop : triggerEmergencyStop}
+              className={`w-full py-1.5 rounded font-bold text-xs flex items-center justify-center space-x-1.5 transition ${
+                isEStopActive
+                  ? 'bg-rose-700 text-white animate-pulse shadow-lg shadow-rose-700/50'
+                  : 'bg-rose-950/80 border border-rose-600/70 text-rose-300 hover:bg-rose-900'
+              }`}
+            >
+              <AlertOctagon className="w-4 h-4 text-rose-400" />
+              <span>{isEStopActive ? 'EMERGENCY STOPPED (CLICK TO RESET)' : 'EMERGENCY STOP (E-STOP)'}</span>
+            </button>
+          </div>
+
+          {/* Tank Cutaway View Controls */}
+          <div className="pt-2 border-t border-slate-800 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-mono">
+              <span className="text-slate-400">Tank Cutaway Opacity:</span>
+              <span className="text-emerald-400 font-bold">{Math.round(cutawayOpacity * 100)}%</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="range"
+                min="0.2"
+                max="1.0"
+                step="0.05"
+                value={cutawayOpacity}
+                onChange={(e) => setCutawayOpacity(parseFloat(e.target.value))}
+                className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              />
+              <button
+                onClick={() => setCutawayOpacity(cutawayOpacity > 0.8 ? 0.45 : 1.0)}
+                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-semibold text-slate-300"
+              >
+                {cutawayOpacity > 0.8 ? 'Cutaway ON' : 'Opaque'}
+              </button>
+            </div>
+          </div>
 
           {/* Manual Drive Controls (Arrow buttons + WASD info) */}
           {driveMode === 'manual' && (
@@ -4481,13 +5385,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             { id: 'macerator', label: 'Macerator & Cavity Pump' },
             { id: 'outriggers', label: 'Hydraulic Outriggers' },
             { id: 'suction_arm', label: 'Articulated Suction Arm' },
+            { id: 'piston', label: 'Hydraulic Compaction Platen' },
             { id: 'vault', label: 'Kath-Kuni Septic Station' }
           ].map((item) => (
             <button
               key={item.id}
               onClick={() => {
                 setSelectedCallout(item.id as any);
-                if (item.id === 'tank' || item.id === 'baffles') {
+                if (item.id === 'tank' || item.id === 'baffles' || item.id === 'piston') {
                   setCameraMode('tank');
                 } else if (item.id === 'vault') {
                   setCameraMode('desludge');
@@ -4618,6 +5523,25 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                   <span className="text-slate-400 block font-sans font-bold text-white mb-0.5">Gas Safety Interlock</span>
                   <span className="text-emerald-400 font-bold">H2S &amp; CH4 Multi-Gas Sensors</span>
                   <p className="text-slate-400 text-[10px] font-sans mt-0.5">Continuous digital telemetry prevents ignition in volatile toxic sewer environments.</p>
+                </div>
+              </div>
+            )}
+            {selectedCallout === 'piston' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-[11px]">
+                <div>
+                  <span className="text-slate-400 block font-sans font-bold text-white mb-0.5">Hydraulic Cylinder &amp; Bore</span>
+                  <span className="text-emerald-400 font-bold">Ø120mm Bore · Ø60mm Rod · 600mm Stroke</span>
+                  <p className="text-slate-400 text-[10px] font-sans mt-0.5">Double-acting chrome cylinder mounted to rigid overhead bridge yoke across tank chassis rails.</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-sans font-bold text-white mb-0.5">Pressure &amp; Dewatering Thrust</span>
+                  <span className="text-cyan-400 font-bold">180 Bar Relief · 203.6 kN Thrust</span>
+                  <p className="text-slate-400 text-[10px] font-sans mt-0.5">Perforated platen with perimeter PU scraper compresses sludge cake down to 260L (1.54x compaction ratio).</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-sans font-bold text-white mb-0.5">Anti-Tilt &amp; Transport Interlock</span>
+                  <span className="text-amber-400 font-bold">Dual Ø45mm Guide Columns &amp; Lock Pins</span>
+                  <p className="text-slate-400 text-[10px] font-sans mt-0.5">Bronze bushings prevent angular tilting. Mechanical retention pins lock platen at 0mm home during travel.</p>
                 </div>
               </div>
             )}
