@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Eye,
@@ -8,7 +8,11 @@ import {
   Sun,
   Layers,
   Info,
-  Maximize2
+  Maximize2,
+  Mountain,
+  Compass,
+  TableProperties,
+  AlertTriangle
 } from 'lucide-react';
 import { useSimulationStore, INSPECTABLE_COMPONENTS } from '../../store/useSimulationStore';
 import { DigitalTwinCanvas } from '../../scene/DigitalTwinCanvas';
@@ -16,6 +20,9 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { CameraPreset } from '../../types/digitalTwin';
+import { TerrainScenarioId } from '../../types/terrainScenarios';
+import { TERRAIN_SCENARIOS } from '../../simulation/terrainFeasibilityModel';
+import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
 
 export const Simulation3DView: React.FC = () => {
   const cameraPreset = useSimulationStore((s) => s.cameraPreset);
@@ -26,6 +33,13 @@ export const Simulation3DView: React.FC = () => {
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
   const telemetry = useSimulationStore((s) => s.telemetry);
   const parameters = useSimulationStore((s) => s.parameters);
+
+  const selectedScenario = useSimulationStore((s) => s.selectedScenario);
+  const setTerrainScenario = useSimulationStore((s) => s.setTerrainScenario);
+  const terrainParams = useSimulationStore((s) => s.terrainParams);
+  const feasibility = useSimulationStore((s) => s.feasibility);
+
+  const [showComparison, setShowComparison] = useState(false);
 
   const presets: { id: CameraPreset; label: string; desc: string }[] = [
     { id: 'reset', label: 'Reset', desc: 'Standard machine overview perspective' },
@@ -40,7 +54,7 @@ export const Simulation3DView: React.FC = () => {
   const selectedData = selectedComponentId ? INSPECTABLE_COMPONENTS[selectedComponentId] : null;
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden bg-graphite-950">
+    <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden bg-graphite-950 relative select-none">
       {/* Main Large Viewport Area */}
       <div className="flex-1 relative flex flex-col h-full">
         {/* Top Floating Control Bar */}
@@ -61,6 +75,38 @@ export const Simulation3DView: React.FC = () => {
                 {p.label}
               </button>
             ))}
+          </div>
+
+          {/* Operating Environment Quick Switcher */}
+          <div className="flex items-center gap-1.5 bg-graphite-950/85 backdrop-blur-md p-1.5 rounded-xl border border-slate-800 shadow-xl pointer-events-auto font-mono text-xs">
+            <Mountain className="w-3.5 h-3.5 text-safety-500 ml-1" />
+            {(
+              [
+                { id: 'level_paved', label: 'Level' },
+                { id: 'hilly_sloped', label: 'Hilly (14°)' },
+                { id: 'narrow_restricted', label: 'Alley (1.6m)' }
+              ] as const
+            ).map((env) => (
+              <button
+                key={env.id}
+                onClick={() => setTerrainScenario(env.id as TerrainScenarioId)}
+                className={`px-2 py-1 rounded text-[11px] font-semibold transition-all ${
+                  selectedScenario === env.id
+                    ? 'bg-safety-500 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {env.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowComparison(!showComparison)}
+              title="Compare all 3 operating environments"
+              className="text-cyan-400 hover:text-cyan-300 px-1.5 py-1 text-[11px] flex items-center gap-1 border-l border-slate-800 pl-2"
+            >
+              <TableProperties className="w-3 h-3" />
+              Compare
+            </button>
           </div>
 
           {/* Layer and Shader Toggles */}
@@ -92,15 +138,6 @@ export const Simulation3DView: React.FC = () => {
               Grid
             </Button>
             <Button
-              variant={displayOptions.godRays ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => toggleDisplayOption('godRays')}
-              icon={<Sun className="w-3.5 h-3.5" />}
-              title="Toggle Volumetric Shaft Light"
-            >
-              Lighting
-            </Button>
-            <Button
               variant={displayOptions.wireframe ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => toggleDisplayOption('wireframe')}
@@ -117,47 +154,68 @@ export const Simulation3DView: React.FC = () => {
           <DigitalTwinCanvas />
         </div>
 
-        {/* Viewport Bottom Telemetry HUD Ribbon */}
+        {/* Viewport Bottom Telemetry & Terrain HUD Ribbon */}
         <div className="absolute bottom-4 left-4 right-4 z-20 pointer-events-none">
           <div className="bg-graphite-950/85 backdrop-blur-md border border-slate-800/90 rounded-xl p-3 shadow-2xl flex flex-wrap items-center justify-between gap-4 pointer-events-auto">
             <div className="flex items-center gap-4 text-xs font-mono">
               <div>
-                <span className="text-slate-400 block text-[10px]">VACUUM CORE</span>
-                <span className="text-safety-400 font-bold">
-                  {telemetry.suctionPressureKpa.toFixed(1)} kPa
+                <span className="text-slate-400 block text-[10px]">ENVIRONMENT</span>
+                <span className="text-safety-400 font-bold uppercase truncate max-w-[140px] block">
+                  {TERRAIN_SCENARIOS[selectedScenario].name}
                 </span>
               </div>
               <div className="border-l border-slate-800 pl-4">
-                <span className="text-slate-400 block text-[10px]">EXTRACTION RATE</span>
-                <span className="text-emerald-400 font-bold">
-                  {telemetry.extractionRateM3H.toFixed(1)} m³/h
+                <span className="text-slate-400 block text-[10px]">CHASSIS TILT</span>
+                <span className={`font-bold ${feasibility.effectiveTiltDeg >= 15 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {feasibility.effectiveTiltDeg.toFixed(1)}°
                 </span>
               </div>
               <div className="border-l border-slate-800 pl-4">
-                <span className="text-slate-400 block text-[10px]">SLUDGE DEPTH</span>
+                <span className="text-slate-400 block text-[10px]">ROUTING HEAD LOSS</span>
                 <span className="text-cyan-400 font-bold">
-                  {telemetry.sludgeLevelM.toFixed(2)} m
+                  {feasibility.totalRoutingLossKpa.toFixed(1)} kPa
                 </span>
               </div>
               <div className="border-l border-slate-800 pl-4">
-                <span className="text-slate-400 block text-[10px]">VIBRATION RMS</span>
-                <span className="text-slate-200 font-bold">
-                  {telemetry.vibrationRmsMmS.toFixed(2)} mm/s
+                <span className="text-slate-400 block text-[10px]">SIDE CLEARANCE</span>
+                <span className={`font-bold ${feasibility.clearanceConflictDetected ? 'text-rose-400' : 'text-slate-200'}`}>
+                  {feasibility.lateralClearanceMarginM.toFixed(2)} m
+                </span>
+              </div>
+              <div className="border-l border-slate-800 pl-4">
+                <span className="text-slate-400 block text-[10px]">STABILITY</span>
+                <span className={`font-bold uppercase ${
+                  feasibility.stabilityStatus === 'critical_unstable'
+                    ? 'text-rose-400'
+                    : feasibility.stabilityStatus === 'caution'
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
+                }`}>
+                  {feasibility.stabilityStatus}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-              <span>Hose: Ø{parameters.hoseDiameterMm}mm × {parameters.hoseLengthM}m</span>
+              <span>Hose Req: {feasibility.requiredHoseLengthM}m (Configured: {parameters.hoseLengthM}m)</span>
               <span className="text-slate-600">•</span>
-              <span>Slurry: {parameters.slurryDensityKgM3} kg/m³</span>
+              <span className="text-[10px] text-slate-500 italic">Preliminary Estimate</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Comparison Modal Overlay */}
+      {showComparison && (
+        <div className="absolute inset-4 z-40 flex items-center justify-center p-4 bg-graphite-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="max-w-4xl w-full">
+            <TerrainComparisonPanel onClose={() => setShowComparison(false)} />
+          </div>
+        </div>
+      )}
+
       {/* Right Details / Component Inspector Panel */}
-      <aside className="w-full md:w-80 bg-graphite-900 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto">
+      <aside className="w-full md:w-80 bg-graphite-900 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto shrink-0">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wider text-white font-mono flex items-center gap-2">
             <Info className="w-4 h-4 text-safety-500" />
@@ -179,40 +237,46 @@ export const Simulation3DView: React.FC = () => {
               </Badge>
             }
           >
-            <div className="space-y-4">
-              <p className="text-xs text-slate-300 leading-relaxed">
+            <div className="space-y-3 font-mono text-xs">
+              <p className="text-slate-300 text-xs leading-relaxed font-sans">
                 {selectedData.description}
               </p>
 
-              <div className="space-y-2 bg-graphite-950 p-3 rounded-xl border border-slate-800 text-xs font-mono">
-                <div className="text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800 pb-1">
-                  Specifications
+              <div className="grid grid-cols-3 gap-2 bg-graphite-950 p-2.5 rounded-lg border border-slate-800 text-center">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">TEMP</span>
+                  <span className="text-slate-200 font-bold">{selectedData.temperatureC}°C</span>
                 </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">PRESS</span>
+                  <span className="text-slate-200 font-bold">{selectedData.pressureBar} bar</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">VIBE</span>
+                  <span className="text-slate-200 font-bold">{selectedData.vibrationMmS} mm/s</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 bg-graphite-950 p-2.5 rounded-lg border border-slate-800 text-[11px]">
+                <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block mb-1">
+                  Technical Specifications
+                </span>
                 {Object.entries(selectedData.specifications).map(([key, val]) => (
-                  <div key={key} className="flex justify-between py-0.5">
+                  <div key={key} className="flex justify-between items-baseline gap-2">
                     <span className="text-slate-400">{key}:</span>
-                    <span className="text-slate-200 font-semibold">{val}</span>
+                    <span className="text-slate-200 font-semibold text-right">{val}</span>
                   </div>
                 ))}
               </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedComponent(null)}
-                className="w-full"
-              >
-                Clear Selection
-              </Button>
             </div>
           </Card>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 border border-dashed border-slate-800 rounded-xl text-center text-slate-400 space-y-2">
-            <Box className="w-8 h-8 text-slate-600 animate-pulse" />
-            <p className="text-xs font-mono">No component currently selected.</p>
-            <p className="text-[11px] text-slate-400">
-              Click the Vacuum Pump, Crawler ROV, Suction Hose, or Concrete Vault in the 3D scene.
-            </p>
+          <div className="flex-1 flex flex-col items-center justify-center p-6 border border-dashed border-slate-800 rounded-xl text-center">
+            <Box className="w-8 h-8 text-slate-600 mb-2" />
+            <span className="text-xs font-mono text-slate-400">No Component Selected</span>
+            <span className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
+              Click machine chassis, pump, tank, boom, nozzle, or septic vault in 3D scene.
+            </span>
           </div>
         )}
       </aside>

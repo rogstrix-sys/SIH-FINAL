@@ -11,49 +11,103 @@ import { HoseNozzle } from './HoseNozzle';
 import { DemonstrationSepticTank } from './DemonstrationSepticTank';
 import { ReceiverTank } from './ReceiverTank';
 import { TerrainEnvironment } from './TerrainEnvironment';
-import { Gauge, Activity, Droplets, Cpu, Box, Radio, Truck } from 'lucide-react';
+import { Gauge, Activity, Droplets, Cpu, Box, Radio, Truck, Compass, ShieldAlert, AlertTriangle } from 'lucide-react';
 
 export const MachineDigitalTwinScene: React.FC = () => {
   const showAnnotations = useSimulationStore((s) => s.displayOptions.showAnnotations);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
   const telemetry = useSimulationStore((s) => s.telemetry);
   const materialBalance = useSimulationStore((s) => s.materialBalance);
-  const params = useSimulationStore((s) => s.parameters);
+  const selectedScenario = useSimulationStore((s) => s.selectedScenario);
+  const terrainParams = useSimulationStore((s) => s.terrainParams);
+  const feasibility = useSimulationStore((s) => s.feasibility);
+  const stabilizerExtension = useSimulationStore((s) => s.kinematics.stabilizerExtension);
+
+  // Dynamic chassis inclination angles based on slope and heading
+  const levelFactor = Math.max(0.15, 1.0 - stabilizerExtension * 0.65);
+  const machinePitchRad =
+    selectedScenario === 'hilly_sloped'
+      ? (feasibility.chassisPitchDeg * (Math.PI / 180.0)) * levelFactor
+      : 0;
+  const machineRollRad =
+    selectedScenario === 'hilly_sloped'
+      ? (feasibility.chassisRollDeg * (Math.PI / 180.0)) * levelFactor
+      : 0;
 
   return (
     <group position={[0, 0, 0]}>
-      {/* 1. Surrounding Terrain & Safety Environment */}
+      {/* 1. Surrounding Terrain & Environmental Obstacles */}
       <TerrainEnvironment />
 
-      {/* 2. Heavy-Duty Mobile Chassis Platform */}
-      <MobileChassis />
+      {/* 2. Mechanized Desludging Mobile Unit (Chassis + Pump + Tank + Reel + Boom) */}
+      <group
+        position={[0, selectedScenario === 'hilly_sloped' ? 0.08 : 0, 0]}
+        rotation={[machinePitchRad, 0, machineRollRad]}
+      >
+        {/* Chassis, Wheels & Outrigger Stabilizers */}
+        <MobileChassis />
 
-      {/* 3. Motor & Vacuum Pump Core Assembly */}
-      <MotorPumpAssembly />
+        {/* Vacuum Pump & Hydraulic Drive Assembly */}
+        <MotorPumpAssembly />
 
-      {/* 4. On-Chassis Sludge Collection Vessel with Sight Glass */}
-      <CollectionTank />
+        {/* On-Board Sludge Containment Vessel */}
+        <CollectionTank />
 
-      {/* 5. External Waste Receiving Tanker */}
+        {/* Powered Hydraulic Hose Reel */}
+        <HoseReel />
+
+        {/* Dual-Joint Articulated Crane Arm */}
+        <ArticulatedBoom />
+
+        {/* 3D Chassis Inclinometer Bubble Widget (Hovering above chassis) */}
+        {selectedScenario === 'hilly_sloped' && (
+          <Html position={[0, 2.5, 0]} center style={{ pointerEvents: 'none' }}>
+            <div className={`px-2.5 py-1 rounded-lg border text-[10px] font-mono shadow-2xl backdrop-blur flex items-center gap-1.5 whitespace-nowrap ${
+              feasibility.stabilityStatus === 'critical_unstable'
+                ? 'bg-rose-950/95 text-rose-300 border-rose-600 animate-pulse font-bold'
+                : feasibility.stabilityStatus === 'caution'
+                ? 'bg-amber-950/90 text-amber-300 border-amber-600'
+                : 'bg-graphite-950/90 text-emerald-300 border-emerald-600'
+            }`}>
+              <Compass className="w-3.5 h-3.5" />
+              <span>
+                CHASSIS TILT: {feasibility.effectiveTiltDeg.toFixed(1)}° (PITCH {feasibility.chassisPitchDeg.toFixed(1)}° | ROLL {feasibility.chassisRollDeg.toFixed(1)}°)
+              </span>
+            </div>
+          </Html>
+        )}
+
+        {/* Lateral Clearance Warning Planes (When in narrow restricted access) */}
+        {selectedScenario === 'narrow_restricted' && feasibility.clearanceConflictDetected && (
+          <group position={[0, 0.45, 0]}>
+            {/* Left red collision proximity indicator */}
+            <mesh position={[0, 0, 0.85]}>
+              <boxGeometry args={[3.2, 0.6, 0.04]} />
+              <meshBasicMaterial color="#e11d48" opacity={0.35} transparent wireframe />
+            </mesh>
+            {/* Right red collision proximity indicator */}
+            <mesh position={[0, 0, -0.85]}>
+              <boxGeometry args={[3.2, 0.6, 0.04]} />
+              <meshBasicMaterial color="#e11d48" opacity={0.35} transparent wireframe />
+            </mesh>
+          </group>
+        )}
+      </group>
+
+      {/* 3. External Waste Receiving Disposal Tanker */}
       <ReceiverTank />
 
-      {/* 6. Powered Rotating Hydraulic Hose Reel */}
-      <HoseReel />
-
-      {/* 7. Dual-Joint Articulated Support Crane Boom */}
-      <ArticulatedBoom />
-
-      {/* 8. Flexible Umbilical Suction Hose Spline */}
+      {/* 4. Flexible Umbilical Suction Hose Spline */}
       <ExtractionHose />
 
-      {/* 9. Submerged Hydro-Jetting & Cutter Suction Nozzle */}
+      {/* 5. Submerged Hydro-Jetting & Cutter Suction Nozzle */}
       <HoseNozzle />
 
-      {/* 10. Demonstration Dual-Compartment Septic Tank (Cutaway) */}
+      {/* 6. Demonstration Dual-Compartment Septic Vault (Cutaway) */}
       <DemonstrationSepticTank />
 
       {/* ========================================================== */}
-      {/* COMPACT SENSOR & COMPONENT OVERLAYS (When enabled)         */}
+      {/* SENSOR & COMPONENT OVERLAYS (When enabled)                 */}
       {/* ========================================================== */}
       {showAnnotations && (
         <group>
@@ -67,7 +121,7 @@ export const MachineDigitalTwinScene: React.FC = () => {
               className="bg-graphite-950/90 hover:bg-graphite-900 border border-slate-700 hover:border-safety-500 rounded px-2 py-0.5 shadow-md text-[9px] font-mono backdrop-blur cursor-pointer transition select-none flex items-center gap-1 text-slate-300 whitespace-nowrap"
             >
               <Box className="w-2.5 h-2.5 text-safety-400" />
-              <span>CHASSIS (4×4)</span>
+              <span>CHASSIS ({feasibility.effectiveGroundClearanceM}m GC)</span>
             </div>
           </Html>
 

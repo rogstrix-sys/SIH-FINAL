@@ -23,7 +23,11 @@ import {
   Clock,
   ArrowRightCircle,
   RefreshCw,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Mountain,
+  Compass,
+  Ruler,
+  TableProperties
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -46,6 +50,9 @@ import { Slider } from '../ui/Slider';
 import { Badge } from '../ui/Badge';
 import { Tooltip } from '../ui/Tooltip';
 import { CameraPreset } from '../../types/digitalTwin';
+import { TerrainScenarioId } from '../../types/terrainScenarios';
+import { TERRAIN_SCENARIOS, PRELIMINARY_ESTIMATE_DISCLAIMER } from '../../simulation/terrainFeasibilityModel';
+import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
 import { formatDuration } from '../../utils/units';
 import { downloadTelemetryCsv, downloadEventsCsv } from '../../utils/csvExport';
 
@@ -64,6 +71,15 @@ export const OverviewDashboard: React.FC = () => {
   const history = useSimulationStore((s) => s.telemetryHistory);
   const eventLog = useSimulationStore((s) => s.eventLog);
   const simSpeed = useSimulationStore((s) => s.simSpeed);
+
+  // Terrain & Feasibility state
+  const selectedScenario = useSimulationStore((s) => s.selectedScenario);
+  const setTerrainScenario = useSimulationStore((s) => s.setTerrainScenario);
+  const terrainParams = useSimulationStore((s) => s.terrainParams);
+  const updateTerrainParams = useSimulationStore((s) => s.updateTerrainParams);
+  const stabilityThresholds = useSimulationStore((s) => s.stabilityThresholds);
+  const updateStabilityThresholds = useSimulationStore((s) => s.updateStabilityThresholds);
+  const feasibility = useSimulationStore((s) => s.feasibility);
 
   // Store actions
   const startSimulation = useSimulationStore((s) => s.startSimulation);
@@ -89,8 +105,10 @@ export const OverviewDashboard: React.FC = () => {
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
 
-  // Local tab for bottom trend charts
+  // Local UI State
   const [activeChartTab, setActiveChartTab] = useState<'flowMotor' | 'tankBalance'>('flowMotor');
+  const [paramPanelTab, setParamPanelTab] = useState<'machine' | 'terrain'>('machine');
+  const [showComparisonPanel, setShowComparisonPanel] = useState(false);
 
   const selectedData = selectedComponentId ? INSPECTABLE_COMPONENTS[selectedComponentId] : null;
 
@@ -218,7 +236,78 @@ export const OverviewDashboard: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col p-3 sm:p-4 gap-4 overflow-y-auto select-none">
-      {/* 0. Machine Sequence Stepper & Mass Balance Ribbon */}
+      {/* 0. Operating Environments Selector Ribbon */}
+      <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3 shadow-md flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Mountain className="w-4 h-4 text-safety-500" />
+          <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+            Challenging Operating Environments
+          </span>
+          <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
+            (Select terrain to update 3D scene & feasibility model)
+          </span>
+        </div>
+
+        {/* 3 Environment Selectors & Matrix Comparison Button */}
+        <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs">
+          {(
+            [
+              { id: 'level_paved', label: '1. Level Paved Access' },
+              { id: 'hilly_sloped', label: '2. Sloped Hilly (14°)' },
+              { id: 'narrow_restricted', label: '3. Narrow Alley (1.6m)' }
+            ] as const
+          ).map((env) => (
+            <button
+              key={env.id}
+              onClick={() => setTerrainScenario(env.id as TerrainScenarioId)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border ${
+                selectedScenario === env.id
+                  ? 'bg-safety-500 text-white border-safety-400 shadow-md shadow-safety-500/20'
+                  : 'bg-graphite-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              {env.label}
+            </button>
+          ))}
+
+          <Button
+            variant={showComparisonPanel ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setShowComparisonPanel(!showComparisonPanel)}
+            className="text-[11px] py-1 px-2.5 flex items-center gap-1"
+          >
+            <TableProperties className="w-3.5 h-3.5" />
+            {showComparisonPanel ? 'Hide Comparison' : 'Compare Environments'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Comparison Matrix Modal / Drawer when active */}
+      {showComparisonPanel && (
+        <TerrainComparisonPanel onClose={() => setShowComparisonPanel(false)} />
+      )}
+
+      {/* Feasibility & Stability Alert Bar (When warnings or limits violated) */}
+      {feasibility.warnings.length > 0 && (
+        <div className="bg-amber-950/40 border border-amber-600/60 rounded-xl p-3 shadow-md text-xs font-mono text-amber-300 flex flex-col gap-1.5 animate-in fade-in">
+          <div className="flex items-center justify-between">
+            <span className="font-bold uppercase flex items-center gap-1.5 text-[11px]">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              Preliminary Feasibility Alerts ({feasibility.warnings.length} Active Limit Notices)
+            </span>
+            <span className="text-[10px] text-amber-400/80 uppercase">
+              Status: {feasibility.stabilityStatus}
+            </span>
+          </div>
+          <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-200/90 pl-1">
+            {feasibility.warnings.map((w, i) => (
+              <li key={`warn-${i}`}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 1. Machine Sequence Stepper & Mass Balance Ribbon */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
         {/* Operating Sequence Stepper */}
         <div className="lg:col-span-7 bg-graphite-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow-md">
@@ -307,7 +396,7 @@ export const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 1. Exactly 8 Live Industrial KPI Cards */}
+      {/* 2. Exactly 8 Live Industrial KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
         {/* KPI 1: Extraction Flow Rate (L/min) */}
         <KpiCard
@@ -405,7 +494,7 @@ export const OverviewDashboard: React.FC = () => {
         <KpiCard
           label="Est. Time Left"
           value={timeRemainingStr}
-          unit={engine.telemetry.estimatedRemainingTimeSec > 0 ? '' : ''}
+          unit=""
           icon={<Clock className="w-4 h-4 text-purple-400" />}
           status={engine.telemetry.estimatedRemainingTimeSec > 0 ? 'nominal' : 'neutral'}
           tooltip={`Based on dynamic flow rate (${engine.telemetry.flowRateLpm.toFixed(1)} L/min)`}
@@ -429,7 +518,7 @@ export const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Machine Operating Controls & Speed Ribbon */}
+      {/* 3. Machine Operating Controls & Speed Ribbon */}
       <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3.5 shadow-md flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
           <div className="flex items-center gap-2">
@@ -629,7 +718,7 @@ export const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Middle Section: 3D Viewport (Left) + Parameter Sliders & Inspector (Right) */}
+      {/* 4. Middle Section: 3D Viewport (Left) + Parameter & Terrain Controls (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[460px]">
         {/* Large 3D Viewport Column */}
         <div className="lg:col-span-8 flex flex-col relative rounded-xl overflow-hidden border border-slate-800 bg-graphite-950 shadow-2xl">
@@ -742,118 +831,268 @@ export const OverviewDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Right Column: Parameters Panel & Component Inspector */}
+        {/* Right Column: Parameters Panel & Terrain Feasibility */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          {/* Machine Parameter Panel with Functional Sliders & Numeric Inputs */}
+          {/* Card with Tab Switcher: Machine Actuators vs Terrain Feasibility */}
           <Card
-            title="Machine Parameters"
-            subtitle="Physics configuration & setpoints"
+            title={paramPanelTab === 'machine' ? 'Machine Parameters' : 'Terrain Feasibility Model'}
+            subtitle={
+              paramPanelTab === 'machine'
+                ? 'Actuator setpoints & fluid properties'
+                : 'Kinematic inclination & route losses'
+            }
             icon={<Sliders className="w-4 h-4 text-safety-500" />}
-          >
-            <div className="space-y-3.5 text-xs">
-              {/* 1. Pump Speed (RPM) */}
-              <Slider
-                id="param-pump-rpm"
-                label="Pump Speed"
-                value={parameters.pumpRpm}
-                min={0}
-                max={3600}
-                step={50}
-                unit="RPM"
-                onChange={(val) => updateParameter('pumpRpm', val)}
-                dangerThreshold={3200}
-                description="Lobe pump displacement cycle frequency."
-              />
-
-              {/* 2. Hose Length (m) */}
-              <Slider
-                id="param-hose-length"
-                label="Hose Length"
-                value={parameters.hoseLengthM}
-                min={5}
-                max={100}
-                step={1}
-                unit="m"
-                onChange={(val) => updateParameter('hoseLengthM', val)}
-                description="Suction conduit length; increases Darcy head loss."
-              />
-
-              {/* 3. Hose Diameter (mm) */}
-              <Slider
-                id="param-hose-diameter"
-                label="Hose Diameter"
-                value={parameters.hoseDiameterMm}
-                min={50}
-                max={200}
-                step={5}
-                unit="mm"
-                onChange={(val) => updateParameter('hoseDiameterMm', val)}
-                description="Inner bore diameter (larger bore reduces friction)."
-              />
-
-              {/* 4. Sludge Consistency / Viscosity (cP) */}
-              <Slider
-                id="param-viscosity"
-                label="Sludge Viscosity"
-                value={parameters.slurryViscosityCp}
-                min={100}
-                max={3000}
-                step={50}
-                unit="cP"
-                onChange={(val) => updateParameter('slurryViscosityCp', val)}
-                dangerThreshold={2200}
-                description="Dynamic rheology (water = 1 cP, thick slurry = 1500+ cP)."
-              />
-
-              {/* 5. Collection Tank Capacity (L) */}
-              <Slider
-                id="param-tank-capacity"
-                label="Tank Capacity"
-                value={engineParams.collectionTankCapacityL}
-                min={1000}
-                max={6000}
-                step={100}
-                unit="L"
-                onChange={(val) => updateEngineParameter('collectionTankCapacityL', val)}
-                description="On-board vacuum containment vessel rated volume."
-              />
-
-              {/* 6. Target Extraction Volume (L) */}
-              <Slider
-                id="param-target-volume"
-                label="Target Volume"
-                value={engineParams.targetExtractionVolumeL}
-                min={500}
-                max={5000}
-                step={100}
-                unit="L"
-                onChange={(val) => updateEngineParameter('targetExtractionVolumeL', val)}
-                description="Batch extraction limit before automatic cycle cut-off."
-              />
-
-              {/* Auxiliary Toggles */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
-                <Button
-                  variant={parameters.waterJetEnabled ? 'primary' : 'secondary'}
-                  size="sm"
-                  onClick={() => updateParameter('waterJetEnabled', !parameters.waterJetEnabled)}
-                  className="text-xs"
+            headerAction={
+              <div className="flex items-center bg-graphite-950 p-0.5 rounded-lg border border-slate-800 font-mono text-[10px]">
+                <button
+                  onClick={() => setParamPanelTab('machine')}
+                  className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                    paramPanelTab === 'machine'
+                      ? 'bg-safety-500 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  Jetting: {parameters.waterJetEnabled ? 'ON' : 'OFF'}
-                </Button>
-                <Button
-                  variant={parameters.cutterHeadEnabled ? 'primary' : 'secondary'}
-                  size="sm"
-                  onClick={() => updateParameter('cutterHeadEnabled', !parameters.cutterHeadEnabled)}
-                  className="text-xs"
+                  Machine
+                </button>
+                <button
+                  onClick={() => setParamPanelTab('terrain')}
+                  className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                    paramPanelTab === 'terrain'
+                      ? 'bg-safety-500 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  Cutter: {parameters.cutterHeadEnabled ? 'ON' : 'OFF'}
-                </Button>
+                  Terrain
+                </button>
               </div>
-            </div>
+            }
+          >
+            {paramPanelTab === 'machine' ? (
+              <div className="space-y-3.5 text-xs">
+                {/* 1. Pump Speed (RPM) */}
+                <Slider
+                  id="param-pump-rpm"
+                  label="Pump Speed"
+                  value={parameters.pumpRpm}
+                  min={0}
+                  max={3600}
+                  step={50}
+                  unit="RPM"
+                  onChange={(val) => updateParameter('pumpRpm', val)}
+                  dangerThreshold={3200}
+                  description="Lobe pump displacement cycle frequency."
+                />
+
+                {/* 2. Hose Length (m) */}
+                <Slider
+                  id="param-hose-length"
+                  label="Configured Hose Length"
+                  value={parameters.hoseLengthM}
+                  min={5}
+                  max={100}
+                  step={1}
+                  unit="m"
+                  onChange={(val) => updateParameter('hoseLengthM', val)}
+                  description="Available suction conduit on reel."
+                />
+
+                {/* 3. Hose Diameter (mm) */}
+                <Slider
+                  id="param-hose-diameter"
+                  label="Hose Diameter"
+                  value={parameters.hoseDiameterMm}
+                  min={50}
+                  max={200}
+                  step={5}
+                  unit="mm"
+                  onChange={(val) => updateParameter('hoseDiameterMm', val)}
+                  description="Inner bore diameter (larger bore reduces friction)."
+                />
+
+                {/* 4. Sludge Consistency / Viscosity (cP) */}
+                <Slider
+                  id="param-viscosity"
+                  label="Sludge Viscosity"
+                  value={parameters.slurryViscosityCp}
+                  min={100}
+                  max={3000}
+                  step={50}
+                  unit="cP"
+                  onChange={(val) => updateParameter('slurryViscosityCp', val)}
+                  dangerThreshold={2200}
+                  description="Dynamic rheology (water = 1 cP, thick slurry = 1500+ cP)."
+                />
+
+                {/* 5. Collection Tank Capacity (L) */}
+                <Slider
+                  id="param-tank-capacity"
+                  label="Tank Capacity"
+                  value={engineParams.collectionTankCapacityL}
+                  min={1000}
+                  max={6000}
+                  step={100}
+                  unit="L"
+                  onChange={(val) => updateEngineParameter('collectionTankCapacityL', val)}
+                  description="On-board vacuum containment vessel rated volume."
+                />
+
+                {/* 6. Target Extraction Volume (L) */}
+                <Slider
+                  id="param-target-volume"
+                  label="Target Volume"
+                  value={engineParams.targetExtractionVolumeL}
+                  min={500}
+                  max={5000}
+                  step={100}
+                  unit="L"
+                  onChange={(val) => updateEngineParameter('targetExtractionVolumeL', val)}
+                  description="Batch extraction limit before automatic cycle cut-off."
+                />
+
+                {/* Auxiliary Toggles */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+                  <Button
+                    variant={parameters.waterJetEnabled ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => updateParameter('waterJetEnabled', !parameters.waterJetEnabled)}
+                    className="text-xs"
+                  >
+                    Jetting: {parameters.waterJetEnabled ? 'ON' : 'OFF'}
+                  </Button>
+                  <Button
+                    variant={parameters.cutterHeadEnabled ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => updateParameter('cutterHeadEnabled', !parameters.cutterHeadEnabled)}
+                    className="text-xs"
+                  >
+                    Cutter: {parameters.cutterHeadEnabled ? 'ON' : 'OFF'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3.5 text-xs">
+                {/* 1. Terrain Slope Angle (°) */}
+                <Slider
+                  id="terrain-slope"
+                  label="Terrain Slope Angle"
+                  value={terrainParams.slopeDeg}
+                  min={0}
+                  max={28}
+                  step={0.5}
+                  unit="°"
+                  onChange={(val) => updateTerrainParams({ slopeDeg: val })}
+                  dangerThreshold={stabilityThresholds.maxChassisTiltDeg}
+                  description="Ground inclination gradient along access route."
+                />
+
+                {/* 2. Surface Roughness */}
+                <Slider
+                  id="terrain-roughness"
+                  label="Surface Roughness (Boulders/Gravel)"
+                  value={terrainParams.surfaceRoughness}
+                  min={0.0}
+                  max={1.0}
+                  step={0.05}
+                  unit=""
+                  onChange={(val) => updateTerrainParams({ surfaceRoughness: val })}
+                  dangerThreshold={0.7}
+                  description="0.0 = smooth paved, 0.7+ = rocky unpaved terrain."
+                />
+
+                {/* 3. Machine Staging Setback Distance (m) */}
+                <Slider
+                  id="terrain-setback"
+                  label="Machine Staging Setback"
+                  value={terrainParams.machineSetbackM}
+                  min={3}
+                  max={30}
+                  step={0.5}
+                  unit="m"
+                  onChange={(val) => updateTerrainParams({ machineSetbackM: val })}
+                  description="Distance between machine chassis and vault opening."
+                />
+
+                {/* 4. Access Corridor Width (m) */}
+                <Slider
+                  id="terrain-width"
+                  label="Path Corridor Width"
+                  value={terrainParams.pathWidthM}
+                  min={1.2}
+                  max={5.0}
+                  step={0.1}
+                  unit="m"
+                  onChange={(val) => updateTerrainParams({ pathWidthM: val })}
+                  description="Clearance envelope width between walls/curbs."
+                />
+
+                {/* 5. Machine Orientation Heading on Slope (°) */}
+                <Slider
+                  id="terrain-heading"
+                  label="Orientation Heading on Slope"
+                  value={terrainParams.machineHeadingDeg}
+                  min={0}
+                  max={180}
+                  step={5}
+                  unit="°"
+                  onChange={(val) => updateTerrainParams({ machineHeadingDeg: val })}
+                  description="0° = nose up-slope (pitch), 90° = cross-slope (roll)."
+                />
+
+                {/* Real-Time Feasibility Results Ribbon */}
+                <div className="bg-graphite-950 p-2.5 rounded-lg border border-slate-800 space-y-1.5 font-mono text-[11px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Chassis Tilt (Compensated):</span>
+                    <span className={`font-bold ${feasibility.effectiveTiltDeg >= 15 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {feasibility.effectiveTiltDeg.toFixed(1)}° (Roll: {feasibility.chassisRollDeg.toFixed(1)}°)
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Required Hose Length:</span>
+                    <span className={`font-bold ${feasibility.hoseLengthAdequate ? 'text-slate-200' : 'text-rose-400'}`}>
+                      {feasibility.requiredHoseLengthM} m ({feasibility.hoseLengthAdequate ? 'ADEQUATE' : 'DEFICIT'})
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Static + Friction Loss:</span>
+                    <span className="text-safety-400 font-bold">
+                      {feasibility.totalRoutingLossKpa} kPa
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Lateral Clearance Margin:</span>
+                    <span className={`font-bold ${feasibility.clearanceConflictDetected ? 'text-rose-400' : 'text-slate-200'}`}>
+                      {feasibility.lateralClearanceMarginM} m/side
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Stability Rating:</span>
+                    <Badge
+                      variant={
+                        feasibility.stabilityStatus === 'critical_unstable'
+                          ? 'danger'
+                          : feasibility.stabilityStatus === 'caution'
+                          ? 'warning'
+                          : 'success'
+                      }
+                      size="sm"
+                    >
+                      {feasibility.stabilityStatus.toUpperCase()}
+                    </Badge>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-400 font-mono italic">
+                  * {PRELIMINARY_ESTIMATE_DISCLAIMER}
+                </p>
+              </div>
+            )}
           </Card>
 
-          {/* Selected Component Inspector Card */}
+          {/* Component Inspector Card */}
           <Card
             title="Component Inspector"
             subtitle="Mechanical & sensory telemetry"
@@ -926,7 +1165,7 @@ export const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Bottom Section: Real-Time Charts + Timestamped Alarms & Event Log */}
+      {/* 5. Bottom Section: Real-Time Charts + Timestamped Alarms & Event Log */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Trend Charts Column */}
         <div className="lg:col-span-7 flex flex-col gap-3">

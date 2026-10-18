@@ -41,6 +41,18 @@ import {
   triggerManualDischarge
 } from '../simulation/deterministicEngine';
 import { createInitialTelemetry } from '../simulation/physicsEngine';
+import {
+  TerrainScenarioId,
+  TerrainParameters,
+  StabilityThresholds,
+  EngineeringFeasibilityEstimate
+} from '../types/terrainScenarios';
+import {
+  TERRAIN_SCENARIOS,
+  DEFAULT_TERRAIN_PARAMS,
+  DEFAULT_STABILITY_THRESHOLDS,
+  calculateTerrainFeasibility
+} from '../simulation/terrainFeasibilityModel';
 
 export const DEFAULT_PARAMETERS: SimulationParameters = {
   pumpRpm: 1850,
@@ -258,6 +270,15 @@ export interface SimulationStore {
   setCameraPreset: (preset: CameraPreset) => void;
   toggleDisplayOption: (key: keyof DisplayOptions) => void;
   setSelectedComponent: (id: string | null) => void;
+
+  // Challenging Terrain & Feasibility Modeling
+  selectedScenario: TerrainScenarioId;
+  terrainParams: TerrainParameters;
+  stabilityThresholds: StabilityThresholds;
+  feasibility: EngineeringFeasibilityEstimate;
+  setTerrainScenario: (id: TerrainScenarioId) => void;
+  updateTerrainParams: (partial: Partial<TerrainParameters>) => void;
+  updateStabilityThresholds: (partial: Partial<StabilityThresholds>) => void;
 }
 
 function syncEngineParamsFromDigitalTwin(
@@ -371,6 +392,19 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     },
     selectedComponentId: null,
 
+    selectedScenario: 'level_paved',
+    terrainParams: { ...DEFAULT_TERRAIN_PARAMS },
+    stabilityThresholds: { ...DEFAULT_STABILITY_THRESHOLDS },
+    feasibility: calculateTerrainFeasibility(
+      DEFAULT_TERRAIN_PARAMS,
+      initialEngine.kinematics.stabilizerExtension,
+      initialParams.hoseLengthM,
+      initialParams.slurryDensityKgM3,
+      initialParams.slurryViscosityCp,
+      initialParams.hoseDiameterMm,
+      DEFAULT_STABILITY_THRESHOLDS
+    ),
+
     startSimulation: () => {
       const { engine, addEvent } = get();
       if (engine.operatingState === 'FAULT') {
@@ -429,6 +463,16 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         }
       ];
 
+      const freshFeasibility = calculateTerrainFeasibility(
+        get().terrainParams,
+        freshEngine.kinematics.stabilizerExtension,
+        parameters.hoseLengthM,
+        parameters.slurryDensityKgM3,
+        parameters.slurryViscosityCp,
+        parameters.hoseDiameterMm,
+        get().stabilityThresholds
+      );
+
       set({
         status: 'idle',
         engine: freshEngine,
@@ -439,7 +483,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         interlocks: freshEngine.interlocks,
         telemetry: freshTelemetry,
         telemetryHistory: freshHistory,
-        alarmsActive: 0
+        alarmsActive: 0,
+        feasibility: freshFeasibility
       });
       addEvent('info', 'SYSTEM_RESET', 'Machine kinematics, tanks, and telemetry reset to initial IDLE baseline.');
     },
@@ -568,9 +613,19 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
             ...enginePartial
           }
         };
+        const nextFeasibility = calculateTerrainFeasibility(
+          state.terrainParams,
+          state.kinematics.stabilizerExtension,
+          nextParams.hoseLengthM,
+          nextParams.slurryDensityKgM3,
+          nextParams.slurryViscosityCp,
+          nextParams.hoseDiameterMm,
+          state.stabilityThresholds
+        );
         return {
           parameters: nextParams,
-          engine: nextEngine
+          engine: nextEngine,
+          feasibility: nextFeasibility
         };
       });
     },
@@ -724,6 +779,16 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         (nextEngine.alarms.motorOverload ? 1 : 0) +
         (nextEngine.alarms.emergencyStopActive ? 1 : 0);
 
+      const nextFeasibility = calculateTerrainFeasibility(
+        state.terrainParams,
+        nextEngine.kinematics.stabilizerExtension,
+        state.parameters.hoseLengthM,
+        state.parameters.slurryDensityKgM3,
+        state.parameters.slurryViscosityCp,
+        state.parameters.hoseDiameterMm,
+        state.stabilityThresholds
+      );
+
       set({
         engine: nextEngine,
         operatingState: nextEngine.operatingState,
@@ -735,7 +800,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         telemetry: nextTelemetry,
         telemetryHistory: nextHistory,
         eventLog: nextEvents,
-        alarmsActive: alarmCount
+        alarmsActive: alarmCount,
+        feasibility: nextFeasibility
       });
     },
 
@@ -778,6 +844,79 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
 
     setSelectedComponent: (id: string | null) => {
       set({ selectedComponentId: id });
+    },
+
+    setTerrainScenario: (scenarioId: TerrainScenarioId) => {
+      const scenarioConfig = TERRAIN_SCENARIOS[scenarioId];
+      if (!scenarioConfig) return;
+      set((state) => {
+        const nextTerrain: TerrainParameters = {
+          ...state.terrainParams,
+          slopeDeg: scenarioConfig.defaultSlopeDeg,
+          surfaceRoughness: scenarioConfig.defaultRoughness,
+          pathWidthM: scenarioConfig.defaultPathWidthM,
+          machineSetbackM: scenarioConfig.defaultSetbackM,
+          machineHeadingDeg: scenarioConfig.defaultHeadingDeg,
+          groundClearanceNominalM: scenarioConfig.groundClearanceNominalM
+        };
+        const nextFeasibility = calculateTerrainFeasibility(
+          nextTerrain,
+          state.kinematics.stabilizerExtension,
+          state.parameters.hoseLengthM,
+          state.parameters.slurryDensityKgM3,
+          state.parameters.slurryViscosityCp,
+          state.parameters.hoseDiameterMm,
+          state.stabilityThresholds
+        );
+        return {
+          selectedScenario: scenarioId,
+          terrainParams: nextTerrain,
+          feasibility: nextFeasibility
+        };
+      });
+      get().addEvent(
+        'info',
+        'SCENARIO_SWITCH',
+        `Operating environment switched to ${TERRAIN_SCENARIOS[scenarioId].name}: Slope ${TERRAIN_SCENARIOS[scenarioId].defaultSlopeDeg}°, Width ${TERRAIN_SCENARIOS[scenarioId].defaultPathWidthM}m.`
+      );
+    },
+
+    updateTerrainParams: (partial: Partial<TerrainParameters>) => {
+      set((state) => {
+        const nextTerrain = { ...state.terrainParams, ...partial };
+        const nextFeasibility = calculateTerrainFeasibility(
+          nextTerrain,
+          state.kinematics.stabilizerExtension,
+          state.parameters.hoseLengthM,
+          state.parameters.slurryDensityKgM3,
+          state.parameters.slurryViscosityCp,
+          state.parameters.hoseDiameterMm,
+          state.stabilityThresholds
+        );
+        return {
+          terrainParams: nextTerrain,
+          feasibility: nextFeasibility
+        };
+      });
+    },
+
+    updateStabilityThresholds: (partial: Partial<StabilityThresholds>) => {
+      set((state) => {
+        const nextThresholds = { ...state.stabilityThresholds, ...partial };
+        const nextFeasibility = calculateTerrainFeasibility(
+          state.terrainParams,
+          state.kinematics.stabilizerExtension,
+          state.parameters.hoseLengthM,
+          state.parameters.slurryDensityKgM3,
+          state.parameters.slurryViscosityCp,
+          state.parameters.hoseDiameterMm,
+          nextThresholds
+        );
+        return {
+          stabilityThresholds: nextThresholds,
+          feasibility: nextFeasibility
+        };
+      });
     }
   };
 });
