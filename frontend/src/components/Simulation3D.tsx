@@ -3297,10 +3297,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
         // Apex of Rollover Pyramid
         const apex = new THREE.Vector3(dynamicSurgeX, comY, dynamicSurgeZ);
-        const pFL = new THREE.Vector3(-0.68, -0.28, 0.80);
-        const pFR = new THREE.Vector3(0.68, -0.28, 0.80);
-        const pRR = new THREE.Vector3(0.68, -0.28, -0.80);
-        const pRL = new THREE.Vector3(-0.68, -0.28, -0.80);
+        const pFL = new THREE.Vector3(-0.68, -0.24, 0.80);
+        const pFR = new THREE.Vector3(0.68, -0.24, 0.80);
+        const pRR = new THREE.Vector3(0.68, -0.24, -0.80);
+        const pRL = new THREE.Vector3(-0.68, -0.24, -0.80);
 
         const pVerts = [
           apex.x, apex.y, apex.z, pFL.x, pFL.y, pFL.z, pFR.x, pFR.y, pFR.z,
@@ -3332,7 +3332,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         }
 
         // Projected ground contact point of gravity vector
-        const groundPlaneY = -0.28;
+        const groundPlaneY = -0.24;
         const hCom = comY - groundPlaneY;
         const projectedGroundX = dynamicSurgeX + Math.tan(chassisRollRef.current) * hCom;
         const projectedGroundZ = dynamicSurgeZ - Math.tan(chassisPitchRef.current) * hCom;
@@ -3397,10 +3397,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             activeStressTest !== 'hill_brake';
 
           const wheelLocalOffsets = [
-            new THREE.Vector3(-0.68, -0.22, -0.85),
-            new THREE.Vector3(0.68, -0.22, -0.85),
-            new THREE.Vector3(-0.68, -0.22, 0.85),
-            new THREE.Vector3(0.68, -0.22, 0.85)
+            new THREE.Vector3(-0.68, -0.24, -0.85),
+            new THREE.Vector3(0.68, -0.24, -0.85),
+            new THREE.Vector3(-0.68, -0.24, 0.85),
+            new THREE.Vector3(0.68, -0.24, 0.85)
           ];
 
           if (isMoving && vehicleGroupRef.current) {
@@ -3454,32 +3454,32 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         // Camera Follow Modes (Including Wheel Cam & Cinematic Drone)
         const currentCam = cameraModeRef.current;
         if (currentCam === 'chase') {
-          const chaseOffset = tangent.clone().multiplyScalar(-8.5).add(new THREE.Vector3(0, 4.2, 0));
-          const targetCamPos = pt.clone().add(chaseOffset);
+          const chaseOffset = tangent.clone().multiplyScalar(-8.5).add(new THREE.Vector3(0, 3.8, 0));
+          const targetCamPos = vehiclePos.clone().add(chaseOffset);
           camera.position.lerp(targetCamPos, 0.08);
-          controls.target.lerp(pt.clone().add(new THREE.Vector3(0, 1.2, 0)), 0.1);
+          controls.target.lerp(vehiclePos.clone().add(new THREE.Vector3(0, 0.5, 0)), 0.1);
         } else if (currentCam === 'cockpit') {
-          const cabPos = pt.clone().add(new THREE.Vector3(0, 0.72, 0)).add(tangent.clone().multiplyScalar(0.7));
+          const cabPos = vehiclePos.clone().add(new THREE.Vector3(0, 0.42, 0)).add(tangent.clone().multiplyScalar(0.7));
           camera.position.copy(cabPos);
-          controls.target.copy(pt.clone().add(tangent.clone().multiplyScalar(10)));
+          controls.target.copy(vehiclePos.clone().add(tangent.clone().multiplyScalar(10)));
         } else if (currentCam === 'drone') {
           const dronePos = new THREE.Vector3(0, 34, 0);
           camera.position.lerp(dronePos, 0.04);
-          controls.target.lerp(pt, 0.06);
+          controls.target.lerp(vehiclePos, 0.06);
         } else if (currentCam === 'tank') {
           const normal = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
-          const tankCamPos = pt.clone().add(normal.clone().multiplyScalar(2.8)).add(new THREE.Vector3(0, 1.2, 0));
+          const tankCamPos = vehiclePos.clone().add(normal.clone().multiplyScalar(2.8)).add(new THREE.Vector3(0, 0.6, 0));
           camera.position.lerp(tankCamPos, 0.08);
-          controls.target.lerp(pt.clone().add(new THREE.Vector3(0, 0.46, -0.28)), 0.1);
+          controls.target.lerp(vehiclePos.clone().add(new THREE.Vector3(0, 0.2, -0.28)), 0.1);
         } else if (currentCam === 'desludge') {
-          const summitTarget = roadCurveRef.current.getPoint(0.98);
+          const summitTarget = roadCurveRef.current.getPoint(0.98).clone().add(new THREE.Vector3(0, 0.62, 0));
           const desludgeCamPos = summitTarget.clone().add(new THREE.Vector3(3.8, 3.2, 3.8));
           camera.position.lerp(desludgeCamPos, 0.06);
-          controls.target.lerp(summitTarget.clone().add(new THREE.Vector3(0, 0.6, 0)), 0.08);
+          controls.target.lerp(summitTarget.clone().add(new THREE.Vector3(0, 0.2, 0)), 0.08);
         } else if (currentCam === 'wheel_axle') {
           // Wheel/Axle Cam: Front-Left crawler drive sprocket & continuous track articulation
           const normal = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
-          const flWheel = pt.clone().add(normal.clone().multiplyScalar(0.72)).add(tangent.clone().multiplyScalar(0.86));
+          const flWheel = vehiclePos.clone().add(normal.clone().multiplyScalar(0.72)).add(tangent.clone().multiplyScalar(0.86));
           const camPos = flWheel.clone().add(normal.clone().multiplyScalar(1.05)).add(new THREE.Vector3(0, 0.48, 0)).add(tangent.clone().multiplyScalar(0.55));
           const targetPos = flWheel.clone().add(new THREE.Vector3(0, 0.08, 0)).add(normal.clone().multiplyScalar(-0.15));
           camera.position.lerp(camPos, 0.1);
@@ -3489,10 +3489,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           droneOrbitAngleRef.current += delta * 0.22;
           const a = droneOrbitAngleRef.current;
           const orbitR = 9.2 + Math.sin(a * 0.7) * 3.2;
-          const orbitH = 4.6 + Math.cos(a * 0.5) * 2.2;
-          const dronePos = pt.clone().add(new THREE.Vector3(Math.cos(a) * orbitR, orbitH, Math.sin(a) * orbitR));
+          const orbitH = 4.2 + Math.cos(a * 0.5) * 2.2;
+          const dronePos = vehiclePos.clone().add(new THREE.Vector3(Math.cos(a) * orbitR, orbitH, Math.sin(a) * orbitR));
           camera.position.lerp(dronePos, 0.06);
-          controls.target.lerp(pt.clone().add(new THREE.Vector3(0, 0.75, 0)), 0.08);
+          controls.target.lerp(vehiclePos.clone().add(new THREE.Vector3(0, 0.35, 0)), 0.08);
         }
       }
 
