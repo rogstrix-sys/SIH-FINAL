@@ -19,6 +19,8 @@ import {
   Gauge,
   ArrowUp,
   ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   Sun,
   Moon,
   CloudRain,
@@ -224,7 +226,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const roofBeaconRef = useRef<THREE.Mesh | null>(null);
   const levelSightFloatRef = useRef<THREE.Mesh | null>(null);
   const trackBeltMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
-  const trackCleatsRef = useRef<Array<{ mesh: THREE.Group; baseU: number }>>([]);
+  const trackCleatsRef = useRef<Array<{ mesh: THREE.Group; baseU: number; side?: 'left' | 'right' }>>([]);
   const trackProgressRef = useRef<number>(0);
   const trackProfileCurveRef = useRef<THREE.CatmullRomCurve3 | null>(null);
   const lidarTurretRef = useRef<THREE.Mesh | null>(null);
@@ -301,6 +303,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   // Vehicle progress tracking
   const pathProgressRef = useRef<number>(0.12);
   const manualThrottleRef = useRef<number>(0);
+  const manualSteerRef = useRef<number>(0);
+  const lateralOffsetRef = useRef<number>(0);
+  const trackProgressLeftRef = useRef<number>(0);
+  const trackProgressRightRef = useRef<number>(0);
+  const leftWheelsRef = useRef<THREE.Group[]>([]);
+  const rightWheelsRef = useRef<THREE.Group[]>([]);
   const desludgeTimerRef = useRef<number>(0);
 
   // Web Audio Context & Procedural Synthesizers
@@ -395,10 +403,16 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           return;
         }
         manualThrottleRef.current = -1;
+      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        manualSteerRef.current = -1;
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        manualSteerRef.current = 1;
       } else if (e.key === ' ') {
         manualThrottleRef.current = 0;
+        manualSteerRef.current = 0;
       } else if (e.key === 'r' || e.key === 'R') {
         pathProgressRef.current = 0.05;
+        lateralOffsetRef.current = 0;
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -412,6 +426,16 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         e.key === 'S'
       ) {
         manualThrottleRef.current = 0;
+      }
+      if (
+        e.key === 'ArrowLeft' ||
+        e.key === 'a' ||
+        e.key === 'A' ||
+        e.key === 'ArrowRight' ||
+        e.key === 'd' ||
+        e.key === 'D'
+      ) {
+        manualSteerRef.current = 0;
       }
     };
 
@@ -1671,6 +1695,49 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       chassisGroup.add(riser);
     });
 
+    // Front Electric Powertrain Cooler Cowling with Swachh Bharat Decal
+    const frontCowl = new THREE.Mesh(
+      new THREE.BoxGeometry(0.64, 0.22, 0.10),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.25 })
+    );
+    frontCowl.position.set(0, 0.24, 1.16);
+    chassisGroup.add(frontCowl);
+
+    const cowlDecal = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.24, 0.10),
+      new THREE.MeshStandardMaterial({ map: swachhDecal, transparent: true, roughness: 0.4 })
+    );
+    cowlDecal.position.set(0, 0.24, 1.215);
+    chassisGroup.add(cowlDecal);
+
+    // Rear Fold-down Service Step / Operator Platform (-Z = -1.24)
+    const operatorPlatform = new THREE.Mesh(
+      new THREE.BoxGeometry(0.78, 0.035, 0.30),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.4 })
+    );
+    operatorPlatform.position.set(0, -0.04, -1.24);
+    operatorPlatform.castShadow = true;
+    chassisGroup.add(operatorPlatform);
+
+    [-0.36, 0.36].forEach((px) => {
+      const pBracket = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.16, 0.26),
+        galvanizedMat
+      );
+      pBracket.position.set(px, 0.02, -1.22);
+      chassisGroup.add(pBracket);
+    });
+
+    // 4 Corner Crane Lifting Eyes / Mountain Air-Drop Hoist Lugs (Safety Orange)
+    [[-0.48, 1.05], [0.48, 1.05], [-0.48, -1.05], [0.48, -1.05]].forEach(([lx, lz]) => {
+      const liftEye = new THREE.Mesh(
+        new THREE.TorusGeometry(0.035, 0.012, 8, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9 })
+      );
+      liftEye.position.set(lx, 0.18, lz);
+      chassisGroup.add(liftEye);
+    });
+
     // =========================================================================
     // SIH 26258 PURPOSE-BUILT TRACKED MECHANIZED DESLUDGING SUPERSTRUCTURE
     // Dedicated Sanitation Equipment Platform (Zero Passenger Cabin / No Cockpit)
@@ -1705,6 +1772,66 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       topRail.rotation.x = Math.PI / 2;
       topRail.position.set(rx, 0.52, 0.65);
       chassisGroup.add(topRail);
+    });
+
+    // Left & Right Side Maintenance Equipment Access Panels with Louvers & Latches
+    [-0.51, 0.51].forEach((px) => {
+      const accessPanel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.025, 0.28, 0.94),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.3 })
+      );
+      accessPanel.position.set(px, 0.28, 0.65);
+      accessPanel.castShadow = true;
+      chassisGroup.add(accessPanel);
+
+      [-0.30, 0.30].forEach((lz) => {
+        const latch = new THREE.Mesh(
+          new THREE.BoxGeometry(0.035, 0.04, 0.06),
+          new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9 })
+        );
+        latch.position.set(px > 0 ? px + 0.012 : px - 0.012, 0.28, 0.65 + lz);
+        chassisGroup.add(latch);
+      });
+
+      for (let v = 0; v < 4; v++) {
+        const louver = new THREE.Mesh(
+          new THREE.BoxGeometry(0.032, 0.012, 0.36),
+          galvanizedMat
+        );
+        louver.rotation.z = px > 0 ? -0.3 : 0.3;
+        louver.position.set(px, 0.22 + v * 0.035, 0.65);
+        chassisGroup.add(louver);
+      }
+    });
+
+    // Perforated Stone Debris Mesh Guard over Pump & Macerator Assembly
+    const pumpGuardMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.36, 0.38, 0.58),
+      new THREE.MeshStandardMaterial({
+        color: 0x475569,
+        wireframe: true,
+        metalness: 0.85
+      })
+    );
+    pumpGuardMesh.position.set(0.28, 0.36, 0.65);
+    chassisGroup.add(pumpGuardMesh);
+
+    // Overhead Protective Roll Arch (ROPS Structural Steel)
+    const ropsArch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 1.02, 12),
+      galvanizedMat
+    );
+    ropsArch.rotation.z = Math.PI / 2;
+    ropsArch.position.set(0, 0.72, 0.65);
+    chassisGroup.add(ropsArch);
+
+    [-0.48, 0.48].forEach((rx) => {
+      const ropsLeg = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.022, 0.022, 0.42, 12),
+        galvanizedMat
+      );
+      ropsLeg.position.set(rx, 0.51, 0.65);
+      chassisGroup.add(ropsLeg);
     });
 
     // 2. Weatherproof Sealed Operator Control & Hydraulic Logic Cabinet (Front Left: x = -0.32, z = 0.68)
@@ -2030,6 +2157,49 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       strap.position.set(0, 0.46, -0.28 + zOffset);
       chassisGroup.add(strap);
     });
+
+    // Structural Tank Cradle Saddle Bolsters (Curved support brackets welded to chassis frame)
+    [-0.45, 0.45].forEach((sz) => {
+      const saddleBolster = new THREE.Mesh(
+        new THREE.CylinderGeometry(tankRadius + 0.032, tankRadius + 0.032, 0.09, 20, 1, false, Math.PI, Math.PI),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.3 })
+      );
+      saddleBolster.rotation.x = Math.PI / 2;
+      saddleBolster.position.set(0, 0.46, -0.28 + sz);
+      chassisGroup.add(saddleBolster);
+
+      const isoPad = new THREE.Mesh(
+        new THREE.CylinderGeometry(tankRadius + 0.016, tankRadius + 0.016, 0.08, 20, 1, false, Math.PI, Math.PI),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95 })
+      );
+      isoPad.rotation.x = Math.PI / 2;
+      isoPad.position.set(0, 0.46, -0.28 + sz);
+      chassisGroup.add(isoPad);
+
+      [-0.41, 0.41].forEach((bx) => {
+        const trunnion = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.018, 0.018, 0.14, 8),
+          galvanizedMat
+        );
+        trunnion.position.set(bx, 0.46, -0.28 + sz);
+        chassisGroup.add(trunnion);
+      });
+    });
+
+    // Forward Inspection Cleanout Manhole (Ø280mm) with Bolted Dome Hatch
+    const cleanoutHatch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.07, 20),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.88, roughness: 0.25 })
+    );
+    cleanoutHatch.position.set(0, 0.86, 0.18);
+    chassisGroup.add(cleanoutHatch);
+
+    const hatchDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+    );
+    hatchDome.position.set(0, 0.89, 0.18);
+    chassisGroup.add(hatchDome);
 
     // Top Cyclone Separator Dome & Stainless Steel Vacuum Piping
     const cyclone = new THREE.Mesh(
@@ -2594,6 +2764,8 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     // 10. Dual Heavy-Duty Continuous Caterpillar Tank Tracks (Extreme-Terrain Crawler Assemblies)
     const trackOffsetsX = [-0.68, 0.68]; // Left & Right Tracks
     wheelsRef.current = [];
+    leftWheelsRef.current = [];
+    rightWheelsRef.current = [];
     suspensionSpringsRef.current = [];
     damperPistonsRef.current = [];
     trackBeltMatsRef.current = [];
@@ -2621,6 +2793,8 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const trackRibbonWidth = 0.28;
 
     trackOffsetsX.forEach((tx) => {
+      const isLeft = tx < 0;
+      const targetSideWheels = isLeft ? leftWheelsRef.current : rightWheelsRef.current;
       const trackModuleGroup = new THREE.Group();
       trackModuleGroup.position.set(tx, -0.06, 0);
       chassisGroup.add(trackModuleGroup); // Mechanically locked to armored rover chassis monocoque
@@ -2643,6 +2817,15 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       frontHousing.position.set(0, 0.08, 0.86);
       trackModuleGroup.add(frontHousing);
 
+      // Hydraulic Planetary Final-Drive Motor Casing
+      const driveMotorCasing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.10, 0.10, 0.18, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85, roughness: 0.28 })
+      );
+      driveMotorCasing.rotation.z = Math.PI / 2;
+      driveMotorCasing.position.set(tx > 0 ? 0.08 : -0.08, 0.08, 0.86);
+      trackModuleGroup.add(driveMotorCasing);
+
       const rearTensioner = new THREE.Mesh(
         new THREE.CylinderGeometry(0.04, 0.04, 0.28, 12),
         galvanizedMat
@@ -2655,6 +2838,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       const frontSprocketHub = new THREE.Group();
       frontSprocketHub.position.set(0, 0.08, 0.86);
       trackModuleGroup.add(frontSprocketHub);
+      targetSideWheels.push(frontSprocketHub);
       wheelsRef.current.push(frontSprocketHub);
 
       const sprocketDisc = new THREE.Mesh(
@@ -2689,6 +2873,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       const rearIdlerHub = new THREE.Group();
       rearIdlerHub.position.set(0, 0.08, -0.86);
       trackModuleGroup.add(rearIdlerHub);
+      targetSideWheels.push(rearIdlerHub);
       wheelsRef.current.push(rearIdlerHub);
 
       const idlerRim = new THREE.Mesh(
@@ -2712,6 +2897,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         const bogieHub = new THREE.Group();
         bogieHub.position.set(0, -0.06, bz);
         trackModuleGroup.add(bogieHub);
+        targetSideWheels.push(bogieHub);
         wheelsRef.current.push(bogieHub);
 
         // Dual Bogie Wheels (inner and outer discs with center gap for guide horns)
@@ -2772,6 +2958,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         const rollerHub = new THREE.Group();
         rollerHub.position.set(0, 0.18, rz);
         trackModuleGroup.add(rollerHub);
+        targetSideWheels.push(rollerHub);
         wheelsRef.current.push(rollerHub);
 
         const rollerWheel = new THREE.Mesh(
@@ -2873,7 +3060,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         cleatGroup.add(horn);
 
         trackModuleGroup.add(cleatGroup);
-        trackCleatsRef.current.push({ mesh: cleatGroup, baseU: u });
+        trackCleatsRef.current.push({ mesh: cleatGroup, baseU: u, side: isLeft ? 'left' : 'right' });
       }
 
       // Armored Track Mud/Rock Deflector Armor Skirt with Hazard Stripes
@@ -3196,10 +3383,20 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           if (pistonStrokeMmRef.current > 5 || !isTransportLockedRef.current) {
             setInterlockWarning('TRANSPORT INTERLOCK: Compaction piston must be in Top Home (0mm) position with Transport Lock Pins engaged before vehicle travel is permitted!');
           } else {
+            const speedFactor = (currentSpeed / 14) * 0.035;
             pathProgressRef.current = Math.max(
               0.01,
-              Math.min(0.99, pathProgressRef.current + manualThrottleRef.current * delta * 0.035)
+              Math.min(0.99, pathProgressRef.current + manualThrottleRef.current * delta * speedFactor)
             );
+            // Lateral steering across road surface (±1.15m within road lane)
+            lateralOffsetRef.current = THREE.MathUtils.clamp(
+              lateralOffsetRef.current + manualSteerRef.current * delta * 1.6,
+              -1.15,
+              1.15
+            );
+            if (manualSteerRef.current === 0 && Math.abs(manualThrottleRef.current) > 0) {
+              lateralOffsetRef.current = THREE.MathUtils.lerp(lateralOffsetRef.current, 0, delta * 0.5);
+            }
           }
         } else if (currentDrive === 'desludge') {
           // Park vehicle at active worksite manhole (Alley t=0.18, Station t=0.42, or Summit t=0.98)
@@ -3497,11 +3694,18 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
         // VEHICLE POSITION: road sits at pt.y + 0.38m; track lowest plane is -0.24m below vehicleGroup
         // Placing vehicleGroup at pt.y + 0.62m rests track contact bottom flush upon road surface
-        const vehiclePos = new THREE.Vector3(pt.x, pt.y + 0.62, pt.z);
+        const upVector = new THREE.Vector3(0, 1, 0);
+        const laneNormal = new THREE.Vector3().crossVectors(upVector, tangent).normalize();
+        const vehiclePos = new THREE.Vector3(pt.x, pt.y + 0.62, pt.z).add(
+          laneNormal.clone().multiplyScalar(lateralOffsetRef.current)
+        );
         vehicleGroupRef.current.position.copy(vehiclePos);
 
-        // FORWARD ORIENTATION: lookTarget at vehiclePos.y ensures parallel slope without pitch distortion
-        const lookTarget = vehiclePos.clone().add(tangent.clone().multiplyScalar(4));
+        // FORWARD ORIENTATION: lookTarget with dynamic steering yaw
+        const steerYaw = manualSteerRef.current * 0.45;
+        const lookTarget = vehiclePos.clone()
+          .add(tangent.clone().multiplyScalar(4))
+          .add(laneNormal.clone().multiplyScalar(steerYaw));
         vehicleGroupRef.current.lookAt(lookTarget);
 
         // Grade & Elevation telemetry
@@ -3542,29 +3746,67 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             : (massKg * 9.81 * inclineSin * speedMs) / 1000 / 0.82;
         setActivePowerKw(Math.round(powerKw * 10) / 10);
 
-        // Rotate all drive sprockets, idlers, and bogie rollers forward about their axle with ground velocity
+        // Rotate all drive sprockets, idlers, and bogie rollers forward/reverse with differential track steering
         if (driveMode !== 'parked' && driveMode !== 'desludge' && activeStressTest !== 'hill_brake') {
-          // Track movement delta U per frame (L_track = 4.8m; at 14 km/h v = 3.88 m/s -> 0.81 rev/sec)
-          const cleatDeltaU = delta * (vehicleSpeedKmh / 14) * 0.82;
-          trackProgressRef.current = (trackProgressRef.current + cleatDeltaU) % 1.0;
+          const throttleDir = driveMode === 'manual' ? manualThrottleRef.current : 1;
+          const steerDir = driveMode === 'manual' ? manualSteerRef.current : 0;
 
-          // Sprockets and bogie wheels rotate in exact mechanical ratio (26.7 rad per track revolution)
-          wheelsRef.current.forEach((w) => {
-            w.rotation.x -= cleatDeltaU * 26.7;
-          });
+          // Differential track velocities for skid-steer crawler
+          let vLeft = throttleDir;
+          let vRight = throttleDir;
 
-          // Continuous caterpillar track belt texture scrolling in 1:1 sync with track cleats (v repeats 4 times)
-          trackBeltMatsRef.current.forEach((mat) => {
-            if (mat.map) mat.map.offset.y -= cleatDeltaU * 4.0;
-            if (mat.bumpMap) mat.bumpMap.offset.y -= cleatDeltaU * 4.0;
-          });
+          if (Math.abs(throttleDir) > 0.01) {
+            vLeft -= steerDir * 0.5;
+            vRight += steerDir * 0.5;
+          } else if (Math.abs(steerDir) > 0.01) {
+            // Counter-rotation on pivot turn
+            vLeft = -steerDir * 0.65;
+            vRight = steerDir * 0.65;
+          }
+
+          const baseRate = delta * (vehicleSpeedKmh / 14) * 0.82;
+          const deltaU_Left = baseRate * vLeft;
+          const deltaU_Right = baseRate * vRight;
+
+          trackProgressLeftRef.current = (trackProgressLeftRef.current + deltaU_Left + 1.0) % 1.0;
+          trackProgressRightRef.current = (trackProgressRightRef.current + deltaU_Right + 1.0) % 1.0;
+          trackProgressRef.current = (trackProgressRef.current + (deltaU_Left + deltaU_Right) * 0.5 + 1.0) % 1.0;
+
+          // Sprockets and bogie wheels rotate differentially
+          if (leftWheelsRef.current && leftWheelsRef.current.length > 0) {
+            leftWheelsRef.current.forEach((w) => {
+              w.rotation.x -= deltaU_Left * 26.7;
+            });
+          }
+          if (rightWheelsRef.current && rightWheelsRef.current.length > 0) {
+            rightWheelsRef.current.forEach((w) => {
+              w.rotation.x -= deltaU_Right * 26.7;
+            });
+          }
+
+          // Continuous caterpillar track belt texture scrolling (Left=0, Right=1)
+          if (trackBeltMatsRef.current.length >= 2) {
+            const matL = trackBeltMatsRef.current[0];
+            if (matL.map) matL.map.offset.y -= deltaU_Left * 4.0;
+            if (matL.bumpMap) matL.bumpMap.offset.y -= deltaU_Left * 4.0;
+
+            const matR = trackBeltMatsRef.current[1];
+            if (matR.map) matR.map.offset.y -= deltaU_Right * 4.0;
+            if (matR.bumpMap) matR.bumpMap.offset.y -= deltaU_Right * 4.0;
+          } else {
+            trackBeltMatsRef.current.forEach((mat) => {
+              if (mat.map) mat.map.offset.y -= baseRate * throttleDir * 4.0;
+              if (mat.bumpMap) mat.bumpMap.offset.y -= baseRate * throttleDir * 4.0;
+            });
+          }
 
           // Dynamically animate all 3D Chevron Grouser Cleats along continuous track curve
           if (trackProfileCurveRef.current) {
             const curve = trackProfileCurveRef.current;
             const xUnit = new THREE.Vector3(1, 0, 0);
             trackCleatsRef.current.forEach((item) => {
-              const currentU = (item.baseU + trackProgressRef.current) % 1.0;
+              const curProg = item.side === 'left' ? trackProgressLeftRef.current : trackProgressRightRef.current;
+              const currentU = (item.baseU + curProg) % 1.0;
               const cp = curve.getPointAt(currentU);
               const cTan = curve.getTangentAt(currentU).normalize();
               const cNorm = xUnit.clone().cross(cTan).normalize();
@@ -5044,7 +5286,17 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           {/* Manual Drive Controls (Arrow buttons + WASD info) */}
           {driveMode === 'manual' && (
             <div className="pt-2 border-t border-slate-800">
-              <div className="flex items-center justify-center space-x-2">
+              <div className="flex items-center justify-center space-x-1.5">
+                <button
+                  onMouseDown={() => { manualSteerRef.current = -1; }}
+                  onMouseUp={() => { manualSteerRef.current = 0; }}
+                  onTouchStart={() => { manualSteerRef.current = -1; }}
+                  onTouchEnd={() => { manualSteerRef.current = 0; }}
+                  className="p-2 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold transition"
+                  title="Steer Left (A / Left Arrow)"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
                 <button
                   onMouseDown={() => {
                     if (pistonStrokeMm > 5 || !isTransportLocked) {
@@ -5054,7 +5306,15 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                     manualThrottleRef.current = -1;
                   }}
                   onMouseUp={() => { manualThrottleRef.current = 0; }}
-                  className="p-2 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold"
+                  onTouchStart={() => {
+                    if (pistonStrokeMm > 5 || !isTransportLocked) {
+                      setInterlockWarning('TRANSPORT INTERLOCK: Platen extended! Return to 0mm & engage Lock Pins before driving.');
+                      return;
+                    }
+                    manualThrottleRef.current = -1;
+                  }}
+                  onTouchEnd={() => { manualThrottleRef.current = 0; }}
+                  className="p-2 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold transition"
                   title="Reverse Downhill (Down / S)"
                 >
                   <ArrowDown className="w-4 h-4" />
@@ -5068,20 +5328,41 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                     manualThrottleRef.current = 1;
                   }}
                   onMouseUp={() => { manualThrottleRef.current = 0; }}
-                  className="p-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
-                  title="Accelerate Uphill (Up / W)"
+                  onTouchStart={() => {
+                    if (pistonStrokeMm > 5 || !isTransportLocked) {
+                      setInterlockWarning('TRANSPORT INTERLOCK: Platen extended! Return to 0mm & engage Lock Pins before driving.');
+                      return;
+                    }
+                    manualThrottleRef.current = 1;
+                  }}
+                  onTouchEnd={() => { manualThrottleRef.current = 0; }}
+                  className="p-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition"
+                  title="Drive Forward Uphill (Up / W)"
                 >
                   <ArrowUp className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => { pathProgressRef.current = 0.05; }}
-                  className="p-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                  onMouseDown={() => { manualSteerRef.current = 1; }}
+                  onMouseUp={() => { manualSteerRef.current = 0; }}
+                  onTouchStart={() => { manualSteerRef.current = 1; }}
+                  onTouchEnd={() => { manualSteerRef.current = 0; }}
+                  className="p-2 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold transition"
+                  title="Steer Right (D / Right Arrow)"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    pathProgressRef.current = 0.05;
+                    lateralOffsetRef.current = 0;
+                  }}
+                  className="p-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
                   title="Reset to Valley Base (R)"
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-[10px] text-slate-400 text-center mt-1">Use W/S or Up/Down arrow keys</p>
+              <p className="text-[10px] text-slate-400 text-center mt-1">Drive: W/S · Steer: A/D · Stop: Space</p>
             </div>
           )}
 
