@@ -26,6 +26,7 @@ import { TerrainScenarioId } from '../../types/terrainScenarios';
 import { TERRAIN_SCENARIOS } from '../../simulation/terrainFeasibilityModel';
 import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
 import { CrawlerMobilityController } from '../CrawlerMobilityController';
+import { SludgeCompactorController } from '../SludgeCompactorController';
 
 export const Simulation3DView: React.FC = () => {
   const cameraPreset = useSimulationStore((s) => s.cameraPreset);
@@ -186,6 +187,11 @@ export const Simulation3DView: React.FC = () => {
           {/* Floating Crawler Mobility Controller Widget */}
           <div className="absolute top-20 left-4 z-20 pointer-events-auto">
             <CrawlerMobilityController />
+          </div>
+
+          {/* Floating Hydraulic Sludge Compactor Controller Widget */}
+          <div className="absolute top-20 right-4 z-20 pointer-events-auto">
+            <SludgeCompactorController />
           </div>
         </div>
 

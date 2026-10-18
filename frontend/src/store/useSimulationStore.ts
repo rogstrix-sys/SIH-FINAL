@@ -65,6 +65,14 @@ import {
   INITIAL_MOBILITY_INPUTS
 } from '../types/vehicleMobility';
 import { stepVehicleMobility } from '../utils/terrainPhysics';
+import {
+  PistonOperatingMode,
+  SludgeCompactionParameters,
+  SludgeCompactionTelemetry,
+  DEFAULT_COMPACTION_PARAMS,
+  INITIAL_COMPACTION_TELEMETRY
+} from '../types/sludgeCompaction';
+import { stepSludgeCompaction } from '../utils/sludgeCompactionModel';
 
 export const DEFAULT_PARAMETERS: SimulationParameters = {
   pumpRpm: 1850,
@@ -136,6 +144,27 @@ export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
       'Sight Gauge': 'Direct optical borosilicate tube with etched ticks',
       'Inspection Hatch': '450 mm top dome with forged wing clamp bolts',
       'Safety Devices': 'Dual PVRV relief valve & cyclone moisture trap'
+    }
+  },
+  compactor: {
+    id: 'compactor',
+    name: 'Articulated Hydraulic Sludge-Compaction Piston & Porous Platen',
+    type: 'Mechanical Dewatering & Volume Consolidation Mechanism',
+    status: 'nominal',
+    temperatureC: 38.0,
+    pressureBar: 180.0,
+    vibrationMmS: 0.8,
+    description: 'Guided vertical hydraulic compaction ram mounted to overhead structural tank gantry. Drives a rigid perforated steel platen with drainage sieve and anti-tilt guide columns downward into the sludge bed, expressing liquid filtrate and consolidating sludge cake (1.2x to 1.8x volume reduction). Features hydraulic relief valve at 180 bar and mechanical transport lock pin.',
+    specifications: {
+      'Cylinder Bore': 'Ø120 mm heavy-duty hydraulic tie-rod cylinder',
+      'Piston Rod': 'Ø60 mm hard chrome-plated high-tensile steel rod',
+      'Max Travel Stroke': '600 mm vertical guided travel',
+      'Hydraulic Thrust': '203.6 kN peak force at 180 bar relief setpoint',
+      'Guide Mechanism': 'Dual Ø45 mm chrome columns with anti-tilt bronze guide bushings',
+      'Compaction Platen': '1.1 m x 0.65 m reinforced perforated plate with edge wiper seal',
+      'Overpressure Protection': 'Pilot-operated relief valve (180 bar) & latched E-trip (210 bar)',
+      'Transport Safety': 'Dual mechanical locking pins with electrical position interlock',
+      'Validation Status': 'SIMULATED APPROXIMATION — Empirical model, not field-validated'
     }
   },
   receiver: {
@@ -320,6 +349,17 @@ export interface SimulationStore {
   stopVehicle: () => void;
   resetVehiclePosition: () => void;
   updateMobilityParams: (partial: Partial<VehicleMobilityParameters>) => void;
+
+  // Hydraulic Sludge-Compaction Piston & Dewatering Mechanism
+  compactionParams: SludgeCompactionParameters;
+  compactionTelemetry: SludgeCompactionTelemetry;
+  extendCompactionPiston: () => void;
+  retractCompactionPiston: () => void;
+  holdCompactionPiston: () => void;
+  lockTransportPosition: () => void;
+  unlockTransportPosition: () => void;
+  resetCompactionOverpressure: () => void;
+  updateCompactionParams: (partial: Partial<SludgeCompactionParameters>) => void;
 }
 
 function syncEngineParamsFromDigitalTwin(
@@ -442,6 +482,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     mobilityTelemetry: { ...INITIAL_MOBILITY_TELEMETRY },
     mobilityInputs: { ...INITIAL_MOBILITY_INPUTS },
 
+    compactionParams: { ...DEFAULT_COMPACTION_PARAMS },
+    compactionTelemetry: { ...INITIAL_COMPACTION_TELEMETRY },
+
     selectedScenario: 'level_paved',
     terrainParams: { ...DEFAULT_TERRAIN_PARAMS },
     stabilityThresholds: { ...DEFAULT_STABILITY_THRESHOLDS },
@@ -545,7 +588,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         alarmsActive: 0,
         feasibility: freshFeasibility,
         mobilityTelemetry: { ...INITIAL_MOBILITY_TELEMETRY },
-        mobilityInputs: { ...INITIAL_MOBILITY_INPUTS }
+        mobilityInputs: { ...INITIAL_MOBILITY_INPUTS },
+        compactionTelemetry: { ...INITIAL_COMPACTION_TELEMETRY }
       });
       addEvent('info', 'SYSTEM_RESET', 'Machine kinematics, tanks, and telemetry reset to initial IDLE baseline.');
     },
@@ -555,14 +599,23 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     },
 
     triggerEmergencyStop: () => {
-      const { engine, addEvent } = get();
+      const { engine, compactionTelemetry, addEvent } = get();
       const nextEngine = triggerEmergencyStop(engine);
+      const nextCompaction: SludgeCompactionTelemetry = {
+        ...compactionTelemetry,
+        pistonState: compactionTelemetry.pistonState === 'EXTENDING' || compactionTelemetry.pistonState === 'RETRACTING'
+          ? 'HOLD'
+          : compactionTelemetry.pistonState,
+        interlockBlocked: true,
+        interlockBlockReason: 'EMERGENCY STOP (E-STOP) ACTUATED — Compaction cylinder isolated'
+      };
       set({
         engine: nextEngine,
         operatingState: nextEngine.operatingState,
         status: 'alarm',
         alarms: nextEngine.alarms,
         interlocks: nextEngine.interlocks,
+        compactionTelemetry: nextCompaction,
         alarmsActive: get().alarmsActive + 1
       });
       addEvent('critical', 'EMERGENCY_STOP', 'EMERGENCY STOP (E-STOP) ACTUATED! Machinery disabled immediately.');
@@ -747,6 +800,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         state.alarms.emergencyStopActive ||
         state.interlocks.isDeployed ||
         state.kinematics.stabilizerExtension > 0.05 ||
+        (!state.compactionTelemetry.isTransportLocked && (state.compactionTelemetry.strokeMm > 5 || state.compactionTelemetry.pistonState !== 'LOCKED')) ||
         state.operatingState === 'DEPLOY' ||
         state.operatingState === 'EXTRACT' ||
         state.operatingState === 'EXTRACTION' ||
@@ -758,6 +812,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           ? 'EMERGENCY STOP (E-STOP) ACTUATED — Track drive inhibited'
           : (state.interlocks.isDeployed || state.kinematics.stabilizerExtension > 0.05)
           ? 'STABILIZERS EXTENDED — Retract hydraulic outriggers to travel'
+          : (!state.compactionTelemetry.isTransportLocked && (state.compactionTelemetry.strokeMm > 5 || state.compactionTelemetry.pistonState !== 'LOCKED'))
+          ? 'COMPACTION PLATEN NOT LOCKED — Retract to top and engage transport lock pin before travel'
           : (state.operatingState === 'EXTRACT' || state.operatingState === 'EXTRACTION' || state.operatingState === 'DISCHARGE')
           ? 'ACTIVE SLURRY TRANSFER — Stop pump and stow umbilical before travel'
           : state.operatingState === 'FAULT'
@@ -776,9 +832,41 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         deltaSeconds
       );
 
-      // If pump engine is idle and not running, only step mobility if moving or inputs pressed
+      // 2. Evaluate Hydraulic Sludge Compaction Piston Step
+      const isCompactionBlocked =
+        state.mobilityTelemetry.isMoving ||
+        nextMobility.isMoving ||
+        (state.kinematics.stabilizerExtension < 0.05 && !state.interlocks.isDeployed) ||
+        state.operatingState === 'EXTRACT' ||
+        state.operatingState === 'EXTRACTION' ||
+        state.operatingState === 'DISCHARGE' ||
+        state.interlocks.emergencyStopLatched ||
+        state.alarms.emergencyStopActive;
+
+      const compactionBlockReason =
+        (state.interlocks.emergencyStopLatched || state.alarms.emergencyStopActive)
+          ? 'EMERGENCY STOP (E-STOP) ACTUATED — Compaction cylinder isolated'
+          : (state.mobilityTelemetry.isMoving || nextMobility.isMoving)
+          ? 'VEHICLE IN MOTION — Stationary compaction operation only'
+          : (state.kinematics.stabilizerExtension < 0.05 && !state.interlocks.isDeployed)
+          ? 'STABILIZERS NOT DEPLOYED — Lower outriggers to stabilize tank frame'
+          : (state.operatingState === 'EXTRACT' || state.operatingState === 'EXTRACTION' || state.operatingState === 'DISCHARGE')
+          ? 'ACTIVE SLURRY TRANSFER — Stop pump before piston dewatering'
+          : null;
+
+      const nextCompaction = stepSludgeCompaction(
+        state.compactionTelemetry,
+        state.compactionParams,
+        state.materialBalance.collectionVolumeL,
+        state.engine.parameters.collectionTankCapacityL,
+        isCompactionBlocked,
+        compactionBlockReason,
+        deltaSeconds
+      );
+
+      // If pump engine is idle and not running, step mobility and compaction
       if (state.engine.operatingState === 'IDLE' && state.status === 'idle') {
-        if (
+        const needsMobility =
           state.mobilityTelemetry.isMoving ||
           nextMobility.isMoving ||
           state.mobilityTelemetry.speedMs !== nextMobility.speedMs ||
@@ -789,9 +877,20 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           state.mobilityInputs.steerRight ||
           state.mobilityInputs.pivotLeft ||
           state.mobilityInputs.pivotRight ||
-          state.mobilityInputs.brake
-        ) {
-          set({ mobilityTelemetry: nextMobility });
+          state.mobilityInputs.brake;
+
+        const needsCompaction =
+          state.compactionTelemetry.pistonState !== nextCompaction.pistonState ||
+          state.compactionTelemetry.strokeMm !== nextCompaction.strokeMm ||
+          state.compactionTelemetry.appliedPressureBar !== nextCompaction.appliedPressureBar ||
+          state.compactionTelemetry.cakeVolumeL !== nextCompaction.cakeVolumeL ||
+          state.compactionTelemetry.interlockBlocked !== nextCompaction.interlockBlocked;
+
+        if (needsMobility || needsCompaction) {
+          set({
+            ...(needsMobility ? { mobilityTelemetry: nextMobility } : {}),
+            ...(needsCompaction ? { compactionTelemetry: nextCompaction } : {})
+          });
         }
         return;
       }
@@ -922,7 +1021,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         eventLog: nextEvents,
         alarmsActive: alarmCount,
         feasibility: nextFeasibility,
-        mobilityTelemetry: nextMobility
+        mobilityTelemetry: nextMobility,
+        compactionTelemetry: nextCompaction
       });
 
       // Update Guided Demo timer & auto-advance
@@ -1360,6 +1460,119 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       set((s) => ({
         mobilityParams: {
           ...s.mobilityParams,
+          ...partial
+        }
+      }));
+    },
+
+    extendCompactionPiston: () => {
+      const { compactionTelemetry, mobilityTelemetry, kinematics, interlocks, operatingState, addEvent } = get();
+      if (compactionTelemetry.isTransportLocked) {
+        addEvent('warning', 'COMPACTION_INTERLOCK', 'Transport lock pins engaged. Unlock transport latch before extending.');
+        return;
+      }
+      if (mobilityTelemetry.isMoving) {
+        addEvent('warning', 'COMPACTION_INTERLOCK', 'Vehicle is in motion. Bring crawler tracks to stop before operating compaction piston.');
+        return;
+      }
+      if (kinematics.stabilizerExtension < 0.05 && !interlocks.isDeployed) {
+        addEvent('warning', 'COMPACTION_INTERLOCK', 'Hydraulic stabilizers not deployed. Lower outriggers to rigidize vehicle frame before dewatering.');
+        return;
+      }
+      if (operatingState === 'EXTRACT' || operatingState === 'EXTRACTION' || operatingState === 'DISCHARGE') {
+        addEvent('warning', 'COMPACTION_INTERLOCK', 'Pump active. Stop slurry extraction or discharge before piston compaction.');
+        return;
+      }
+      if (compactionTelemetry.overpressureTrip) {
+        addEvent('critical', 'COMPACTION_FAULT', 'Overpressure trip latched. Reset hydraulic fault before operating cylinder.');
+        return;
+      }
+      set((s) => ({
+        compactionTelemetry: {
+          ...s.compactionTelemetry,
+          pistonState: 'EXTENDING',
+          interlockBlocked: false,
+          interlockBlockReason: null
+        }
+      }));
+      addEvent('info', 'COMPACTOR_CMD', 'Compaction cylinder extending. Porous platen driving downward into collection tank.');
+    },
+
+    retractCompactionPiston: () => {
+      const { compactionTelemetry, addEvent } = get();
+      if (compactionTelemetry.isTransportLocked) {
+        return;
+      }
+      set((s) => ({
+        compactionTelemetry: {
+          ...s.compactionTelemetry,
+          pistonState: 'RETRACTING',
+          interlockBlocked: false,
+          interlockBlockReason: null
+        }
+      }));
+      addEvent('info', 'COMPACTOR_CMD', 'Compaction cylinder retracting upward toward top home position.');
+    },
+
+    holdCompactionPiston: () => {
+      const { addEvent } = get();
+      set((s) => ({
+        compactionTelemetry: {
+          ...s.compactionTelemetry,
+          pistonState: 'HOLD'
+        }
+      }));
+      addEvent('info', 'COMPACTOR_CMD', 'Compaction cylinder hydraulic valves closed. Platen position held.');
+    },
+
+    lockTransportPosition: () => {
+      const { compactionTelemetry, addEvent } = get();
+      if (compactionTelemetry.strokeMm > 5) {
+        addEvent('warning', 'COMPACTION_LOCK_FAIL', 'Cannot engage transport lock: piston is not at top home position (stroke > 0 mm). Retract platen first.');
+        return;
+      }
+      set((s) => ({
+        compactionTelemetry: {
+          ...s.compactionTelemetry,
+          pistonState: 'LOCKED',
+          isTransportLocked: true,
+          strokeMm: 0,
+          strokePct: 0
+        }
+      }));
+      addEvent('info', 'TRANSPORT_LOCK', 'Dual mechanical transport locking pins engaged. Platen secured for vehicle travel.');
+    },
+
+    unlockTransportPosition: () => {
+      const { addEvent } = get();
+      set((s) => ({
+        compactionTelemetry: {
+          ...s.compactionTelemetry,
+          pistonState: 'HOME',
+          isTransportLocked: false
+        }
+      }));
+      addEvent('info', 'TRANSPORT_LOCK', 'Mechanical transport locking pins disengaged. Hydraulic compaction system armed.');
+    },
+
+    resetCompactionOverpressure: () => {
+      const { addEvent } = get();
+      set((s) => ({
+        compactionTelemetry: {
+          ...s.compactionTelemetry,
+          overpressureTrip: false,
+          pistonState: 'HOLD',
+          interlockBlocked: false,
+          interlockBlockReason: null
+        }
+      }));
+      addEvent('info', 'COMPACTION_RESET', 'Hydraulic overpressure trip reset. Piston returned to HOLD mode.');
+    },
+
+    updateCompactionParams: (partial: Partial<SludgeCompactionParameters>) => {
+      set((s) => ({
+        compactionParams: {
+          ...s.compactionParams,
           ...partial
         }
       }));

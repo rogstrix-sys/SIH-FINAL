@@ -42,6 +42,8 @@ export const EngineeringAssumptionsPanel: React.FC = () => {
   const feasibility = useSimulationStore((s) => s.feasibility);
   const engineParams = useSimulationStore((s) => s.engine.parameters);
   const mobility = useSimulationStore((s) => s.mobilityTelemetry);
+  const compaction = useSimulationStore((s) => s.compactionTelemetry);
+  const compactionParams = useSimulationStore((s) => s.compactionParams);
 
   const [classificationFilter, setClassificationFilter] = useState<string>('ALL');
   const [expandedItemId, setExpandedItemId] = useState<string | null>('calc-mass-balance');
@@ -274,6 +276,50 @@ export const EngineeringAssumptionsPanel: React.FC = () => {
       ],
       sourceJustification: 'Wong (2008), Theory of Ground Vehicles; SAE J1309 Crawler Tractor Gradeability Protocol',
       classification: 'ESTIMATED'
+    },
+    {
+      id: 'calc-compaction-dewatering',
+      resultName: 'Porous Platen Hydraulic Compaction & Dewatering Mass-Balance',
+      currentValue: `Ratio: ${compaction.compactionRatio.toFixed(2)}x (Cake: ${compaction.cakeVolumeL} L, Filtrate: ${compaction.filtrateVolumeL} L at ${compaction.appliedPressureBar} bar)`,
+      isAvailable: true,
+      units: 'x (compaction ratio) / L / bar',
+      inputParameters: [
+        `Bore Diameter = ${compactionParams.boreDiameterMm} mm`,
+        `Piston Stroke = ${compaction.strokeMm} mm`,
+        `Relief Setpoint = ${compactionParams.reliefPressureBar} bar`,
+        `Dewaterability Factor = ${compactionParams.dewaterabilityFactor}`
+      ],
+      calculationMethod: 'Empirical Terzaghi 1D consolidation analogy with power-law pore resistance for septage cake under rigid porous platen',
+      equation: 'V_filtrate = V₀ · f_dew · (Δz / Δz_max)¹·⁴;  V_cake = V₀ - V_filtrate;  CR = V₀ / V_cake',
+      assumedValues: [
+        'Homogeneous fecal sludge cake with uniform porosity and permeability',
+        'Separated liquid filtrate drains through perforated screen into upper weir zone',
+        'Conservative volume reduction clamped to 1.2x–1.8x physical ceiling',
+        'SIMULATED APPROXIMATION — Empirical model, zero physical field validation claimed'
+      ],
+      sourceJustification: 'EPA Wastewater Technology Fact Sheet: Belt Filter & Plate Presses (EPA 832-F-00-057); ISO 24510',
+      classification: 'ESTIMATED'
+    },
+    {
+      id: 'calc-compaction-thrust',
+      resultName: 'Compaction Cylinder Hydraulic Thrust & Relief Valve Interlock',
+      currentValue: `${compaction.compactionForceKn.toFixed(1)} kN thrust at ${compaction.appliedPressureBar.toFixed(1)} bar (Relief: ${compactionParams.reliefPressureBar} bar, Trip: ${compactionParams.overpressureTripBar} bar)`,
+      isAvailable: true,
+      units: 'kN / bar',
+      inputParameters: [
+        `Bore Area A_bore = ${(Math.PI * Math.pow(compactionParams.boreDiameterMm / 2000, 2)).toFixed(5)} m²`,
+        `Pressure Transducer = ${compaction.appliedPressureBar} bar`,
+        `Overpressure Trip Limit = ${compactionParams.overpressureTripBar} bar`
+      ],
+      calculationMethod: 'Hydrostatic cylinder thrust equilibrium with pilot-operated pressure relief valve bypass and latched safety interlock',
+      equation: 'F_thrust = P_hyd · A_bore · 100 [kN]; P_hyd ≤ P_relief = 180 bar',
+      assumedValues: [
+        'Quasi-static hydraulic actuation without high-frequency pressure pulsations',
+        'Bypass relief valve cracks open at 180 bar and recirculates hydraulic oil to reservoir',
+        'Electrical trip switch trips machinery to protective HOLD if pressure reaches 210 bar'
+      ],
+      sourceJustification: 'ISO 6020/2 Fluid power cylinders; ISO 4413 Hydraulic fluid power safety standards',
+      classification: 'SIMULATED'
     }
   ];
 
