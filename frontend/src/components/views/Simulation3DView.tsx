@@ -12,7 +12,8 @@ import {
   Mountain,
   Compass,
   TableProperties,
-  AlertTriangle
+  AlertTriangle,
+  Truck
 } from 'lucide-react';
 import { useSimulationStore, INSPECTABLE_COMPONENTS } from '../../store/useSimulationStore';
 import { DigitalTwinCanvas } from '../../scene/DigitalTwinCanvas';
@@ -29,6 +30,7 @@ export const Simulation3DView: React.FC = () => {
   const setCameraPreset = useSimulationStore((s) => s.setCameraPreset);
   const displayOptions = useSimulationStore((s) => s.displayOptions);
   const toggleDisplayOption = useSimulationStore((s) => s.toggleDisplayOption);
+  const setMobilityMode = useSimulationStore((s) => s.setMobilityMode);
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
   const telemetry = useSimulationStore((s) => s.telemetry);
@@ -145,6 +147,15 @@ export const Simulation3DView: React.FC = () => {
               title="Toggle Ground Grid"
             >
               Grid
+            </Button>
+            <Button
+              variant={displayOptions.mobilityMode === 'tracks' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setMobilityMode(displayOptions.mobilityMode === 'tracks' ? 'wheels' : 'tracks')}
+              icon={<Truck className="w-3.5 h-3.5" />}
+              title="Switch between 4-Wheel and Crawler Track Mobility Gear"
+            >
+              {displayOptions.mobilityMode === 'tracks' ? 'Tracks' : 'Wheels'}
             </Button>
             <Button
               variant={displayOptions.wireframe ? 'secondary' : 'ghost'}

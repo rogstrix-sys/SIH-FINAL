@@ -1,6 +1,15 @@
 export type SimulationStatus = 'idle' | 'running' | 'paused' | 'alarm' | 'complete';
 
-export type NavView = 'overview' | 'simulation3d' | 'sensors' | 'parameters' | 'reports';
+export type NavView =
+  | 'overview'
+  | 'simulation3d'
+  | 'terrain'
+  | 'operations'
+  | 'analysis'
+  | 'prototype'
+  | 'sensors'
+  | 'parameters'
+  | 'reports';
 
 export type CameraPreset = 'reset' | 'iso' | 'top' | 'side' | 'boom' | 'nozzle' | 'cutaway';
 
@@ -80,6 +89,8 @@ export interface DisplayOptions {
   godRays: boolean;
   soundEnabled: boolean;
   showGrid: boolean;
+  mobilityMode: 'wheels' | 'tracks';
+  showSensorOverlay: boolean;
 }
 
 export interface ComponentInspectionData {

@@ -28,28 +28,36 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'simulation3d',
-    label: '3D Simulation',
+    label: '3D Machine',
     icon: Box,
-    description: 'Full-canvas interactive digital twin'
+    description: 'Full-canvas interactive digital twin mechanical model'
   },
   {
-    id: 'sensors',
-    label: 'Sensors',
+    id: 'terrain',
+    label: 'Terrain Scenarios',
+    icon: Mountain,
+    badge: 'SIH',
+    description: 'Climatic zones and steep hilly access models'
+  },
+  {
+    id: 'operations',
+    label: 'Live Operations',
     icon: Activity,
     badge: 'LIVE',
-    description: 'Real-time telemetry and gas matrix'
+    description: 'Real-time sequencing, safety interlocks & gas matrix'
   },
   {
-    id: 'parameters',
-    label: 'Operating Parameters',
-    icon: Sliders,
-    description: 'Hydraulic and mechanical control tuning'
-  },
-  {
-    id: 'reports',
-    label: 'Reports',
+    id: 'analysis',
+    label: 'Engineering Analysis',
     icon: FileText,
-    description: 'Fluid dynamics and mass balance logs'
+    description: 'Darcy-Weisbach head loss, rheology & mass balance'
+  },
+  {
+    id: 'prototype',
+    label: 'Prototype Planning',
+    icon: Compass,
+    badge: 'TRL 4',
+    description: 'Hardware BOM, modular assembly & TRL roadmap'
   }
 ];
 
@@ -76,7 +84,7 @@ export const LeftNavigation: React.FC<LeftNavigationProps> = ({ onOpenLegacyView
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
-          const hasAlarmOnSensors = item.id === 'sensors' && alarmsActive > 0;
+          const hasAlarmOnSensors = (item.id === 'operations' || item.id === 'sensors') && alarmsActive > 0;
 
           return (
             <button

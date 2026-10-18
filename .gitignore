@@ -21,6 +21,8 @@ backend/.pytest_cache/
 frontend/dist/
 frontend/dist-ssr/
 *.local
+frontend/playwright-report/
+frontend/test-results/
 
 # Logs
 npm-debug.log*

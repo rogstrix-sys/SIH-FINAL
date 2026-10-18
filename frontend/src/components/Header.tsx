@@ -75,15 +75,15 @@ export const Header: React.FC = () => {
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              <span>Desludge Digital Twin</span>
+            <h1 className="text-sm sm:text-base font-bold tracking-tight text-white flex items-center gap-2">
+              <span>SIH 26258 | Adaptive Mechanized Desludging Digital Twin</span>
             </h1>
             <Badge variant="safety" size="sm">
-              ENGINEERING v2.4
+              SIH 26258
             </Badge>
           </div>
-          <p className="text-[11px] text-slate-400 font-mono hidden md:block">
-            Deterministic Slurry Hydro-Mechanics & Machine Kinematics
+          <p className="text-[10px] sm:text-[11px] text-slate-400 font-mono hidden md:block">
+            Innovative Mechanized Desludging Models for Varied Climatic Zones and Hilly Terrains.
           </p>
         </div>
       </div>
@@ -98,7 +98,7 @@ export const Header: React.FC = () => {
           </Badge>
         </div>
 
-        {/* Connection Indicator labelled SIMULATED */}
+        {/* Persistent Connection Indicator labelled SIMULATED ENGINEERING DATA */}
         <div
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-cyan-700/40 bg-cyan-950/40 text-cyan-400 font-mono text-[11px]"
           title="Telemetry stream connected to internal deterministic simulation engine"
@@ -107,7 +107,7 @@ export const Header: React.FC = () => {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
           </span>
-          <span className="font-semibold tracking-wider uppercase">SIMULATED</span>
+          <span className="font-semibold tracking-wider uppercase">SIMULATED ENGINEERING DATA</span>
         </div>
 
         {/* Active Alarms Counter */}

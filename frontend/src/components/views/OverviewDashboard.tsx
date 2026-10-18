@@ -104,6 +104,7 @@ export const OverviewDashboard: React.FC = () => {
   const setCameraPreset = useSimulationStore((s) => s.setCameraPreset);
   const displayOptions = useSimulationStore((s) => s.displayOptions);
   const toggleDisplayOption = useSimulationStore((s) => s.toggleDisplayOption);
+  const setMobilityMode = useSimulationStore((s) => s.setMobilityMode);
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
 
@@ -781,6 +782,16 @@ export const OverviewDashboard: React.FC = () => {
                 className="text-[10px] py-1 px-2"
               >
                 Grid
+              </Button>
+              <Button
+                variant={displayOptions.mobilityMode === 'tracks' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setMobilityMode(displayOptions.mobilityMode === 'tracks' ? 'wheels' : 'tracks')}
+                title="Switch between 4-Wheel and Crawler Track Mobility Gear"
+                className="text-[10px] py-1 px-2 font-mono flex items-center gap-1"
+              >
+                <Truck className="w-3 h-3" />
+                {displayOptions.mobilityMode === 'tracks' ? 'Tracks' : 'Wheels'}
               </Button>
               <Button
                 variant={displayOptions.wireframe ? 'secondary' : 'ghost'}

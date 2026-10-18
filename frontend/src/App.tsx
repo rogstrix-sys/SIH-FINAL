@@ -3,6 +3,10 @@ import { Header } from './components/Header';
 import { LeftNavigation } from './components/LeftNavigation';
 import { OverviewDashboard } from './components/views/OverviewDashboard';
 import { Simulation3DView } from './components/views/Simulation3DView';
+import { TerrainScenariosView } from './components/views/TerrainScenariosView';
+import { LiveOperationsView } from './components/views/LiveOperationsView';
+import { EngineeringAnalysisView } from './components/views/EngineeringAnalysisView';
+import { PrototypePlanningView } from './components/views/PrototypePlanningView';
 import { SensorsView } from './components/views/SensorsView';
 import { ParametersView } from './components/views/ParametersView';
 import { ReportsView } from './components/views/ReportsView';
@@ -168,9 +172,11 @@ export const App: React.FC = () => {
           <main className="flex-1 flex flex-col overflow-hidden bg-graphite-950">
             {activeView === 'overview' && <OverviewDashboard />}
             {activeView === 'simulation3d' && <Simulation3DView />}
-            {activeView === 'sensors' && <SensorsView />}
+            {activeView === 'terrain' && <TerrainScenariosView />}
+            {(activeView === 'operations' || activeView === 'sensors') && <LiveOperationsView />}
+            {(activeView === 'analysis' || activeView === 'reports') && <EngineeringAnalysisView />}
+            {activeView === 'prototype' && <PrototypePlanningView />}
             {activeView === 'parameters' && <ParametersView />}
-            {activeView === 'reports' && <ReportsView />}
           </main>
         </div>
       )}

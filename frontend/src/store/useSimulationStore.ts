@@ -76,99 +76,102 @@ export const DEFAULT_PARAMETERS: SimulationParameters = {
 export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
   chassis: {
     id: 'chassis',
-    name: 'Heavy-Duty 4-Wheel Mobile Chassis',
+    name: 'Heavy-Duty 4-Wheel / Crawler Mobile Chassis',
     type: 'Mobility Platform',
     status: 'nominal',
     temperatureC: 24.5,
     pressureBar: 0,
     vibrationMmS: 0.6,
-    description: 'Narrow-gauge welded box-section steel chassis engineered for restricted-access alleyways and steep mountain slopes.',
+    description: 'Narrow-gauge welded box-section steel chassis engineered for restricted-access alleyways and steep mountain slopes. Selectable between high-flotation agricultural lug wheels and articulated rubber continuous tracks.',
     specifications: {
-      'Track Width': '1.35 m restricted access',
-      'Wheelbase': '2.20 m articulated',
-      'Tires': '26x12.00-12 Heavy Lug Agricultural',
-      'Stabilizers': '4x Hydraulic outrigger pads',
-      'Ground Clearance': '320 mm'
+      'Track Width': '1.35 m (Conceptual Assumption for Narrow Alleys)',
+      'Wheelbase': '2.10 m (Conceptual Assumption)',
+      'Ground Clearance': '320 mm nominal (Conceptual Model)',
+      'Approximate Payload': '2,800 kg GVW Rating (Conceptual Estimate)',
+      'Mobility Running Gear': 'Selectable 4-Wheel Lug / Articulated Rubber Crawler',
+      'Stabilizers': '4x Telescopic hydraulic outrigger pads'
     }
   },
   pump: {
     id: 'pump',
-    name: 'Tri-Lobe Positive Displacement Vacuum Pump',
-    type: 'Hydraulic Core Unit',
+    name: 'Tri-Lobe Positive Displacement Vacuum Slurry Pump',
+    type: 'Hydraulic Pumping Core',
     status: 'nominal',
     temperatureC: 48.5,
     pressureBar: 2.8,
     vibrationMmS: 2.1,
-    description: 'Direct-drive rotary lobe pump designed for non-Newtonian viscous septage evacuation without mechanical air lock.',
+    description: 'Direct-drive rotary lobe pump designed for non-Newtonian viscous septage evacuation without mechanical air lock. Coupled to 11 kW TEFC electric drive motor.',
     specifications: {
-      'Displacement': '36 m³/h nominal',
-      'Max Vacuum': '-88 kPa continuous',
-      'Shaft Power': '11.0 kW rated',
-      'Lobe Geometry': 'Helical tri-lobe polyurethane'
+      'Displacement Capacity': '36 m³/h nominal (Conceptual Assumption)',
+      'Max Vacuum Rating': '-88 kPa continuous (-0.88 bar)',
+      'Shaft Power': '11.0 kW rated IE3 electric motor',
+      'Lobe Geometry': 'Helical tri-lobe polyurethane with wear plates',
+      'Operating Speed': '1,800 - 2,400 RPM rated'
     }
   },
   tank: {
     id: 'tank',
-    name: 'On-Board Sludge Collection Vessel',
-    type: 'Containment Vessel',
+    name: 'On-Board Cylindrical Sludge Collection Vessel',
+    type: 'Containment Pressure-Vacuum Vessel',
     status: 'nominal',
     temperatureC: 21.0,
     pressureBar: -0.72,
     vibrationMmS: 0.4,
-    description: 'Cylindrical pressure-vacuum certified collection tank with sight-glass level tube and hydraulic dump door.',
+    description: 'Pressure-vacuum certified cylindrical tank featuring anti-slosh internal baffle plates, external calibrated borosilicate sight glass, and full-opening hydraulic cleanout door.',
     specifications: {
-      'Working Volume': '2,400 Liters rated',
-      'Shell Thickness': '6.0 mm structural carbon steel',
-      'Sight Gauge': 'Direct optical borosilicate tube',
-      'Inspection Hatch': '450 mm top dome with wing clamps'
+      'Working Volume': '2,400 Liters (Conceptual Sizing Assumption)',
+      'Shell Thickness': '6.0 mm structural carbon steel (SA 516 Gr 70)',
+      'Sight Gauge': 'Direct optical borosilicate tube with etched ticks',
+      'Inspection Hatch': '450 mm top dome with forged wing clamp bolts',
+      'Safety Devices': 'Dual PVRV relief valve & cyclone moisture trap'
     }
   },
   receiver: {
     id: 'receiver',
     name: 'External Waste Disposal Receiving Tanker',
-    type: 'Receiving Facility',
+    type: 'Discharge Receiving Facility',
     status: 'nominal',
     temperatureC: 18.0,
     pressureBar: 1.01,
     vibrationMmS: 0.1,
     description: '10,000L high-capacity transport disposal tanker receiving transferred sludge during discharge cycle.',
     specifications: {
-      'Gross Capacity': '10,000 Liters',
-      'Inlet Flange': 'DN100 Camlock Coupling',
-      'Vessel Type': 'Triple-axle vacuum road tanker',
-      'Transfer Status': 'Atmospheric gravity & pump discharge'
+      'Gross Capacity': '10,000 Liters (Standard Municipal Sizing Assumption)',
+      'Inlet Flange': 'DN100 Camlock Coupling with quick-release levers',
+      'Vessel Type': 'Triple-axle highway vacuum road tanker',
+      'Transfer Rate': '750 L/min nominal pump discharge'
     }
   },
   hosereel: {
     id: 'hosereel',
-    name: 'Powered Hydraulic Hose Reel',
-    type: 'Hose Management',
+    name: 'Powered Hydraulic Hose Reel Mechanism',
+    type: 'Conduit Management Subsystem',
     status: 'nominal',
     temperatureC: 28.0,
     pressureBar: 120,
     vibrationMmS: 0.9,
     description: 'High-torque hydraulic motor reel spooling 35m of heavy-duty spiral wire-reinforced extraction hose.',
     specifications: {
-      'Drum Capacity': '45 m of Ø100mm hose',
+      'Drum Capacity': '35 m of Ø100mm heavy hose (Conceptual Assumption)',
       'Drive': 'Orbit hydraulic motor with auto-brake',
-      'Swivel Joint': 'Dual O-ring high-vacuum swivel',
-      'Guide Arms': 'Four-roller fairlead guide'
+      'Swivel Joint': 'Dual Viton O-ring high-vacuum swivel union',
+      'Guide Arms': 'Four-roller fairlead guide with tension roller'
     }
   },
   boom: {
     id: 'boom',
-    name: 'Articulated Dual-Joint Support Boom',
-    type: 'Hydraulic Manipulator',
+    name: 'Articulated Dual-Joint Support Boom Crane',
+    type: 'Hydraulic Hose Manipulator',
     status: 'nominal',
     temperatureC: 32.0,
     pressureBar: 160,
     vibrationMmS: 1.2,
-    description: '360° slew hydraulic crane arm supporting extraction hose over septic tank opening with twin lift cylinders.',
+    description: 'Articulated dual-joint hydraulic crane arm that positions and supports the heavy suction umbilical over septic vault openings.',
     specifications: {
-      'Reach Radius': '4.20 m maximum',
-      'Rotation Range': '270° slew bearing',
-      'Lift Capacity': '250 kg at maximum extension',
-      'Actuation': 'Twin chrome hydraulic cylinders'
+      'Reach Radius': '4.20 m maximum (Conceptual Assumption)',
+      'Rotation Range': '270° slew ring bearing',
+      'Lift Capacity': '250 kg at maximum extension (Conceptual Model)',
+      'Actuation': 'Twin chrome hydraulic cylinders with safety check valves'
     }
   },
   hose: {
@@ -182,41 +185,41 @@ export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
     description: 'Helix steel-wire reinforced PVC composite hose with quick-disconnect camlock couplings.',
     specifications: {
       'Inner Diameter': '100 mm (4 inch)',
-      'Burst Pressure': '12.0 bar',
+      'Burst Pressure': '12.0 bar rating',
       'Vacuum Rating': '-95 kPa full collapse resistant',
-      'Length': '35 m operational'
+      'Configured Length': '35 m operational reach'
     }
   },
   nozzle: {
     id: 'nozzle',
-    name: 'Submerged Slurry Jetting Nozzle',
-    type: 'Suction & Agitation Head',
+    name: 'Submerged Slurry Fluidizing Nozzle & Cutter',
+    type: 'Downhole Extraction Head',
     status: 'nominal',
     temperatureC: 17.5,
     pressureBar: 140,
     vibrationMmS: 2.8,
-    description: 'Heavy steel suction bell with circular peripheral hydro-jetting manifold for breaking consolidated sludge layers.',
+    description: 'Heavy steel suction bell with circular peripheral hydro-jetting manifold and rotary cutterhead for breaking consolidated sludge layers.',
     specifications: {
-      'Intake Aperture': 'Ø110 mm flared inlet',
-      'Jetting Nozzles': '6x fan carbide inserts',
-      'Jet Pressure': 'Up to 250 bar rated',
-      'Agitation Radius': '0.8 m fluidized cone'
+      'Intake Aperture': 'Ø110 mm flared inlet (Conceptual Assumption)',
+      'Jetting Nozzles': '6x fan carbide inserts (140 bar shear pressure)',
+      'Cutterhead Speed': '240 RPM rated macerator',
+      'Agitation Cone': '0.8 m fluidized cone diameter'
     }
   },
   septictank: {
     id: 'septictank',
-    name: 'Demonstration Septic Tank (Cutaway)',
+    name: 'Dual-Compartment Demonstration Septic Vault',
     type: 'Sanitation Vault',
     status: 'nominal',
-    temperatureC: 16.5,
-    pressureBar: 1.01,
+    temperatureC: 16.0,
+    pressureBar: 0,
     vibrationMmS: 0.1,
-    description: 'Dual-compartment municipal septic tank model demonstrating sludge settling and supernatant liquid stratification.',
+    description: 'Cutaway demonstration septic tank showing settled viscous sludge layer, anaerobic liquid layer, top scum crust, and central transfer weir baffle.',
     specifications: {
-      'Gross Capacity': '4,200 Liters',
-      'Baffle Wall': 'Concrete dividing weir',
-      'Access Opening': '600 mm manhole chimney',
-      'Cutaway Wall': 'Architectural cross-section profile'
+      'Vault Volume': '4,200 Liters total (Conceptual Assumption)',
+      'Initial Sludge Depth': '1.85 m fluid column',
+      'Cutaway Section': '120° acrylic sectional cut showing dynamic suction vortex',
+      'Atmosphere': 'Hazardous sewer gas zone (H2S, CH4, CO monitored)'
     }
   }
 };
@@ -271,6 +274,7 @@ export interface SimulationStore {
   clearEvents: () => void;
   setCameraPreset: (preset: CameraPreset) => void;
   toggleDisplayOption: (key: keyof DisplayOptions) => void;
+  setMobilityMode: (mode: 'wheels' | 'tracks') => void;
   setSelectedComponent: (id: string | null) => void;
 
   // Challenging Terrain & Feasibility Modeling
@@ -399,7 +403,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       showParticles: true,
       godRays: true,
       soundEnabled: false,
-      showGrid: true
+      showGrid: true,
+      mobilityMode: 'wheels',
+      showSensorOverlay: true
     },
     selectedComponentId: null,
 
@@ -880,6 +886,15 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         displayOptions: {
           ...state.displayOptions,
           [key]: !state.displayOptions[key]
+        }
+      }));
+    },
+
+    setMobilityMode: (mode: 'wheels' | 'tracks') => {
+      set((state) => ({
+        displayOptions: {
+          ...state.displayOptions,
+          mobilityMode: mode
         }
       }));
     },
