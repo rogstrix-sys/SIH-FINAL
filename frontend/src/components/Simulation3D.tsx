@@ -49,7 +49,11 @@ import {
   createCadDimensionBadge,
   createSludgeFoamTexture,
   createCloudTexture,
-  createCrawlerTrackTexture
+  createCrawlerTrackTexture,
+  createIndianParapetTexture,
+  createBROSignTexture,
+  createBROMilestoneTexture,
+  createTibetanPrayerFlagsTexture
 } from './simulationTextures';
 
 // Custom 3D Helical Curve for Coil Springs
@@ -88,8 +92,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Geographic & Climatic preset options
-  const [terrainPreset, setTerrainPreset] = useState<'shimla' | 'aizawl' | 'ladakh'>('shimla');
+  // Geographic & Climatic Indian Himalayan preset options (Uttarakhand Ghats, Himachal Alpine, Ladakh High-Pass)
+  const [terrainPreset, setTerrainPreset] = useState<
+    'uttarakhand' | 'himachal' | 'ladakh' | 'shimla' | 'aizawl'
+  >('uttarakhand');
   const [slopeDeg, setSlopeDeg] = useState<number>(site.slope_degrees || 28.0);
   const [payloadLiters, setPayloadLiters] = useState<number>(400);
   const [hasBaffles, setHasBaffles] = useState<boolean>(true);
@@ -356,15 +362,17 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     sceneRef.current = scene;
 
     let skyColorHex = isNightMode ? 0x050914 : 0x0f172a;
-    if (terrainPreset === 'aizawl') {
-      skyColorHex = isNightMode ? 0x040d12 : 0x0a221e;
+    if (terrainPreset === 'uttarakhand' || terrainPreset === 'aizawl') {
+      skyColorHex = isNightMode ? 0x040d12 : 0x0b2520; // Garhwal misty valley emerald tint
     } else if (terrainPreset === 'ladakh') {
-      skyColorHex = isNightMode ? 0x060c18 : 0x162334;
+      skyColorHex = isNightMode ? 0x060c18 : 0x1a2638; // Cold high-altitude crystalline blue-grey
+    } else if (terrainPreset === 'himachal' || terrainPreset === 'shimla') {
+      skyColorHex = isNightMode ? 0x050916 : 0x0f1d30; // Alpine deodar pine sky
     }
     scene.background = new THREE.Color(skyColorHex);
     scene.fog = new THREE.FogExp2(
       skyColorHex,
-      terrainPreset === 'aizawl' ? 0.012 : activeWeather === 'snow' ? 0.010 : 0.007
+      terrainPreset === 'uttarakhand' ? 0.009 : terrainPreset === 'ladakh' ? 0.006 : activeWeather === 'snow' ? 0.010 : 0.007
     );
 
     // 2. Camera with Expansive 700m Mountain Sightlines
@@ -434,7 +442,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     scene.add(mountainGroup);
 
     // Procedural PBR Textures
-    const asphaltTex = createAsphaltTextures();
+    const asphaltTex = createAsphaltTextures(terrainPreset);
     asphaltTex.map.repeat.set(1, 36);
     asphaltTex.bumpMap.repeat.set(1, 36);
     asphaltTex.roughnessMap.repeat.set(1, 36);
@@ -444,6 +452,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     rockTex.bumpMap.repeat.set(12, 12);
     rockTex.roughnessMap.repeat.set(12, 12);
 
+    const indianParapetTex = createIndianParapetTexture();
+    indianParapetTex.map.repeat.set(1, 1);
+    indianParapetTex.bumpMap.repeat.set(1, 1);
+
+    const prayerFlagsTex = createTibetanPrayerFlagsTexture();
     const stoneWallTex = createKathKuniStoneTexture();
     const tireTex = createTireTextures();
     const swachhDecal = createDecalTexture('swachh_bharat');
@@ -474,11 +487,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const roadCurve = new THREE.CatmullRomCurve3(roadWaypoints, false, 'catmullrom', 0.15);
     roadCurveRef.current = roadCurve;
 
-    // 7. Prominently Visible Mountain Road: Wide Asphalt (3.4m), Raised Stone Retaining Wall Embankment, Dual Gravel Shoulders, Cat-Eye Studs & W-Beam Crash Barriers
+    // 7. Prominently Visible Indian Mountain Road: Wide Asphalt (3.6m), Solid Engineered Retaining Wall Embankment, Dual Gravel Shoulders, Indian Black/White Parapets, BRO Milestones & Slogan Signboards
     const roadSegments = 360;
-    const roadWidth = 3.4;
-    const shoulderWidth = 0.48;
-    const roadYOffset = 0.22;
+    const roadWidth = 3.6;
+    const shoulderWidth = 0.50;
+    const roadYOffset = 0.38; // Raised cleanly above mountain terrain
     const curvePoints = roadCurve.getPoints(roadSegments);
 
     const roadGeo = new THREE.BufferGeometry();
@@ -500,7 +513,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const shNorms: number[] = [];
     const shIdx: number[] = [];
 
-    // Continuous W-Beam Steel Crash Barrier Ribbon
+    // Continuous W-Beam Steel Crash Barrier Ribbon (for Himachal preset)
     const grGeo = new THREE.BufferGeometry();
     const grVerts: number[] = [];
     const grNorms: number[] = [];
@@ -518,6 +531,17 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       side: THREE.DoubleSide
     });
 
+    const indianParapetMat = new THREE.MeshStandardMaterial({
+      map: indianParapetTex.map,
+      bumpMap: indianParapetTex.bumpMap,
+      bumpScale: 0.05,
+      roughness: 0.85,
+      metalness: 0.12,
+      side: THREE.DoubleSide
+    });
+
+    const parapetBlockGeo = new THREE.BoxGeometry(0.85, 0.65, 0.35);
+
     for (let i = 0; i <= roadSegments; i++) {
       const t = i / roadSegments;
       const pt = curvePoints[i];
@@ -528,22 +552,21 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       const leftPt = pt.clone().add(normal.clone().multiplyScalar(roadWidth / 2));
       const rightPt = pt.clone().add(normal.clone().multiplyScalar(-roadWidth / 2));
 
-      // Road Tarmac Bed with UV mapping (U: 0 to 1 across width; V: t along length)
+      // 1. Road Tarmac Bed with UV mapping (U: 0 to 1 across width; V: t along length)
       roadVerts.push(leftPt.x, leftPt.y + roadYOffset, leftPt.z);
       roadVerts.push(rightPt.x, rightPt.y + roadYOffset, rightPt.z);
       roadNorms.push(0, 1, 0, 0, 1, 0);
       roadUvs.push(0, t, 1, t);
 
-      // Outer Raised Stone Retaining Wall Embankment
+      // 2. Outer Deep Stone Retaining Wall Embankment (supports road into bedrock)
       const wallTop = leftPt.clone().setY(leftPt.y + roadYOffset);
-      const wallBottom = leftPt.clone().add(normal.clone().multiplyScalar(0.35)).setY(leftPt.y + roadYOffset - 0.65);
+      const wallBottom = leftPt.clone().add(normal.clone().multiplyScalar(0.42)).setY(leftPt.y + roadYOffset - 1.8);
       embVerts.push(wallTop.x, wallTop.y, wallTop.z);
       embVerts.push(wallBottom.x, wallBottom.y, wallBottom.z);
-      embNorms.push(normal.x, 0.3, normal.z);
-      embNorms.push(normal.x, 0.3, normal.z);
+      embNorms.push(normal.x, 0.2, normal.z, normal.x, 0.2, normal.z);
       embUvs.push(0, t * 18, 1, t * 18);
 
-      // Dual Gravel Road Shoulders
+      // 3. Dual Gravel Road Shoulders
       const outerShoulderEdge = leftPt.clone().add(normal.clone().multiplyScalar(shoulderWidth));
       const innerShoulderEdge = rightPt.clone().add(normal.clone().multiplyScalar(-shoulderWidth));
       shVerts.push(leftPt.x, leftPt.y + roadYOffset - 0.01, leftPt.z);
@@ -552,7 +575,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       shVerts.push(innerShoulderEdge.x, innerShoulderEdge.y + roadYOffset - 0.03, innerShoulderEdge.z);
       shNorms.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
 
-      // Retroreflective Cat-Eye Road Studs along centerline every 4 segments
+      // 4. Retroreflective Cat-Eye Road Studs along centerline every 4 segments
       if (i % 4 === 0) {
         const stud = new THREE.Mesh(
           new THREE.BoxGeometry(0.12, 0.04, 0.12),
@@ -569,48 +592,109 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         mountainGroup.add(stud);
       }
 
-      // Corrugated W-Beam Crash Barrier (Profile heights along outer precipice edge)
-      const grEdge = leftPt.clone().add(normal.clone().multiplyScalar(0.18));
+      // 5. REGIONAL ROADSIDE SAFETY BARRIERS:
+      const grEdge = leftPt.clone().add(normal.clone().multiplyScalar(0.22));
       const grBaseY = grEdge.y + roadYOffset;
-      const p0 = new THREE.Vector3(grEdge.x, grBaseY + 0.32, grEdge.z);
-      const p1 = new THREE.Vector3(grEdge.x + normal.x * 0.04, grBaseY + 0.42, grEdge.z + normal.z * 0.04);
-      const p2 = new THREE.Vector3(grEdge.x, grBaseY + 0.50, grEdge.z);
-      const p3 = new THREE.Vector3(grEdge.x + normal.x * 0.04, grBaseY + 0.58, grEdge.z + normal.z * 0.04);
-      const p4 = new THREE.Vector3(grEdge.x, grBaseY + 0.68, grEdge.z);
 
-      grVerts.push(p0.x, p0.y, p0.z);
-      grVerts.push(p1.x, p1.y, p1.z);
-      grVerts.push(p2.x, p2.y, p2.z);
-      grVerts.push(p3.x, p3.y, p3.z);
-      grVerts.push(p4.x, p4.y, p4.z);
+      if (terrainPreset === 'uttarakhand' || terrainPreset === 'aizawl') {
+        // --- UTTARAKHAND: Iconic Indian Hill Road Black & White Concrete Safety Parapet Blocks ---
+        if (i % 2 === 0) {
+          const parapetBlock = new THREE.Mesh(parapetBlockGeo, indianParapetMat);
+          parapetBlock.position.set(grEdge.x, grBaseY + 0.32, grEdge.z);
+          parapetBlock.rotation.y = Math.atan2(tangent.x, tangent.z);
+          parapetBlock.castShadow = true;
+          parapetBlock.receiveShadow = true;
+          mountainGroup.add(parapetBlock);
 
-      grNorms.push(normal.x, 0, normal.z);
-      grNorms.push(normal.x, 0, normal.z);
-      grNorms.push(normal.x, 0, normal.z);
-      grNorms.push(normal.x, 0, normal.z);
-      grNorms.push(normal.x, 0, normal.z);
+          // Retroreflective hazard reflector dot on road face of block
+          const dot = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.04, 0.04, 0.02, 8),
+            new THREE.MeshBasicMaterial({ color: i % 4 === 0 ? 0xef4444 : 0xfacc15 })
+          );
+          dot.rotation.x = Math.PI / 2;
+          dot.position.set(0, 0.14, 0.18);
+          parapetBlock.add(dot);
+        }
+      } else if (terrainPreset === 'ladakh') {
+        // --- LADAKH: Drystone Guard Boulders + Tibetan 5-Color Prayer Flags at Passes ---
+        if (i % 3 === 0) {
+          const boulderGeo = new THREE.DodecahedronGeometry(0.42 + (i % 4) * 0.08, 1);
+          const boulderMat = new THREE.MeshStandardMaterial({
+            map: rockTex.map,
+            roughness: 0.88,
+            metalness: 0.15
+          });
+          const guardStone = new THREE.Mesh(boulderGeo, boulderMat);
+          guardStone.position.set(grEdge.x, grBaseY + 0.28, grEdge.z);
+          guardStone.rotation.set((i * 0.4) % Math.PI, (i * 0.7) % Math.PI, 0);
+          guardStone.castShadow = true;
+          mountainGroup.add(guardStone);
+        }
 
-      // Concrete Drainage Gutter along inner cliff wall
-      const drainEdge = rightPt.clone().add(normal.clone().multiplyScalar(-0.04));
-      const drainBottom = drainEdge.clone().add(normal.clone().multiplyScalar(-0.18)).setY(drainEdge.y + roadYOffset - 0.16);
-      const drainWall = drainEdge.clone().add(normal.clone().multiplyScalar(-0.38)).setY(drainEdge.y + roadYOffset + 0.02);
+        // Tibetan Prayer Flag Mast Assemblies at Switchback Curves (i = 80, 180, 264) and Summit (i = 350)
+        if (i === 80 || i === 180 || i === 264 || i === 350) {
+          const mastGroup = new THREE.Group();
+          mastGroup.position.set(grEdge.x, grBaseY, grEdge.z);
+          mountainGroup.add(mastGroup);
 
-      drainVerts.push(drainEdge.x, drainEdge.y + roadYOffset, drainEdge.z);
-      drainVerts.push(drainBottom.x, drainBottom.y, drainBottom.z);
-      drainVerts.push(drainWall.x, drainWall.y, drainWall.z);
+          // Weathered Himalayan Cedar / Juniper Pass Pole
+          const mast = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.07, 0.10, 5.2, 8),
+            new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 })
+          );
+          mast.position.y = 2.6;
+          mast.castShadow = true;
+          mastGroup.add(mast);
 
-      // Guardrail Steel Posts every 6 segments
-      if (i % 6 === 0) {
-        const post = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 0.76, 0.08),
-          galvanizedMat
-        );
-        post.position.set(grEdge.x, grBaseY + 0.38, grEdge.z);
-        post.castShadow = true;
-        mountainGroup.add(post);
+          // White Khata ceremonial scarf wrapped at pole joint
+          const khata = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.12, 0.12, 0.35, 8),
+            new THREE.MeshBasicMaterial({ color: 0xf8fafc })
+          );
+          khata.position.y = 4.8;
+          mastGroup.add(khata);
 
-        // Retroreflective Delineator Tabs on Hairpins
-        if ((i > 65 && i < 115) || (i > 160 && i < 210) || (i > 245 && i < 290)) {
+          // Fluttering 5-Color Tibetan Prayer Flags Banner (Lungta)
+          const flagBannerGeo = new THREE.PlaneGeometry(3.6, 0.9, 8, 2);
+          const flagBannerMat = new THREE.MeshStandardMaterial({
+            map: prayerFlagsTex,
+            roughness: 0.85,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.95
+          });
+          const flagBanner = new THREE.Mesh(flagBannerGeo, flagBannerMat);
+          flagBanner.position.set(1.6, 4.3, 0);
+          flagBanner.rotation.y = Math.atan2(tangent.x, tangent.z) + Math.PI / 6;
+          mastGroup.add(flagBanner);
+        }
+      } else {
+        // --- HIMACHAL: Galvanized W-Beam Crash Barrier Ribbon ---
+        const p0 = new THREE.Vector3(grEdge.x, grBaseY + 0.32, grEdge.z);
+        const p1 = new THREE.Vector3(grEdge.x + normal.x * 0.04, grBaseY + 0.42, grEdge.z + normal.z * 0.04);
+        const p2 = new THREE.Vector3(grEdge.x, grBaseY + 0.50, grEdge.z);
+        const p3 = new THREE.Vector3(grEdge.x + normal.x * 0.04, grBaseY + 0.58, grEdge.z + normal.z * 0.04);
+        const p4 = new THREE.Vector3(grEdge.x, grBaseY + 0.68, grEdge.z);
+
+        grVerts.push(p0.x, p0.y, p0.z);
+        grVerts.push(p1.x, p1.y, p1.z);
+        grVerts.push(p2.x, p2.y, p2.z);
+        grVerts.push(p3.x, p3.y, p3.z);
+        grVerts.push(p4.x, p4.y, p4.z);
+
+        grNorms.push(normal.x, 0, normal.z);
+        grNorms.push(normal.x, 0, normal.z);
+        grNorms.push(normal.x, 0, normal.z);
+        grNorms.push(normal.x, 0, normal.z);
+        grNorms.push(normal.x, 0, normal.z);
+
+        if (i % 6 === 0) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.76, 0.08), galvanizedMat);
+          post.position.set(grEdge.x, grBaseY + 0.38, grEdge.z);
+          post.castShadow = true;
+          mountainGroup.add(post);
+
+          // Retroreflective Delineators
           const delineator = new THREE.Mesh(
             new THREE.BoxGeometry(0.06, 0.14, 0.03),
             new THREE.MeshBasicMaterial({ color: i % 12 === 0 ? 0xef4444 : 0xfacc15 })
@@ -620,10 +704,19 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         }
       }
 
+      // 6. Concrete Drainage Gutter along inner cliff wall (Universal in Indian Ghats)
+      const drainEdge = rightPt.clone().add(normal.clone().multiplyScalar(-0.04));
+      const drainBottom = drainEdge.clone().add(normal.clone().multiplyScalar(-0.18)).setY(drainEdge.y + roadYOffset - 0.16);
+      const drainWall = drainEdge.clone().add(normal.clone().multiplyScalar(-0.38)).setY(drainEdge.y + roadYOffset + 0.02);
+
+      drainVerts.push(drainEdge.x, drainEdge.y + roadYOffset, drainEdge.z);
+      drainVerts.push(drainBottom.x, drainBottom.y, drainBottom.z);
+      drainVerts.push(drainWall.x, drainWall.y, drainWall.z);
+
       // Hairpin Curve Chevron Hazard Boards at apexes
-      const isHairpinApex = (i >= 76 && i <= 88 && i % 3 === 0) ||
-                            (i >= 174 && i <= 186 && i % 3 === 0) ||
-                            (i >= 258 && i <= 270 && i % 3 === 0);
+      const isHairpinApex = (i >= 76 && i <= 88 && i % 4 === 0) ||
+                            (i >= 174 && i <= 186 && i % 4 === 0) ||
+                            (i >= 258 && i <= 270 && i % 4 === 0);
       if (isHairpinApex) {
         const chevronBoard = new THREE.Mesh(
           new THREE.BoxGeometry(0.85, 0.45, 0.03),
@@ -646,28 +739,31 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         chevronBoard.add(chevArrow);
       }
 
+      // Quads indexing: Counter-clockwise winding (+Y face normal upwards)
       if (i < roadSegments) {
         const v = i * 2;
-        roadIdx.push(v, v + 1, v + 2);
-        roadIdx.push(v + 1, v + 3, v + 2);
+        roadIdx.push(v, v + 2, v + 1); // CRITICAL FIX: Counter-clockwise (+Y normal up, eliminates transparency culling)
+        roadIdx.push(v + 1, v + 2, v + 3);
 
         // Embankment Quads
         const eV = i * 2;
-        embIdx.push(eV, eV + 1, eV + 2);
-        embIdx.push(eV + 1, eV + 3, eV + 2);
+        embIdx.push(eV, eV + 2, eV + 1);
+        embIdx.push(eV + 1, eV + 2, eV + 3);
 
         // Shoulders Quads
         const sV = i * 4;
-        shIdx.push(sV, sV + 1, sV + 4);
-        shIdx.push(sV + 1, sV + 5, sV + 4);
-        shIdx.push(sV + 2, sV + 3, sV + 6);
-        shIdx.push(sV + 3, sV + 7, sV + 6);
+        shIdx.push(sV, sV + 4, sV + 1);
+        shIdx.push(sV + 1, sV + 4, sV + 5);
+        shIdx.push(sV + 2, sV + 6, sV + 3);
+        shIdx.push(sV + 3, sV + 6, sV + 7);
 
-        // Guardrail Ribbon Quads
-        const grV = i * 5;
-        for (let s = 0; s < 4; s++) {
-          grIdx.push(grV + s, grV + s + 1, grV + s + 5);
-          grIdx.push(grV + s + 1, grV + s + 6, grV + s + 5);
+        // Guardrail Ribbon Quads (if Himachal)
+        if (terrainPreset === 'himachal' || terrainPreset === 'shimla') {
+          const grV = i * 5;
+          for (let s = 0; s < 4; s++) {
+            grIdx.push(grV + s, grV + s + 1, grV + s + 5);
+            grIdx.push(grV + s + 1, grV + s + 6, grV + s + 5);
+          }
         }
 
         // Drain Gutter Quads
@@ -683,14 +779,22 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     roadGeo.setAttribute('normal', new THREE.Float32BufferAttribute(roadNorms, 3));
     roadGeo.setAttribute('uv', new THREE.Float32BufferAttribute(roadUvs, 2));
     roadGeo.setIndex(roadIdx);
+    roadGeo.computeVertexNormals();
 
+    // 100% Solid & Opaque PBR Road Material with Polygon Offset to guarantee 0 z-fighting and 0 culling
     const roadMat = new THREE.MeshStandardMaterial({
       map: asphaltTex.map,
       bumpMap: asphaltTex.bumpMap,
-      bumpScale: 0.05,
+      bumpScale: 0.08,
       roughnessMap: asphaltTex.roughnessMap,
-      roughness: 0.85,
-      metalness: 0.12
+      roughness: 0.82,
+      metalness: 0.14,
+      side: THREE.DoubleSide, // CRITICAL: Never culled by camera angles
+      polygonOffset: true,
+      polygonOffsetFactor: -3.0,
+      polygonOffsetUnits: -4.0,
+      depthWrite: true,
+      depthTest: true
     });
     const roadMesh = new THREE.Mesh(roadGeo, roadMat);
     roadMesh.receiveShadow = true;
@@ -701,6 +805,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     embGeo.setAttribute('normal', new THREE.Float32BufferAttribute(embNorms, 3));
     embGeo.setAttribute('uv', new THREE.Float32BufferAttribute(embUvs, 2));
     embGeo.setIndex(embIdx);
+    embGeo.computeVertexNormals();
     const embMesh = new THREE.Mesh(
       embGeo,
       new THREE.MeshStandardMaterial({
@@ -721,7 +826,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const shMesh = new THREE.Mesh(
       shGeo,
       new THREE.MeshStandardMaterial({
-        color: 0x8a7f72,
+        color: terrainPreset === 'ladakh' ? 0xa89984 : 0x8a7f72,
         roughness: 0.95,
         metalness: 0.05,
         side: THREE.DoubleSide
@@ -730,13 +835,15 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     shMesh.receiveShadow = true;
     mountainGroup.add(shMesh);
 
-    // Guardrail Mesh
-    grGeo.setAttribute('position', new THREE.Float32BufferAttribute(grVerts, 3));
-    grGeo.setAttribute('normal', new THREE.Float32BufferAttribute(grNorms, 3));
-    grGeo.setIndex(grIdx);
-    const grMesh = new THREE.Mesh(grGeo, galvanizedMat);
-    grMesh.castShadow = true;
-    mountainGroup.add(grMesh);
+    // Guardrail Ribbon Mesh (if Himachal)
+    if ((terrainPreset === 'himachal' || terrainPreset === 'shimla') && grVerts.length > 0) {
+      grGeo.setAttribute('position', new THREE.Float32BufferAttribute(grVerts, 3));
+      grGeo.setAttribute('normal', new THREE.Float32BufferAttribute(grNorms, 3));
+      grGeo.setIndex(grIdx);
+      const grMesh = new THREE.Mesh(grGeo, galvanizedMat);
+      grMesh.castShadow = true;
+      mountainGroup.add(grMesh);
+    }
 
     // Concrete Drainage Gutter Mesh
     drainGeo.setAttribute('position', new THREE.Float32BufferAttribute(drainVerts, 3));
@@ -754,37 +861,91 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     drainMesh.receiveShadow = true;
     mountainGroup.add(drainMesh);
 
-    // Roadside Grade & Mountain Warning Signs with Procedural Textures
-    const signLocations = [
-      { t: 0.06, title: '28° STEEP INCLINE', sub: 'ENGAGE LOW GEAR 4WD', icon: 'slope' as const },
-      { t: 0.24, title: 'HAIRPIN BEND 1', sub: 'SOUND HORN · SLOW', icon: 'curve' as const },
-      { t: 0.46, title: 'SLOSH HAZARD ZONE', sub: 'DUAL BAFFLES ACTIVE', icon: 'hazard' as const },
-      { t: 0.68, title: 'HAIRPIN BEND 2', sub: 'STEEP PRECIPICE', icon: 'curve' as const },
-      { t: 0.88, title: 'SUMMIT VILLAGE APPROACH', sub: 'SEPTIC PIT AHEAD', icon: 'slope' as const }
+    // 7B. AUTHENTIC BORDER ROADS ORGANISATION (BRO) MILESTONES & HIGHWAY SLOGAN BOARDS
+    // Traditional Indian Highway Milestones (NH-58 / NH-5 / NH-1D)
+    const milestoneWaypoints = [
+      { t: 0.12, route: terrainPreset === 'himachal' ? 'NH 5' : terrainPreset === 'ladakh' ? 'NH 1D' : 'NH 58', km: 84, elev: 'ELEV 1,850 M' },
+      { t: 0.48, route: terrainPreset === 'himachal' ? 'NH 5' : terrainPreset === 'ladakh' ? 'NH 1D' : 'NH 58', km: 42, elev: 'ELEV 2,240 M' },
+      { t: 0.85, route: terrainPreset === 'himachal' ? 'NH 5' : terrainPreset === 'ladakh' ? 'NH 1D' : 'NH 58', km: 6, elev: terrainPreset === 'ladakh' ? '17,982 FT' : 'ELEV 2,680 M' }
     ];
-    signLocations.forEach((s) => {
+
+    milestoneWaypoints.forEach((ms) => {
+      const msPt = roadCurve.getPoint(ms.t);
+      const msTan = roadCurve.getTangent(ms.t).normalize();
+      const msNorm = new THREE.Vector3().crossVectors(msTan, new THREE.Vector3(0, 1, 0)).normalize();
+      const msPos = msPt.clone().add(msNorm.clone().multiplyScalar(-roadWidth / 2 - 0.72));
+
+      // Milestone Pillar Group
+      const msGroup = new THREE.Group();
+      msGroup.position.set(msPos.x, msPos.y + roadYOffset + 0.38, msPos.z);
+      msGroup.rotation.y = Math.atan2(msTan.x, msTan.z) + Math.PI / 2;
+      mountainGroup.add(msGroup);
+
+      // Milestone 3D body with curved dome top
+      const msGeo = new THREE.BoxGeometry(0.42, 0.76, 0.24);
+      const msTex = createBROMilestoneTexture(terrainPreset, ms.route, ms.km, ms.elev);
+      const msMat = new THREE.MeshStandardMaterial({
+        map: msTex,
+        roughness: 0.65,
+        metalness: 0.1
+      });
+      const msMesh = new THREE.Mesh(msGeo, msMat);
+      msMesh.castShadow = true;
+      msGroup.add(msMesh);
+    });
+
+    // Signature Border Roads Organisation (BRO) Yellow Slogan Signboards
+    const broSlogans: Record<string, Array<{ t: number; slogan: string; sub?: string }>> = {
+      uttarakhand: [
+        { t: 0.06, slogan: 'DRIVE ON MY CURVES WITH CARE', sub: 'PROJECT SHIVALIK · NH-58' },
+        { t: 0.25, slogan: 'SAFETY ON ROAD, SAFE TEA AT HOME', sub: 'ACCIDENT PRONE BEND' },
+        { t: 0.45, slogan: 'IF YOU ARE MARRIED, DIVORCE SPEED', sub: 'GIVE WAY TO UPHILL VEHICLES' },
+        { t: 0.65, slogan: 'ALERT TODAY, ALIVE TOMORROW', sub: 'STEEP PRECIPICE AHEAD' },
+        { t: 0.82, slogan: 'BRO WELCOMES YOU TO DEV BHOOMI', sub: 'SUMMIT VILLAGE 2 KM' }
+      ],
+      himachal: [
+        { t: 0.06, slogan: 'PEEP PEEP DONT SLEEP', sub: 'PROJECT DEEPAK · NH-5' },
+        { t: 0.25, slogan: 'BETTER BE MR. LATE THAN LATE MR.', sub: 'BLIND HAIRPIN CURVE' },
+        { t: 0.45, slogan: 'LIFE IS A SHORT TRIP, DONT MAKE IT SHORTER', sub: 'USE LOW GEAR 4WD' },
+        { t: 0.65, slogan: 'DARLING I LIKE YOU, BUT NOT SO FAST', sub: 'ROCKFALL HAZARD ZONE' },
+        { t: 0.82, slogan: 'PROJECT DEEPAK · DRIVE SAFELY', sub: 'SUMMIT SANITATION HUB' }
+      ],
+      ladakh: [
+        { t: 0.06, slogan: 'DONT BE SILLY ON THE CHILLY', sub: 'PROJECT HIMANK · NH-1D' },
+        { t: 0.25, slogan: 'AFTER WHISKY, DRIVING IS RISKY', sub: 'HIGH ALTITUDE PASS' },
+        { t: 0.45, slogan: 'HIGHEST MOTORABLE PASS IN THE WORLD', sub: 'KHARDUNG LA · 17,982 FT' },
+        { t: 0.65, slogan: 'BE GENTLE ON MY CURVES', sub: 'SUB-ZERO ICE PATCHES' },
+        { t: 0.82, slogan: 'PROJECT HIMANK · THE MOUNTAIN TAMERS', sub: 'OXYGEN LEVEL 50% · DRIVE SLOW' }
+      ]
+    };
+
+    const activeSlogans = broSlogans[terrainPreset] || broSlogans.uttarakhand;
+    activeSlogans.forEach((s) => {
       const pt = roadCurve.getPoint(s.t);
       const tangent = roadCurve.getTangent(s.t).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
-      const signPos = pt.clone().add(normal.clone().multiplyScalar(roadWidth / 2 + 0.65));
+      const signPos = pt.clone().add(normal.clone().multiplyScalar(roadWidth / 2 + 0.85));
 
-      const pole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 1.6, 8),
-        galvanizedMat
-      );
-      pole.position.set(signPos.x, signPos.y + 0.8, signPos.z);
-      mountainGroup.add(pole);
+      // Dual Galvanized Steel Mounting Posts
+      const poleL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 8), galvanizedMat);
+      poleL.position.set(signPos.x + normal.x * 0.35, signPos.y + roadYOffset + 1.1, signPos.z + normal.z * 0.35);
+      mountainGroup.add(poleL);
 
-      const signTex = createMountainSignTexture(s.title, s.sub, s.icon);
-      const boardGeo = new THREE.BoxGeometry(0.9, 0.6, 0.03);
+      const poleR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 8), galvanizedMat);
+      poleR.position.set(signPos.x - normal.x * 0.35, signPos.y + roadYOffset + 1.1, signPos.z - normal.z * 0.35);
+      mountainGroup.add(poleR);
+
+      const signTex = createBROSignTexture(terrainPreset, s.slogan, s.sub);
+      const boardGeo = new THREE.BoxGeometry(1.4, 0.8, 0.04);
       const boardMat = new THREE.MeshStandardMaterial({
         map: signTex,
-        roughness: 0.3,
-        metalness: 0.2
+        roughness: 0.35,
+        metalness: 0.25
       });
       const board = new THREE.Mesh(boardGeo, boardMat);
-      board.position.set(signPos.x, signPos.y + 1.45, signPos.z);
+      board.position.set(signPos.x, signPos.y + roadYOffset + 1.75, signPos.z);
       board.lookAt(signPos.clone().add(tangent));
+      board.castShadow = true;
       mountainGroup.add(board);
     });
 
@@ -856,10 +1017,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         }
       }
 
-      // Smooth terrain depression under the road curve to prevent clipping
+      // Smooth terrain bench cut under the road curve to guarantee rock never clips through road
       let minRoadDist = 999;
       let nearestRoadY = 0;
-      for (let k = 0; k < curvePoints.length; k += 3) {
+      for (let k = 0; k < curvePoints.length; k += 2) {
         const d = Math.hypot(vx - curvePoints[k].x, vz - curvePoints[k].z);
         if (d < minRoadDist) {
           minRoadDist = d;
@@ -868,8 +1029,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       }
 
       if (minRoadDist < roadWidth * 1.35) {
-        const blend = minRoadDist / (roadWidth * 1.35);
-        vy = nearestRoadY * (1 - blend) + vy * blend;
+        // Engineered mountain road bench cut: carve ground strictly BELOW asphalt and stone bedding
+        const benchY = nearestRoadY - 0.28;
+        const blend = Math.max(0, (minRoadDist - roadWidth * 0.52) / (roadWidth * 0.83));
+        vy = benchY * (1 - blend) + vy * blend;
       }
 
       pos.setY(i, vy);
@@ -877,42 +1040,45 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
     terrainGeo.computeVertexNormals();
 
-    // Slope-Based Vertex Shading (Craggy rock on steep angles, grass/moss on shelves)
+    // Slope-Based Vertex Shading (Craggy rock on steep angles, regional vegetation on shelves)
     const normals = terrainGeo.attributes.normal;
     const colors = new Float32Array(pos.count * 3);
 
     for (let i = 0; i < pos.count; i++) {
       const vy = pos.getY(i);
-      const ny = normals.getY(i); // Vertical component of normal (1.0 = flat ground, 0.0 = sheer vertical cliff)
+      const ny = normals.getY(i); // Vertical component of normal (1.0 = flat ground, 0.0 = vertical cliff)
 
-      let r = 0.18, g = 0.26, b = 0.18; // Default temperate soil/grass
+      let r = 0.18, g = 0.26, b = 0.18;
 
-      if (terrainPreset === 'aizawl') {
-        // Lush monsoon vegetation on slopes; wet dark mud rock on cliffs
+      if (terrainPreset === 'uttarakhand' || terrainPreset === 'aizawl') {
+        // Garhwal & Kumaon Ghats: dark slate/shale rock faces; lush riverine moss & terraces
         if (ny < 0.72) {
-          r = 0.22; g = 0.18; b = 0.14;
+          r = 0.22; g = 0.25; b = 0.27; // Slate crag
         } else {
-          r = 0.10; g = 0.28; b = 0.13;
+          r = 0.12; g = 0.32; b = 0.16; // Lush Himalayan valley grass/moss
+        }
+        if (vy > 24.0 * slopeScaleY) {
+          r = 0.88; g = 0.92; b = 0.96; // Alpine ridge frost
         }
       } else if (terrainPreset === 'ladakh') {
-        // Arid high-altitude cold desert rock & frost
+        // High-Altitude Cold Desert: barren scree, mineral dust & permanent glacial snow
         if (ny < 0.70) {
-          r = 0.38; g = 0.35; b = 0.31;
+          r = 0.42; g = 0.38; b = 0.34; // Ladakh batholith granodiorite rock
         } else {
-          r = 0.52; g = 0.48; b = 0.44;
+          r = 0.54; g = 0.50; b = 0.45; // Sun-baked mineral silt & moraine
         }
-        if (vy > 12.0 * slopeScaleY) {
-          r = 0.88; g = 0.92; b = 0.96;
+        if (vy > 10.0 * slopeScaleY) {
+          r = 0.92; g = 0.95; b = 0.98; // Glacial snowpack
         }
       } else {
-        // Shimla alpine temperate
+        // Himachal Pradesh (Shimla - Kinnaur NH-5): grey granite cliffs, alpine turf & snow dusting
         if (ny < 0.72) {
-          r = 0.30; g = 0.33; b = 0.36;
+          r = 0.28; g = 0.32; b = 0.35; // Granite crag
         } else {
-          r = 0.18; g = 0.30; b = 0.19;
+          r = 0.18; g = 0.29; b = 0.18; // Alpine deodar grass
         }
-        if (vy > 20.0 * slopeScaleY) {
-          r = 0.90; g = 0.93; b = 0.97;
+        if (vy > 18.0 * slopeScaleY) {
+          r = 0.90; g = 0.93; b = 0.97; // Snow cap
         }
       }
 
@@ -1004,33 +1170,58 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     ];
     pineTreeLocations.forEach(([tx, tz]) => {
       const tree = new THREE.Group();
-      const foliageColor =
-        terrainPreset === 'ladakh' ? 0x1f2937 : terrainPreset === 'aizawl' ? 0x064e3b : 0x14532d;
-      const foliageMat = new THREE.MeshStandardMaterial({ color: foliageColor, roughness: 0.85 });
 
-      // 3 Staggered Conical Foliage Tiers
-      const tier1 = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.5, 7), foliageMat);
-      tier1.position.y = 1.3;
-      tier1.castShadow = true;
-      tree.add(tier1);
+      if (terrainPreset === 'ladakh') {
+        // High-altitude Whitewashed Buddhist Chortens / Stupa Cairns (Signature Ladakh roadside monument)
+        const stupaBase = new THREE.Mesh(
+          new THREE.BoxGeometry(1.2, 0.7, 1.2),
+          new THREE.MeshStandardMaterial({ color: 0xd4d4d8, roughness: 0.85 })
+        );
+        stupaBase.position.y = 0.35;
+        stupaBase.castShadow = true;
+        tree.add(stupaBase);
 
-      const tier2 = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.4, 7), foliageMat);
-      tier2.position.y = 2.1;
-      tier2.castShadow = true;
-      tree.add(tier2);
+        const stupaMid = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.44, 0.58, 0.75, 8),
+          new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 })
+        );
+        stupaMid.position.y = 0.95;
+        stupaMid.castShadow = true;
+        tree.add(stupaMid);
 
-      const tier3 = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.2, 7), foliageMat);
-      tier3.position.y = 2.9;
-      tier3.castShadow = true;
-      tree.add(tier3);
+        const stupaSpire = new THREE.Mesh(
+          new THREE.ConeGeometry(0.24, 0.8, 8),
+          new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7, roughness: 0.25 })
+        );
+        stupaSpire.position.y = 1.65;
+        tree.add(stupaSpire);
+      } else {
+        // 3 Staggered Conical Foliage Tiers for Deodar & Blue Pine (Uttarakhand & Himachal)
+        const foliageColor = terrainPreset === 'uttarakhand' || terrainPreset === 'aizawl' ? 0x093f21 : 0x14532d;
+        const foliageMat = new THREE.MeshStandardMaterial({ color: foliageColor, roughness: 0.85 });
 
-      // Trunk
-      const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.14, 0.20, 0.9, 6),
-        new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 })
-      );
-      trunk.position.y = 0.45;
-      tree.add(trunk);
+        const tier1 = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.5, 7), foliageMat);
+        tier1.position.y = 1.3;
+        tier1.castShadow = true;
+        tree.add(tier1);
+
+        const tier2 = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.4, 7), foliageMat);
+        tier2.position.y = 2.1;
+        tier2.castShadow = true;
+        tree.add(tier2);
+
+        const tier3 = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.2, 7), foliageMat);
+        tier3.position.y = 2.9;
+        tier3.castShadow = true;
+        tree.add(tier3);
+
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.14, 0.20, 0.9, 6),
+          new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 })
+        );
+        trunk.position.y = 0.45;
+        tree.add(trunk);
+      }
 
       const ty = -tz * terrainElevationFactor + (Math.abs(tx) > 8 ? (Math.abs(tx) - 8) * 0.75 : 0);
       tree.position.set(tx, ty, tz);
@@ -3351,10 +3542,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   // Reactive Day/Night Atmosphere & Volumetric Lighting
   useEffect(() => {
     let skyColorHex = isNightMode ? 0x050914 : 0x0f172a;
-    if (terrainPreset === 'aizawl') {
-      skyColorHex = isNightMode ? 0x040d12 : 0x0a221e;
+    if (terrainPreset === 'uttarakhand' || terrainPreset === 'aizawl') {
+      skyColorHex = isNightMode ? 0x040d12 : 0x0b2520;
     } else if (terrainPreset === 'ladakh') {
-      skyColorHex = isNightMode ? 0x060c18 : 0x162334;
+      skyColorHex = isNightMode ? 0x060c18 : 0x1a2638;
+    } else if (terrainPreset === 'himachal' || terrainPreset === 'shimla') {
+      skyColorHex = isNightMode ? 0x050916 : 0x0f1d30;
     }
     if (sceneRef.current) {
       sceneRef.current.background = new THREE.Color(skyColorHex);
@@ -4109,49 +4302,69 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         </div>
 
         {/* Bottom-Right Environment & Regional Preset Switcher */}
-        <div className="absolute bottom-4 right-4 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-lg p-2.5 text-xs shadow-xl flex flex-wrap items-center gap-3 pointer-events-auto">
+        <div className="absolute bottom-4 right-4 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-lg p-2.5 text-xs shadow-2xl flex flex-wrap items-center gap-3 pointer-events-auto">
           {/* Regional Terrain Presets */}
-          <div className="flex items-center space-x-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] text-slate-400 font-mono flex items-center space-x-1">
               <Compass className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Zone:</span>
+              <span>Region:</span>
             </span>
             <button
               onClick={() => {
-                setTerrainPreset('shimla');
+                setTerrainPreset('uttarakhand');
                 setSlopeDeg(28.0);
                 setActiveWeather('clear');
               }}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                terrainPreset === 'shimla' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'
+                terrainPreset === 'uttarakhand' || terrainPreset === 'aizawl'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/30'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
+              title="Garhwal & Kumaon Ghats (NH-58 · Badrinath · Project Shivalik)"
             >
-              Shimla (28°)
+              Uttarakhand (28°)
             </button>
             <button
               onClick={() => {
-                setTerrainPreset('aizawl');
-                setSlopeDeg(24.0);
-                setActiveWeather('rain');
+                setTerrainPreset('himachal');
+                setSlopeDeg(26.0);
+                setActiveWeather('clear');
               }}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                terrainPreset === 'aizawl' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'
+                terrainPreset === 'himachal' || terrainPreset === 'shimla'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/30'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
+              title="Pir Panjal & Kinnaur Highway (NH-5 · Project Deepak)"
             >
-              Aizawl Monsoon
+              Himachal (26°)
             </button>
             <button
               onClick={() => {
                 setTerrainPreset('ladakh');
-                setSlopeDeg(30.0);
+                setSlopeDeg(32.0);
                 setActiveWeather('snow');
               }}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                terrainPreset === 'ladakh' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'
+                terrainPreset === 'ladakh'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/30'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
+              title="Cold Desert Khardung La Pass (NH-1D · 17,982 FT · Project Himank)"
             >
-              Ladakh Sub-Zero
+              Ladakh Pass (32°)
             </button>
+          </div>
+
+          {/* Active Indian BRO Highway Project Badge */}
+          <div className="hidden lg:flex items-center">
+            <span className="text-[10px] text-amber-300 font-mono bg-amber-950/80 border border-amber-600/40 px-2 py-0.5 rounded">
+              {terrainPreset === 'ladakh'
+                ? 'BRO Project Himank · NH-1D Khardung La Pass'
+                : terrainPreset === 'himachal' || terrainPreset === 'shimla'
+                ? 'BRO Project Deepak · NH-5 Kinnaur Highway'
+                : 'BRO Project Shivalik · NH-58 Badrinath Ghats'}
+            </span>
           </div>
 
           <div className="h-4 w-px bg-slate-700 hidden sm:block" />

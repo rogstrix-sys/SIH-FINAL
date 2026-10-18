@@ -5,13 +5,18 @@ import * as THREE from 'three';
  * Generates photorealistic canvas textures with zero external asset or network dependencies.
  */
 
-// 1. Photorealistic Asphalt Road Textures (Tarmac, Aggregates, Tire Tracks, Weathered Yellow Line, Bump & Roughness)
-export function createAsphaltTextures(): {
+// 1. Photorealistic Asphalt Road Textures for Indian Himalayan Regions (Uttarakhand, Himachal, Ladakh)
+export function createAsphaltTextures(
+  region: 'uttarakhand' | 'himachal' | 'ladakh' | 'shimla' | 'aizawl' = 'uttarakhand'
+): {
   map: THREE.CanvasTexture;
   bumpMap: THREE.CanvasTexture;
   roughnessMap: THREE.CanvasTexture;
 } {
   const size = 1024;
+  const isLadakh = region === 'ladakh';
+  const isHimachal = region === 'himachal' || region === 'shimla';
+  // Default is Uttarakhand (Garhwal & Kumaon Ghats)
 
   // --- Diffuse / Albedo Map ---
   const colorCanvas = document.createElement('canvas');
@@ -19,8 +24,14 @@ export function createAsphaltTextures(): {
   colorCanvas.height = size;
   const ctx = colorCanvas.getContext('2d')!;
 
-  // 1. Base bitumen tarmac with micro-grain noise
-  ctx.fillStyle = '#1b1e23';
+  // 1. Base bitumen tarmac color tailored to Indian Himalayan geology
+  let baseBitumen = '#14171c'; // Uttarakhand wet deep charcoal bitumen
+  if (isLadakh) {
+    baseBitumen = '#2b2d32'; // Sun-bleached high-altitude dusty cold desert bitumen
+  } else if (isHimachal) {
+    baseBitumen = '#1f2329'; // Weathered aggregate asphalt
+  }
+  ctx.fillStyle = baseBitumen;
   ctx.fillRect(0, 0, size, size);
 
   // Micro-bitumen noise variation
@@ -28,82 +39,114 @@ export function createAsphaltTextures(): {
     for (let x = 0; x < size; x += 4) {
       if (Math.random() > 0.45) {
         const val = Math.floor(Math.random() * 16 - 8);
-        ctx.fillStyle = `rgba(${27 + val}, ${30 + val}, ${35 + val}, 0.65)`;
+        const rVal = isLadakh ? 43 + val : isHimachal ? 31 + val : 20 + val;
+        const gVal = isLadakh ? 45 + val : isHimachal ? 35 + val : 23 + val;
+        const bVal = isLadakh ? 50 + val : isHimachal ? 41 + val : 28 + val;
+        ctx.fillStyle = `rgba(${rVal}, ${gVal}, ${bVal}, 0.70)`;
         ctx.fillRect(x, y, 4, 4);
       }
     }
   }
 
-  // 2. Tire wear tracks (two darker, smoothed compacted bitumen bands)
+  // 2. Tire wear tracks (two darker, smoothed compacted bitumen lanes)
   const leftTrack = ctx.createLinearGradient(size * 0.18, 0, size * 0.40, 0);
-  leftTrack.addColorStop(0, 'rgba(16, 18, 22, 0)');
-  leftTrack.addColorStop(0.2, 'rgba(12, 14, 18, 0.7)');
-  leftTrack.addColorStop(0.8, 'rgba(12, 14, 18, 0.7)');
-  leftTrack.addColorStop(1, 'rgba(16, 18, 22, 0)');
+  leftTrack.addColorStop(0, 'rgba(14, 16, 20, 0)');
+  leftTrack.addColorStop(0.2, 'rgba(10, 12, 16, 0.75)');
+  leftTrack.addColorStop(0.8, 'rgba(10, 12, 16, 0.75)');
+  leftTrack.addColorStop(1, 'rgba(14, 16, 20, 0)');
   ctx.fillStyle = leftTrack;
   ctx.fillRect(size * 0.16, 0, size * 0.26, size);
 
   const rightTrack = ctx.createLinearGradient(size * 0.60, 0, size * 0.82, 0);
-  rightTrack.addColorStop(0, 'rgba(16, 18, 22, 0)');
-  rightTrack.addColorStop(0.2, 'rgba(12, 14, 18, 0.7)');
-  rightTrack.addColorStop(0.8, 'rgba(12, 14, 18, 0.7)');
-  rightTrack.addColorStop(1, 'rgba(16, 18, 22, 0)');
+  rightTrack.addColorStop(0, 'rgba(14, 16, 20, 0)');
+  rightTrack.addColorStop(0.2, 'rgba(10, 12, 16, 0.75)');
+  rightTrack.addColorStop(0.8, 'rgba(10, 12, 16, 0.75)');
+  rightTrack.addColorStop(1, 'rgba(14, 16, 20, 0)');
   ctx.fillStyle = rightTrack;
   ctx.fillRect(size * 0.58, 0, size * 0.26, size);
 
-  // 3. Dense micro-aggregate gravel flecks (granite, basalt, quartz, tar voids)
+  // 3. Dense micro-aggregate gravel flecks (granite, basalt, quartzite, tar voids)
   for (let i = 0; i < 18000; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
     const r = Math.random() * 1.8 + 0.3;
     const tone = Math.random();
     if (tone < 0.35) {
-      ctx.fillStyle = 'rgba(78, 86, 96, 0.55)'; // grey basalt
+      ctx.fillStyle = 'rgba(75, 82, 92, 0.55)'; // grey basalt
     } else if (tone < 0.65) {
-      ctx.fillStyle = 'rgba(130, 140, 152, 0.45)'; // light granite
+      ctx.fillStyle = 'rgba(125, 135, 148, 0.45)'; // light granite
     } else if (tone < 0.85) {
-      ctx.fillStyle = 'rgba(175, 185, 195, 0.35)'; // white quartz fleck
+      ctx.fillStyle = isLadakh ? 'rgba(190, 180, 165, 0.40)' : 'rgba(175, 185, 195, 0.35)'; // quartz / sand fleck
     } else {
-      ctx.fillStyle = 'rgba(10, 11, 13, 0.65)'; // dark tar void
+      ctx.fillStyle = 'rgba(8, 10, 12, 0.65)'; // dark tar void
     }
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // 4. Continuous Weathered White Shoulder Edge Lines
-  // Left edge stripe (X: ~0.08 - 0.11)
+  // 4. Bitumen Tar Patch Repairs (Characteristic of Indian mountain ghat highways)
+  if (!isLadakh) {
+    ctx.fillStyle = 'rgba(10, 12, 15, 0.85)';
+    // Patch 1
+    ctx.fillRect(size * 0.22, size * 0.12, size * 0.20, size * 0.16);
+    // Patch 2
+    ctx.fillRect(size * 0.52, size * 0.60, size * 0.24, size * 0.20);
+    // Sealant tar seam lines around patches
+    ctx.strokeStyle = 'rgba(6, 7, 9, 0.95)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(size * 0.22, size * 0.12, size * 0.20, size * 0.16);
+    ctx.strokeRect(size * 0.52, size * 0.60, size * 0.24, size * 0.20);
+  }
+
+  // 5. High-Pass Sand & Silt Drift along Shoulders (Signature Ladakh cold desert pass effect)
+  if (isLadakh) {
+    const siltL = ctx.createLinearGradient(0, 0, size * 0.16, 0);
+    siltL.addColorStop(0, 'rgba(180, 165, 140, 0.55)');
+    siltL.addColorStop(0.7, 'rgba(180, 165, 140, 0.25)');
+    siltL.addColorStop(1, 'rgba(180, 165, 140, 0)');
+    ctx.fillStyle = siltL;
+    ctx.fillRect(0, 0, size * 0.16, size);
+
+    const siltR = ctx.createLinearGradient(size, 0, size * 0.84, 0);
+    siltR.addColorStop(0, 'rgba(180, 165, 140, 0.55)');
+    siltR.addColorStop(0.7, 'rgba(180, 165, 140, 0.25)');
+    siltR.addColorStop(1, 'rgba(180, 165, 140, 0)');
+    ctx.fillStyle = siltR;
+    ctx.fillRect(size * 0.84, 0, size * 0.16, size);
+  }
+
+  // 6. Continuous Weathered Shoulder Edge Lines
   const leftEdgeX = size * 0.085;
   const edgeW = size * 0.024;
-  ctx.fillStyle = 'rgba(235, 240, 248, 0.82)';
+  ctx.fillStyle = isLadakh ? 'rgba(220, 225, 230, 0.75)' : 'rgba(240, 245, 252, 0.88)';
   ctx.fillRect(leftEdgeX, 0, edgeW, size);
 
-  // Right edge stripe (X: ~0.89 - 0.915)
   const rightEdgeX = size * 0.89;
   ctx.fillRect(rightEdgeX, 0, edgeW, size);
 
-  // 5. Weathered Yellow Dashed Centerline (X: ~0.485 - 0.515, Y: active 0.15 - 0.85)
+  // 7. Authentic Indian Centerline Markings
+  // Uttarakhand: Crisp white dashed centerline (standard NH-58/NH-7 hill ghat marking)
+  // Himachal: Weathered yellow dashed centerline
+  // Ladakh: Pale yellow / white weathered dashed line
   const lineX = size * 0.488;
   const lineW = size * 0.024;
-  const dashStartY = size * 0.15;
-  const dashHeight = size * 0.70;
+  const dashStartY = size * 0.12;
+  const dashHeight = size * 0.76;
 
-  // Base weathered yellow paint
-  ctx.fillStyle = '#f59e0b';
+  ctx.fillStyle = isHimachal ? '#f59e0b' : isLadakh ? '#e2e8f0' : '#ffffff';
   ctx.fillRect(lineX, dashStartY, lineW, dashHeight);
 
   // Weathering, paint wear & chipped edge effects on centerline
   for (let y = dashStartY; y <= dashStartY + dashHeight; y += 3) {
-    // Edge chipping
     const chipL = (Math.random() - 0.4) * 4;
     const chipR = (Math.random() - 0.4) * 4;
-    ctx.fillStyle = '#1b1e23';
+    ctx.fillStyle = baseBitumen;
     ctx.fillRect(lineX + chipL - 2, y, 3, 3);
     ctx.fillRect(lineX + lineW - chipR, y, 3, 3);
 
-    // Worn center patches (asphalt showing through worn paint)
     if (Math.random() > 0.65) {
-      ctx.fillStyle = `rgba(27, 30, 35, ${Math.random() * 0.55 + 0.2})`;
+      ctx.fillStyle = `rgba(20, 24, 30, ${Math.random() * 0.55 + 0.2})`;
       ctx.fillRect(lineX + Math.random() * (lineW - 6), y, Math.random() * 6 + 2, Math.random() * 4 + 2);
     }
   }
@@ -111,7 +154,7 @@ export function createAsphaltTextures(): {
   // Edge line weathering
   for (let y = 0; y < size; y += 4) {
     if (Math.random() > 0.7) {
-      ctx.fillStyle = '#1b1e23';
+      ctx.fillStyle = baseBitumen;
       ctx.fillRect(leftEdgeX + Math.random() * edgeW, y, 3, 3);
       ctx.fillRect(rightEdgeX + Math.random() * edgeW, y, 3, 3);
     }
@@ -138,10 +181,29 @@ export function createAsphaltTextures(): {
   }
 
   // Raised paint thickness relief for centerline and edge lines
-  bumpCtx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+  bumpCtx.fillStyle = 'rgba(255, 255, 255, 0.24)';
   bumpCtx.fillRect(lineX, dashStartY, lineW, dashHeight);
   bumpCtx.fillRect(leftEdgeX, 0, edgeW, size);
   bumpCtx.fillRect(rightEdgeX, 0, edgeW, size);
+
+  // Tar patch seams in bump map
+  if (!isLadakh) {
+    bumpCtx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    bumpCtx.lineWidth = 4;
+    bumpCtx.strokeRect(size * 0.22, size * 0.12, size * 0.20, size * 0.16);
+    bumpCtx.strokeRect(size * 0.52, size * 0.60, size * 0.24, size * 0.20);
+  }
+
+  // Frost heave cracks for Ladakh
+  if (isLadakh) {
+    bumpCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    bumpCtx.lineWidth = 2.5;
+    bumpCtx.beginPath();
+    bumpCtx.moveTo(size * 0.15, size * 0.3);
+    bumpCtx.lineTo(size * 0.35, size * 0.38);
+    bumpCtx.lineTo(size * 0.55, size * 0.35);
+    bumpCtx.stroke();
+  }
 
   // --- Roughness Map (Matte Stone vs Sleeker Bitumen vs Paint) ---
   const roughCanvas = document.createElement('canvas');
@@ -175,8 +237,10 @@ export function createAsphaltTextures(): {
   return { map, bumpMap, roughnessMap };
 }
 
-// 2. Cliff Face & Strata Rock Textures (Geological Mountain Strata Bands & Craggy Fissures)
-export function createRockTextures(preset: 'shimla' | 'aizawl' | 'ladakh'): {
+// 2. Cliff Face & Strata Rock Textures for Indian Himalayan Regions
+export function createRockTextures(
+  preset: 'uttarakhand' | 'himachal' | 'ladakh' | 'shimla' | 'aizawl' = 'uttarakhand'
+): {
   map: THREE.CanvasTexture;
   bumpMap: THREE.CanvasTexture;
   roughnessMap: THREE.CanvasTexture;
@@ -197,22 +261,27 @@ export function createRockTextures(preset: 'shimla' | 'aizawl' | 'ladakh'): {
   roughCanvas.height = size;
   const roughCtx = roughCanvas.getContext('2d')!;
 
-  // Base geological palette per climate/region
-  let baseColor = '#3a4249';
-  let bandColors = ['#2b3137', '#48525b', '#57626d', '#353e46', '#22272c'];
-  let veinColor = 'rgba(226, 232, 240, 0.45)'; // calcite seam
-  let lichenColor = 'rgba(74, 98, 68, 0.4)';
+  // Base geological palette per Indian Himalayan region
+  let baseColor = '#343a40'; // Uttarakhand Garhwal slate/quartzite
+  let bandColors = ['#282e34', '#424a52', '#505862', '#30373d', '#20252a'];
+  let veinColor = 'rgba(235, 240, 248, 0.5)'; // White quartz seam
+  let lichenColor = 'rgba(54, 88, 52, 0.45)'; // Himalayan river valley moss
 
-  if (preset === 'aizawl') {
+  if (preset === 'himachal' || preset === 'shimla') {
+    baseColor = '#3c4349'; // Pir Panjal grey granite & slate
+    bandColors = ['#2d3339', '#4a535b', '#566069', '#373e44', '#242a30'];
+    veinColor = 'rgba(226, 232, 240, 0.45)'; // Calcite vein
+    lichenColor = 'rgba(64, 86, 60, 0.35)'; // Alpine pine undergrowth
+  } else if (preset === 'ladakh') {
+    baseColor = '#544e47'; // Ladakh batholith granodiorite & barren scree
+    bandColors = ['#443f39', '#665f57', '#766e64', '#3c3833', '#504a43'];
+    veinColor = 'rgba(245, 248, 252, 0.6)'; // Cold quartz/frost vein
+    lichenColor = 'rgba(175, 168, 160, 0.2)'; // Bare high-altitude mineral crust
+  } else if (preset === 'aizawl') {
     baseColor = '#30261f';
     bandColors = ['#241d18', '#42352a', '#4c3e32', '#2a221b', '#362b22'];
-    veinColor = 'rgba(217, 119, 6, 0.35)'; // ferruginous clay vein
-    lichenColor = 'rgba(46, 92, 48, 0.65)'; // lush mountain moss
-  } else if (preset === 'ladakh') {
-    baseColor = '#504c47';
-    bandColors = ['#423f3b', '#625c56', '#726a63', '#393633', '#4d4843'];
-    veinColor = 'rgba(241, 245, 249, 0.5)'; // cold quartz/ice vein
-    lichenColor = 'rgba(180, 175, 168, 0.25)'; // alpine mineral crust
+    veinColor = 'rgba(217, 119, 6, 0.35)';
+    lichenColor = 'rgba(46, 92, 48, 0.65)';
   }
 
   ctx.fillStyle = baseColor;
@@ -905,4 +974,281 @@ export function createCrawlerTrackTexture(): {
 
   return { map, bumpMap };
 }
+
+// 12. Iconic Indian Hill Road Black & White Concrete Safety Parapet Texture (Universal in Uttarakhand & Himachal Ghats)
+export function createIndianParapetTexture(): {
+  map: THREE.CanvasTexture;
+  bumpMap: THREE.CanvasTexture;
+} {
+  const w = 512;
+  const h = 256;
+
+  const colorCanvas = document.createElement('canvas');
+  colorCanvas.width = w;
+  colorCanvas.height = h;
+  const ctx = colorCanvas.getContext('2d')!;
+
+  const bumpCanvas = document.createElement('canvas');
+  bumpCanvas.width = w;
+  bumpCanvas.height = h;
+  const bCtx = bumpCanvas.getContext('2d')!;
+
+  // Alternating vertical stripes: 50% Stark White (#f8fafc) and 50% Coal Black (#0f172a)
+  const stripeW = w / 2;
+
+  // Left stripe: Stark White concrete
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, stripeW, h);
+  bCtx.fillStyle = '#b0b0b0';
+  bCtx.fillRect(0, 0, stripeW, h);
+
+  // Right stripe: Coal Black concrete
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(stripeW, 0, stripeW, h);
+  bCtx.fillStyle = '#a0a0a0';
+  bCtx.fillRect(stripeW, 0, stripeW, h);
+
+  // Concrete micro-porosity and aggregate noise
+  for (let i = 0; i < 6000; i++) {
+    const x = Math.random() * w;
+    const y = Math.random() * h;
+    const r = Math.random() * 1.5 + 0.4;
+    const isDark = Math.random() > 0.5;
+    ctx.fillStyle = isDark ? 'rgba(30, 41, 59, 0.25)' : 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    bCtx.fillStyle = isDark ? '#404040' : '#ffffff';
+    bCtx.beginPath();
+    bCtx.arc(x, y, r, 0, Math.PI * 2);
+    bCtx.fill();
+  }
+
+  // Vertical chamfer groove at stripe boundary
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.fillRect(stripeW - 3, 0, 6, h);
+  bCtx.fillStyle = '#202020';
+  bCtx.fillRect(stripeW - 3, 0, 6, h);
+
+  // Weathering, road dust and monsoon rain grime near bottom edge
+  const grimeGrad = ctx.createLinearGradient(0, h * 0.70, 0, h);
+  grimeGrad.addColorStop(0, 'rgba(51, 65, 85, 0)');
+  grimeGrad.addColorStop(1, 'rgba(41, 37, 36, 0.65)');
+  ctx.fillStyle = grimeGrad;
+  ctx.fillRect(0, h * 0.70, w, h * 0.30);
+
+  const map = new THREE.CanvasTexture(colorCanvas);
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+
+  const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+  bumpMap.wrapS = THREE.RepeatWrapping;
+  bumpMap.wrapT = THREE.RepeatWrapping;
+
+  return { map, bumpMap };
+}
+
+// 13. Authentic Border Roads Organisation (BRO) Mountain Highway Signboard Texture
+export function createBROSignTexture(
+  region: 'uttarakhand' | 'himachal' | 'ladakh' | string,
+  slogan: string,
+  subtitle?: string
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const ctx = canvas.getContext('2d')!;
+
+  // Iconic BRO Indian Highway Yellow background (#facc15)
+  ctx.fillStyle = '#facc15';
+  ctx.fillRect(0, 0, 640, 360);
+
+  // Distinctive double black border
+  ctx.strokeStyle = '#0a0a0a';
+  ctx.lineWidth = 14;
+  ctx.strokeRect(10, 10, 620, 340);
+
+  ctx.lineWidth = 4;
+  ctx.strokeRect(26, 26, 588, 308);
+
+  // Top header: BORDER ROADS ORGANISATION
+  ctx.fillStyle = '#0a0a0a';
+  ctx.font = 'bold 22px "Arial Black", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('BORDER ROADS ORGANISATION', 320, 62);
+
+  // Project badge
+  let projectTag = 'PROJECT SHIVALIK';
+  if (region === 'himachal' || region === 'shimla') projectTag = 'PROJECT DEEPAK';
+  if (region === 'ladakh') projectTag = 'PROJECT HIMANK';
+
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(160, 78, 320, 30);
+  ctx.fillStyle = '#facc15';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText(projectTag, 320, 99);
+
+  // Divider line
+  ctx.strokeStyle = '#0a0a0a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(40, 122);
+  ctx.lineTo(600, 122);
+  ctx.stroke();
+
+  // Main high-impact BRO slogan
+  ctx.fillStyle = '#0a0a0a';
+  ctx.font = 'bold 28px "Arial Black", Impact, sans-serif';
+  ctx.fillText(slogan, 320, 185);
+
+  // Subtitle / cautionary advisory
+  if (subtitle) {
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.fillText(subtitle, 320, 230);
+  }
+
+  // Footer: Road courtesy / Emergency reminder
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText('GIVE WAY TO UPHILL VEHICLES · DRIVE WITH CARE', 320, 290);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}
+
+// 14. Indian Highway & BRO Curved Dome Milestone Pillar Texture
+export function createBROMilestoneTexture(
+  region: 'uttarakhand' | 'himachal' | 'ladakh' | string,
+  route: string,
+  km: number,
+  elevText: string
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 384;
+  const ctx = canvas.getContext('2d')!;
+
+  // 1. Lower pillar body: Crisp white concrete
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, 256, 384);
+
+  // 2. Upper arched dome: Indian National Highway Yellow (#facc15)
+  ctx.fillStyle = '#facc15';
+  ctx.beginPath();
+  ctx.arc(128, 96, 96, Math.PI, 0, false);
+  ctx.lineTo(224, 120);
+  ctx.lineTo(32, 120);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = '#0a0a0a';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Highway code on dome (e.g. NH 58, NH 5, NH 1D)
+  ctx.fillStyle = '#0a0a0a';
+  ctx.font = 'bold 28px "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(route, 128, 86);
+
+  // Destination & Distance in black bold lettering
+  let destination = 'BADRINATH';
+  if (region === 'himachal' || region === 'shimla') destination = 'KINNAUR';
+  if (region === 'ladakh') destination = 'KHARDUNG LA';
+
+  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.fillText(destination, 128, 175);
+
+  ctx.font = 'bold 44px "Arial Black", Impact, sans-serif';
+  ctx.fillText(`${km}`, 128, 235);
+
+  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.fillText('KM', 128, 265);
+
+  // BRO mark and Elevation
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(32, 285);
+  ctx.lineTo(224, 285);
+  ctx.stroke();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 15px monospace';
+  ctx.fillText(elevText, 128, 315);
+
+  ctx.font = 'bold 16px "Arial Black", monospace';
+  ctx.fillText('B. R. O.', 128, 345);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}
+
+// 15. Tibetan 5-Color Buddhist Prayer Flags Texture (Lungta: Blue, White, Red, Green, Yellow) for Ladakh Passes
+export function createTibetanPrayerFlagsTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+
+  const colors = [
+    '#1e40af', // Blue: Sky / Space
+    '#f8fafc', // White: Air / Wind
+    '#dc2626', // Red: Fire
+    '#15803d', // Green: Water
+    '#eab308'  // Yellow: Earth
+  ];
+
+  const flagW = 512 / 5;
+
+  // Background top string
+  ctx.strokeStyle = '#78716c';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 10);
+  ctx.lineTo(512, 10);
+  ctx.stroke();
+
+  colors.forEach((col, idx) => {
+    const x = idx * flagW;
+    ctx.fillStyle = col;
+    // Flag cloth rectangle with ragged bottom edges
+    ctx.fillRect(x + 2, 10, flagW - 4, 108);
+
+    // Sacred Lungta Wind Horse woodcut emblem in center
+    ctx.strokeStyle = col === '#f8fafc' || col === '#eab308' ? '#0f172a' : '#ffffff';
+    ctx.fillStyle = col === '#f8fafc' || col === '#eab308' ? '#0f172a' : '#ffffff';
+    ctx.lineWidth = 2;
+
+    const cx = x + flagW / 2;
+    const cy = 60;
+
+    // Stylized Wind Horse glyph
+    ctx.beginPath();
+    ctx.arc(cx, cy - 8, 10, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, cy + 12);
+    ctx.lineTo(cx + 14, cy + 12);
+    ctx.lineTo(cx, cy - 4);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Sacred Sanskrit/Tibetan mantra text lines
+    for (let l = 28; l < 110; l += 14) {
+      if (Math.abs(l - cy) > 16) {
+        ctx.fillRect(x + 10, l, flagW - 20, 2);
+      }
+    }
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.repeat.set(2, 1);
+  return texture;
+}
+
 
