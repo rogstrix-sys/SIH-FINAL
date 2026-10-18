@@ -98,6 +98,99 @@ class HelixCurve extends THREE.Curve<THREE.Vector3> {
   }
 }
 
+export type MountainWorkflowStage =
+  | '1_DRIVE_TO_SITE'
+  | '2_POSITION_VEHICLE'
+  | '3_DEPLOY_STABILIZERS_HOSE'
+  | '4_PRIME_PUMP'
+  | '5_EXTRACT_SLUDGE'
+  | '6_SETTLE_SLUDGE'
+  | '7_COMPACT_SLUDGE'
+  | '8_SECURE_PISTON'
+  | '9_CONFIRM_TRANSPORT_READY'
+  | '10_RESUME_DRIVING';
+
+export interface MountainWorkflowStepDef {
+  id: MountainWorkflowStage;
+  num: number;
+  name: string;
+  shortName: string;
+  description: string;
+}
+
+export const MOUNTAIN_WORKFLOW_STEPS: MountainWorkflowStepDef[] = [
+  {
+    id: '1_DRIVE_TO_SITE',
+    num: 1,
+    name: 'Drive to Mountain Worksite',
+    shortName: '1. Drive',
+    description: 'Tracked vehicle travels along switchback road to worksite waypoint.'
+  },
+  {
+    id: '2_POSITION_VEHICLE',
+    num: 2,
+    name: 'Stop & Position Vehicle',
+    shortName: '2. Position',
+    description: 'Vehicle stops and aligns intake manifold with septic vault manhole.'
+  },
+  {
+    id: '3_DEPLOY_STABILIZERS_HOSE',
+    num: 3,
+    name: 'Deploy Stabilizers & Hose',
+    shortName: '3. Deploy',
+    description: 'Plant hydraulic outriggers to ground and articulate suction boom.'
+  },
+  {
+    id: '4_PRIME_PUMP',
+    num: 4,
+    name: 'Prime Extraction Pump',
+    shortName: '4. Prime',
+    description: 'Engage macerator and rotary positive-displacement pump vacuum.'
+  },
+  {
+    id: '5_EXTRACT_SLUDGE',
+    num: 5,
+    name: 'Extract Sludge to Tank',
+    shortName: '5. Extract',
+    description: 'Vacuum transfer 400 L sludge from source vault into vehicle tank.'
+  },
+  {
+    id: '6_SETTLE_SLUDGE',
+    num: 6,
+    name: 'Stop Pump & Allow Settling',
+    shortName: '6. Settle',
+    description: 'Disengage pump and allow gravitational solids clarification.'
+  },
+  {
+    id: '7_COMPACT_SLUDGE',
+    num: 7,
+    name: 'Compact Sludge In-Situ',
+    shortName: '7. Compact',
+    description: 'Extend hydraulic piston to press sludge cake and express liquid filtrate.'
+  },
+  {
+    id: '8_SECURE_PISTON',
+    num: 8,
+    name: 'Retract & Secure Piston',
+    shortName: '8. Secure',
+    description: 'Return platen to 0 mm, engage retention pins, and stow boom.'
+  },
+  {
+    id: '9_CONFIRM_TRANSPORT_READY',
+    num: 9,
+    name: 'Confirm Transport Readiness',
+    shortName: '9. Ready',
+    description: 'Verify 0mm retention, outriggers stowed, and certified roadworthiness.'
+  },
+  {
+    id: '10_RESUME_DRIVING',
+    num: 10,
+    name: 'Resume Driving',
+    shortName: '10. Resume',
+    description: 'Re-engage crawler tracks and resume mountain transit.'
+  }
+];
+
 interface Simulation3DProps {
   site: SiteConditions;
   setSite?: React.Dispatch<React.SetStateAction<SiteConditions>>;
@@ -155,6 +248,15 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   >('idle');
   const [isEStopActive, setIsEStopActive] = useState<boolean>(false);
   const [interlockWarning, setInterlockWarning] = useState<string | null>(null);
+
+  // 10-Stage Mountain Mission Workflow state
+  const [workflowStage, setWorkflowStage] = useState<MountainWorkflowStage>('1_DRIVE_TO_SITE');
+  const [isAutoWorkflowRunning, setIsAutoWorkflowRunning] = useState<boolean>(false);
+  const [sourceVaultVolumeL, setSourceVaultVolumeL] = useState<number>(1200);
+  const [collectionTankVolumeL, setCollectionTankVolumeL] = useState<number>(0);
+  const [extractionRateLpm, setExtractionRateLpm] = useState<number>(0.0);
+  const [suctionVacuumKpa, setSuctionVacuumKpa] = useState<number>(0.0);
+  const [isTransportReady, setIsTransportReady] = useState<boolean>(true);
 
   // Hydraulic Sludge-Compaction Piston & Dewatering state
   const [pistonMode, setPistonMode] = useState<PistonOperatingMode>('LOCKED');
@@ -292,6 +394,16 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const isReliefValveOpenRef = useRef(isReliefValveOpen);
   const interlockWarningTimeoutRef = useRef<any>(null);
 
+  // 10-Stage Mountain Mission Workflow refs
+  const workflowStageRef = useRef<MountainWorkflowStage>(workflowStage);
+  const isAutoWorkflowRunningRef = useRef<boolean>(isAutoWorkflowRunning);
+  const workflowTimerRef = useRef<number>(0);
+  const sourceVaultVolumeLRef = useRef<number>(sourceVaultVolumeL);
+  const collectionTankVolumeLRef = useRef<number>(collectionTankVolumeL);
+  const extractionRateLpmRef = useRef<number>(extractionRateLpm);
+  const suctionVacuumKpaRef = useRef<number>(suctionVacuumKpa);
+  const isTransportReadyRef = useRef<boolean>(isTransportReady);
+
   cameraModeRef.current = cameraMode;
   driveModeRef.current = driveMode;
   vehicleSpeedKmhRef.current = vehicleSpeedKmh;
@@ -312,6 +424,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   maxStrokeLimitMmRef.current = maxStrokeLimitMm;
   reliefPressureLimitBarRef.current = reliefPressureLimitBar;
   isReliefValveOpenRef.current = isReliefValveOpen;
+  workflowStageRef.current = workflowStage;
+  isAutoWorkflowRunningRef.current = isAutoWorkflowRunning;
+  sourceVaultVolumeLRef.current = sourceVaultVolumeL;
+  collectionTankVolumeLRef.current = collectionTankVolumeL;
+  extractionRateLpmRef.current = extractionRateLpm;
+  suctionVacuumKpaRef.current = suctionVacuumKpa;
+  isTransportReadyRef.current = isTransportReady;
 
   // Vehicle progress tracking
   const pathProgressRef = useRef<number>(0.12);
@@ -3411,158 +3530,249 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               lateralOffsetRef.current = THREE.MathUtils.lerp(lateralOffsetRef.current, 0, delta * 0.5);
             }
           }
-        } else if (currentDrive === 'desludge') {
-          // Park vehicle at active worksite manhole (Alley t=0.18, Station t=0.42, or Summit t=0.98)
-          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, targetWorksiteT, 0.05);
+        }
 
-          // Full-Scale Sequenced Worksite Mission (Stabilize -> Deploy -> Prime -> Extract -> Settle -> Compact -> Secure)
-          desludgeTimerRef.current += delta;
-          const missionT = desludgeTimerRef.current;
+        // 10-Stage Mechanized Desludging & Dewatering Workflow Orchestration
+        const curStage = workflowStageRef.current;
+        const isDeployStage = [
+          '3_DEPLOY_STABILIZERS_HOSE',
+          '4_PRIME_PUMP',
+          '5_EXTRACT_SLUDGE',
+          '6_SETTLE_SLUDGE',
+          '7_COMPACT_SLUDGE'
+        ].includes(curStage);
 
-          if (missionT < 2.5) {
-            // 1. Stabilize & Deploy Outriggers + Articulated Suction Arm
-            setMissionStage('stabilizing');
-            setDesludgeStage('deploying');
-            outriggersRef.current.forEach((jack) => {
-              jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.28, 0.08);
-            });
-            if (suctionArmRef.current) {
-              suctionArmRef.current.rotation.x = THREE.MathUtils.lerp(
-                suctionArmRef.current.rotation.x,
-                -0.65,
-                0.08
-              );
-            }
-          } else if (missionT < 4.5) {
-            // 2. Priming Pump & High-Torque Macerator
-            setMissionStage('priming');
-            if (maceratorBladesRef.current) {
-              maceratorBladesRef.current.rotation.z += delta * 18;
-            }
-          } else if (missionT < 12.5) {
-            // 3. Suction Extraction Transfer Cycle
-            setMissionStage('extracting');
-            setDesludgeStage('pumping');
-            const extractProgress = (missionT - 4.5) / 8.0;
-            const pct = Math.min(100, Math.round(extractProgress * 100));
-            setDesludgeProgressPct(pct);
-            const currentPumpedLiters = Math.round((pct / 100) * 400);
-            setPumpedVolumeLiters(currentPumpedLiters);
+        // World coordinates of active worksite manhole and vehicle intake manifold
+        let activeWorksitePt = summitGroupRef.current
+          ? summitGroupRef.current.localToWorld(new THREE.Vector3(0, 0.25, 0))
+          : roadCurveRef.current.getPoint(0.98).clone().add(new THREE.Vector3(0, 0.25, 0));
 
-            // Spin macerator blades
-            if (maceratorBladesRef.current) {
-              maceratorBladesRef.current.rotation.z += delta * 26;
-            }
+        if (currentWorksite === 'alley' && alleyManholeRef.current) {
+          activeWorksitePt = alleyManholeRef.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0));
+        } else if (currentWorksite === 'station' && serviceManholeRef.current) {
+          activeWorksitePt = serviceManholeRef.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0));
+        }
 
-            // Pit sludge level drops
-            if (pitLiquidRef.current && currentWorksite === 'summit') {
-              pitLiquidRef.current.scale.y = Math.max(0.1, 1 - extractProgress * 0.7);
-              pitLiquidRef.current.position.y = -0.6 - extractProgress * 0.35;
-            }
+        const manifoldPt = vehicleGroupRef.current
+          ? vehicleGroupRef.current.localToWorld(new THREE.Vector3(0, 0.45, 1.10))
+          : activeWorksitePt.clone().add(new THREE.Vector3(0, 0.98, 1.10));
 
-            // Vehicle tank sludge fills up
-            if (vehicleTankLiquidRef.current) {
-              const fillScale = 0.15 + extractProgress * 0.85;
-              vehicleTankLiquidRef.current.scale.y = fillScale;
-            }
+        const dynamicHoseCurve = new THREE.CatmullRomCurve3([
+          activeWorksitePt,
+          activeWorksitePt.clone().lerp(manifoldPt, 0.35).add(new THREE.Vector3(0, 0.55, 0)),
+          activeWorksitePt.clone().lerp(manifoldPt, 0.70).add(new THREE.Vector3(0, 0.35, 0)),
+          manifoldPt
+        ]);
 
-            // Level sight float rises
-            if (levelSightFloatRef.current) {
-              levelSightFloatRef.current.position.y = 0.46 - 0.16 + extractProgress * 0.32;
-            }
-
-            // World coordinates of active worksite manhole and vehicle intake manifold
-            let activeWorksitePt = summitGroupRef.current
-              ? summitGroupRef.current.localToWorld(new THREE.Vector3(0, 0.25, 0))
-              : roadCurveRef.current.getPoint(0.98).clone().add(new THREE.Vector3(0, 0.25, 0));
-
-            if (currentWorksite === 'alley' && alleyManholeRef.current) {
-              activeWorksitePt = alleyManholeRef.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0));
-            } else if (currentWorksite === 'station' && serviceManholeRef.current) {
-              activeWorksitePt = serviceManholeRef.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0));
-            }
-
-            const manifoldPt = vehicleGroupRef.current
-              ? vehicleGroupRef.current.localToWorld(new THREE.Vector3(0, 0.45, 1.10))
-              : activeWorksitePt.clone().add(new THREE.Vector3(0, 0.98, 1.10));
-
-            const dynamicHoseCurve = new THREE.CatmullRomCurve3([
-              activeWorksitePt,
-              activeWorksitePt.clone().lerp(manifoldPt, 0.35).add(new THREE.Vector3(0, 0.55, 0)),
-              activeWorksitePt.clone().lerp(manifoldPt, 0.70).add(new THREE.Vector3(0, 0.35, 0)),
-              manifoldPt
-            ]);
-
-            // Physical suction hose tube
-            if (suctionHoseTubeRef.current) {
-              suctionHoseTubeRef.current.geometry.dispose();
-              suctionHoseTubeRef.current.geometry = new THREE.TubeGeometry(dynamicHoseCurve, 24, 0.038, 8, false);
-              suctionHoseTubeRef.current.visible = true;
-            }
-
-            // Flow Particles VFX
-            if (suctionFlowPointsRef.current) {
-              suctionFlowPointsRef.current.visible = true;
-              const fGeo = suctionFlowPointsRef.current.geometry;
-              const fPos = fGeo.attributes.position.array as Float32Array;
-              for (let i = 0; i < 120; i++) {
-                const curOffset = ((i / 120) + elapsed * 1.8) % 1.0;
-                const ptOnCurve = dynamicHoseCurve.getPoint(curOffset);
-                fPos[i * 3] = ptOnCurve.x + (Math.sin(elapsed * 12 + i) * 0.02);
-                fPos[i * 3 + 1] = ptOnCurve.y + (Math.cos(elapsed * 12 + i) * 0.02);
-                fPos[i * 3 + 2] = ptOnCurve.z + (Math.sin(elapsed * 8 + i * 2) * 0.02);
-              }
-              fGeo.attributes.position.needsUpdate = true;
-            }
-
-            // Pump audio
-            if (pumpGainRef.current) {
-              pumpGainRef.current.gain.setValueAtTime(0.2, audioCtxRef.current?.currentTime || 0);
-            }
-          } else if (missionT < 14.5) {
-            // 4. Settling Rest Phase (Pump disengaged, heavy solids settling)
-            setMissionStage('settling');
-            if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
-            if (pumpGainRef.current) {
-              pumpGainRef.current.gain.setValueAtTime(0, audioCtxRef.current?.currentTime || 0);
-            }
-          } else if (missionT < 23.5) {
-            // 5. Hydraulic Compaction & Dewatering Phase
-            setMissionStage('compacting');
-            setPistonMode('EXTENDING');
-            isTransportLockedRef.current = false;
-            const compProgress = (missionT - 14.5) / 9.0;
-            pistonStrokeMmRef.current = Math.min(520, Math.round(compProgress * 520));
-          } else if (missionT < 28.0) {
-            // 6. Platen Retraction & Mechanical Transport Retention Locking
-            setMissionStage('securing');
-            setPistonMode('RETRACTING');
-            const secProgress = (missionT - 23.5) / 4.5;
-            pistonStrokeMmRef.current = Math.max(0, Math.round(520 * (1 - secProgress)));
-            if (pistonStrokeMmRef.current === 0) {
-              isTransportLockedRef.current = true;
-              setPistonMode('LOCKED');
-            }
-          } else {
-            // 7. Worksite Mission Complete & Transport Readiness Confirmed
-            setMissionStage('ready_to_travel');
-            setDesludgeStage('completed');
-            if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = false;
-            if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
-            // Stow outriggers & boom
-            outriggersRef.current.forEach((jack) => {
-              jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.06, 0.08);
-            });
-            if (suctionArmRef.current) {
-              suctionArmRef.current.rotation.x = THREE.MathUtils.lerp(suctionArmRef.current.rotation.x, 0.0, 0.08);
-            }
+        if (isDeployStage) {
+          // Plant hydraulic outriggers firmly into ground
+          outriggersRef.current.forEach((jack) => {
+            jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.28, 0.08);
+          });
+          // Articulate suction crane boom towards vault manhole
+          if (suctionArmRef.current) {
+            suctionArmRef.current.rotation.x = THREE.MathUtils.lerp(suctionArmRef.current.rotation.x, -0.65, 0.08);
+          }
+          // Dynamic flexible suction hose tube
+          if (suctionHoseTubeRef.current) {
+            suctionHoseTubeRef.current.geometry.dispose();
+            suctionHoseTubeRef.current.geometry = new THREE.TubeGeometry(dynamicHoseCurve, 24, 0.038, 8, false);
+            suctionHoseTubeRef.current.visible = true;
+          }
+        } else {
+          // Stow outriggers & suction boom for travel
+          outriggersRef.current.forEach((jack) => {
+            jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.06, 0.08);
+          });
+          if (suctionArmRef.current) {
+            suctionArmRef.current.rotation.x = THREE.MathUtils.lerp(suctionArmRef.current.rotation.x, 0.0, 0.08);
+          }
+          if (suctionHoseTubeRef.current) {
+            suctionHoseTubeRef.current.visible = false;
           }
         }
 
-        // Hide flow particles & tube when not actively extracting
-        if (currentDrive !== 'desludge' || (desludgeTimerRef.current >= 12.5)) {
+        // Stage-by-Stage Operational Sequencing
+        if (curStage === '1_DRIVE_TO_SITE') {
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            const distToWorksite = Math.abs(pathProgressRef.current - targetWorksiteT);
+            if (distToWorksite < 0.03 || workflowTimerRef.current >= 6.0) {
+              transitionToWorkflowStage('2_POSITION_VEHICLE');
+            }
+          }
+        } else if (curStage === '2_POSITION_VEHICLE') {
+          // Bring vehicle to smooth stop and align intake manifold with manhole
+          pathProgressRef.current = THREE.MathUtils.lerp(pathProgressRef.current, targetWorksiteT, 0.08);
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          isTransportReadyRef.current = false;
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (workflowTimerRef.current >= 2.0) {
+              transitionToWorkflowStage('3_DEPLOY_STABILIZERS_HOSE');
+            }
+          }
+        } else if (curStage === '3_DEPLOY_STABILIZERS_HOSE') {
+          pathProgressRef.current = targetWorksiteT;
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          isTransportReadyRef.current = false;
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (workflowTimerRef.current >= 2.5) {
+              transitionToWorkflowStage('4_PRIME_PUMP');
+            }
+          }
+        } else if (curStage === '4_PRIME_PUMP') {
+          pathProgressRef.current = targetWorksiteT;
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          isTransportReadyRef.current = false;
+          if (maceratorBladesRef.current) {
+            maceratorBladesRef.current.rotation.z += delta * 20;
+          }
+          suctionVacuumKpaRef.current = THREE.MathUtils.lerp(suctionVacuumKpaRef.current, -48.0, delta * 2.0);
+          extractionRateLpmRef.current = THREE.MathUtils.lerp(extractionRateLpmRef.current, 60.0, delta * 2.0);
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (workflowTimerRef.current >= 2.0) {
+              transitionToWorkflowStage('5_EXTRACT_SLUDGE');
+            }
+          }
+        } else if (curStage === '5_EXTRACT_SLUDGE') {
+          pathProgressRef.current = targetWorksiteT;
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          isTransportReadyRef.current = false;
+          suctionVacuumKpaRef.current = -68.5;
+          extractionRateLpmRef.current = 150.0;
+          if (maceratorBladesRef.current) {
+            maceratorBladesRef.current.rotation.z += delta * 28;
+          }
+
+          // Transfer sludge from source vault into vehicle collection tank (Strict conservation: V_source + V_tank = 1200L)
+          const transferRateLps = 48.0; // Scaled simulation speed (fills 400L in ~8.3s)
+          const deltaL = Math.min(400 - collectionTankVolumeLRef.current, transferRateLps * delta);
+          collectionTankVolumeLRef.current += deltaL;
+          sourceVaultVolumeLRef.current = 1200 - collectionTankVolumeLRef.current;
+
+          // Slurry flow particles VFX along hose curve
+          if (suctionFlowPointsRef.current) {
+            suctionFlowPointsRef.current.visible = true;
+            const fGeo = suctionFlowPointsRef.current.geometry;
+            const fPos = fGeo.attributes.position.array as Float32Array;
+            for (let i = 0; i < 120; i++) {
+              const curOffset = ((i / 120) + elapsed * 1.8) % 1.0;
+              const ptOnCurve = dynamicHoseCurve.getPoint(curOffset);
+              fPos[i * 3] = ptOnCurve.x + (Math.sin(elapsed * 12 + i) * 0.02);
+              fPos[i * 3 + 1] = ptOnCurve.y + (Math.cos(elapsed * 12 + i) * 0.02);
+              fPos[i * 3 + 2] = ptOnCurve.z + (Math.sin(elapsed * 8 + i * 2) * 0.02);
+            }
+            fGeo.attributes.position.needsUpdate = true;
+          }
+
+          // Pit liquid drops
+          if (pitLiquidRef.current && currentWorksite === 'summit') {
+            pitLiquidRef.current.scale.y = Math.max(0.1, sourceVaultVolumeLRef.current / 1200);
+            pitLiquidRef.current.position.y = -0.6 - (1 - sourceVaultVolumeLRef.current / 1200) * 0.35;
+          }
+
+          // Vehicle collection tank fills up
+          if (vehicleTankLiquidRef.current) {
+            vehicleTankLiquidRef.current.scale.y = 0.15 + (collectionTankVolumeLRef.current / 400) * 0.85;
+          }
+
+          // Level sight float rises
+          if (levelSightFloatRef.current) {
+            levelSightFloatRef.current.position.y = 0.46 - 0.16 + (collectionTankVolumeLRef.current / 400) * 0.32;
+          }
+
+          // Pump audio
+          if (pumpGainRef.current) {
+            pumpGainRef.current.gain.setValueAtTime(0.2, audioCtxRef.current?.currentTime || 0);
+          }
+
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (collectionTankVolumeLRef.current >= 400 || workflowTimerRef.current >= 9.0) {
+              transitionToWorkflowStage('6_SETTLE_SLUDGE');
+            }
+          }
+        } else if (curStage === '6_SETTLE_SLUDGE') {
+          pathProgressRef.current = targetWorksiteT;
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          isTransportReadyRef.current = false;
+          extractionRateLpmRef.current = 0;
+          suctionVacuumKpaRef.current = 0;
           if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
-          if (suctionHoseTubeRef.current && currentDrive !== 'desludge') suctionHoseTubeRef.current.visible = false;
+          if (pumpGainRef.current) {
+            pumpGainRef.current.gain.setValueAtTime(0, audioCtxRef.current?.currentTime || 0);
+          }
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (workflowTimerRef.current >= 2.0) {
+              transitionToWorkflowStage('7_COMPACT_SLUDGE');
+            }
+          }
+        } else if (curStage === '7_COMPACT_SLUDGE') {
+          pathProgressRef.current = targetWorksiteT;
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          isTransportReadyRef.current = false;
+          pistonModeRef.current = 'EXTENDING';
+          isTransportLockedRef.current = false;
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (pistonStrokeMmRef.current >= 520 || workflowTimerRef.current >= 8.0) {
+              transitionToWorkflowStage('8_SECURE_PISTON');
+            }
+          }
+        } else if (curStage === '8_SECURE_PISTON') {
+          pathProgressRef.current = targetWorksiteT;
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          isTransportReadyRef.current = false;
+          pistonModeRef.current = 'RETRACTING';
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (pistonStrokeMmRef.current <= 0 && workflowTimerRef.current >= 3.0) {
+              transitionToWorkflowStage('9_CONFIRM_TRANSPORT_READY');
+            }
+          }
+        } else if (curStage === '9_CONFIRM_TRANSPORT_READY') {
+          pathProgressRef.current = targetWorksiteT;
+          vehicleSpeedKmhRef.current = 0;
+          driveModeRef.current = 'parked';
+          pistonStrokeMmRef.current = 0;
+          isTransportLockedRef.current = true;
+          pistonModeRef.current = 'LOCKED';
+          isTransportReadyRef.current = true;
+          if (isAutoWorkflowRunningRef.current) {
+            workflowTimerRef.current += delta;
+            if (workflowTimerRef.current >= 2.0) {
+              transitionToWorkflowStage('10_RESUME_DRIVING');
+            }
+          }
+        } else if (curStage === '10_RESUME_DRIVING') {
+          pistonStrokeMmRef.current = 0;
+          isTransportLockedRef.current = true;
+          pistonModeRef.current = 'LOCKED';
+          isTransportReadyRef.current = true;
+          if (currentDrive === 'auto_climb') {
+            const speedFactor = (currentSpeed / 14) * 0.026;
+            pathProgressRef.current = (pathProgressRef.current + delta * speedFactor) % 1;
+          }
+          if (isAutoWorkflowRunningRef.current) {
+            setIsAutoWorkflowRunning(false);
+            isAutoWorkflowRunningRef.current = false;
+          }
+        }
+
+        // Hide flow particles & tube when not in stage 5
+        if (curStage !== '5_EXTRACT_SLUDGE') {
+          if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
         }
 
         // Manual Piston Mode Execution (Outside Auto Mission Sequence)
@@ -3715,6 +3925,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
         // Periodic Throttle Sync to React State for Telemetry HUD (every ~100ms)
         if (Math.round(elapsed * 10) % 2 === 0) {
+          setWorkflowStage(workflowStageRef.current);
+          setSourceVaultVolumeL(Math.round(sourceVaultVolumeLRef.current));
+          setCollectionTankVolumeL(Math.round(collectionTankVolumeLRef.current));
+          setExtractionRateLpm(Math.round(extractionRateLpmRef.current * 10) / 10);
+          setSuctionVacuumKpa(Math.round(suctionVacuumKpaRef.current * 10) / 10);
+          setIsTransportReady(isTransportReadyRef.current);
+          setVehicleSpeedKmh(Math.round(vehicleSpeedKmhRef.current));
+          setDriveMode(driveModeRef.current);
           setPistonStrokeMm(Math.round(strokeMm));
           setAppliedPressureBar(dewateringResult.hydraulicPressureBar);
           setCompactionForceKn(
@@ -3725,20 +3943,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           setCompactionRatio(dewateringResult.compactionRatio);
           setIsTransportLocked(isTransportLockedRef.current);
           setIsReliefValveOpen(dewateringResult.reliefValveOpen || dewateringResult.hydraulicPressureBar >= reliefPressureLimitBarRef.current);
-        }
-
-        // Retract outriggers and suction arm back to travel position when not in mission
-        if (driveMode !== 'desludge') {
-          outriggersRef.current.forEach((jack) => {
-            jack.position.y = THREE.MathUtils.lerp(jack.position.y, -0.06, 0.08);
-          });
-          if (suctionArmRef.current) {
-            suctionArmRef.current.rotation.x = THREE.MathUtils.lerp(
-              suctionArmRef.current.rotation.x,
-              0.0,
-              0.08
-            );
-          }
         }
 
         const t = pathProgressRef.current;
@@ -4489,6 +4693,217 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     }
   };
 
+  // 10-Stage Mountain Mission Workflow Transitions
+  const transitionToWorkflowStage = (target: MountainWorkflowStage) => {
+    setWorkflowStage(target);
+    workflowStageRef.current = target;
+    workflowTimerRef.current = 0;
+    setInterlockWarning(null);
+
+    const targetWorksiteT = selectedWorksite === 'alley' ? 0.18 : selectedWorksite === 'station' ? 0.42 : 0.98;
+
+    switch (target) {
+      case '1_DRIVE_TO_SITE':
+        setDriveMode('auto_climb');
+        driveModeRef.current = 'auto_climb';
+        setVehicleSpeedKmh(14);
+        vehicleSpeedKmhRef.current = 14;
+        setPistonMode('LOCKED');
+        pistonModeRef.current = 'LOCKED';
+        setIsTransportLocked(true);
+        isTransportLockedRef.current = true;
+        setPistonStrokeMm(0);
+        pistonStrokeMmRef.current = 0;
+        setExtractionRateLpm(0);
+        extractionRateLpmRef.current = 0;
+        setSuctionVacuumKpa(0);
+        suctionVacuumKpaRef.current = 0;
+        setIsTransportReady(true);
+        isTransportReadyRef.current = true;
+        setCameraMode('chase');
+        cameraModeRef.current = 'chase';
+        if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = false;
+        if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
+        break;
+
+      case '2_POSITION_VEHICLE':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        pathProgressRef.current = targetWorksiteT;
+        setIsTransportReady(false);
+        isTransportReadyRef.current = false;
+        setCameraMode('desludge');
+        cameraModeRef.current = 'desludge';
+        break;
+
+      case '3_DEPLOY_STABILIZERS_HOSE':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        setIsTransportReady(false);
+        isTransportReadyRef.current = false;
+        setCameraMode('desludge');
+        cameraModeRef.current = 'desludge';
+        if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = true;
+        break;
+
+      case '4_PRIME_PUMP':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        setIsTransportReady(false);
+        isTransportReadyRef.current = false;
+        setSuctionVacuumKpa(-45.0);
+        suctionVacuumKpaRef.current = -45.0;
+        setExtractionRateLpm(60.0);
+        extractionRateLpmRef.current = 60.0;
+        setCameraMode('desludge');
+        cameraModeRef.current = 'desludge';
+        if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = true;
+        break;
+
+      case '5_EXTRACT_SLUDGE':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        setIsTransportReady(false);
+        isTransportReadyRef.current = false;
+        setSuctionVacuumKpa(-68.5);
+        suctionVacuumKpaRef.current = -68.5;
+        setExtractionRateLpm(150.0);
+        extractionRateLpmRef.current = 150.0;
+        setCameraMode('desludge');
+        cameraModeRef.current = 'desludge';
+        if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = true;
+        if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = true;
+        break;
+
+      case '6_SETTLE_SLUDGE':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        setIsTransportReady(false);
+        isTransportReadyRef.current = false;
+        setExtractionRateLpm(0);
+        extractionRateLpmRef.current = 0;
+        setSuctionVacuumKpa(0);
+        suctionVacuumKpaRef.current = 0;
+        if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
+        break;
+
+      case '7_COMPACT_SLUDGE':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        setIsTransportReady(false);
+        isTransportReadyRef.current = false;
+        setIsTransportLocked(false);
+        isTransportLockedRef.current = false;
+        setPistonMode('EXTENDING');
+        pistonModeRef.current = 'EXTENDING';
+        setCameraMode('tank');
+        cameraModeRef.current = 'tank';
+        if (cutawayOpacity >= 0.85) setCutawayOpacity(0.35);
+        break;
+
+      case '8_SECURE_PISTON':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        setIsTransportReady(false);
+        isTransportReadyRef.current = false;
+        setPistonMode('RETRACTING');
+        pistonModeRef.current = 'RETRACTING';
+        setCameraMode('tank');
+        cameraModeRef.current = 'tank';
+        break;
+
+      case '9_CONFIRM_TRANSPORT_READY':
+        setDriveMode('parked');
+        driveModeRef.current = 'parked';
+        setVehicleSpeedKmh(0);
+        vehicleSpeedKmhRef.current = 0;
+        setPistonMode('LOCKED');
+        pistonModeRef.current = 'LOCKED';
+        setIsTransportLocked(true);
+        isTransportLockedRef.current = true;
+        setPistonStrokeMm(0);
+        pistonStrokeMmRef.current = 0;
+        setIsTransportReady(true);
+        isTransportReadyRef.current = true;
+        setCameraMode('chase');
+        cameraModeRef.current = 'chase';
+        if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = false;
+        if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
+        break;
+
+      case '10_RESUME_DRIVING':
+        setPistonMode('LOCKED');
+        pistonModeRef.current = 'LOCKED';
+        setIsTransportLocked(true);
+        isTransportLockedRef.current = true;
+        setPistonStrokeMm(0);
+        pistonStrokeMmRef.current = 0;
+        setIsTransportReady(true);
+        isTransportReadyRef.current = true;
+        setDriveMode('auto_climb');
+        driveModeRef.current = 'auto_climb';
+        setVehicleSpeedKmh(14);
+        vehicleSpeedKmhRef.current = 14;
+        setCameraMode('chase');
+        cameraModeRef.current = 'chase';
+        if (suctionHoseTubeRef.current) suctionHoseTubeRef.current.visible = false;
+        if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
+        break;
+    }
+  };
+
+  const advanceWorkflowStep = () => {
+    const curIdx = MOUNTAIN_WORKFLOW_STEPS.findIndex((s) => s.id === workflowStageRef.current);
+    if (curIdx >= 0 && curIdx < MOUNTAIN_WORKFLOW_STEPS.length - 1) {
+      transitionToWorkflowStage(MOUNTAIN_WORKFLOW_STEPS[curIdx + 1].id);
+    }
+  };
+
+  const prevWorkflowStep = () => {
+    const curIdx = MOUNTAIN_WORKFLOW_STEPS.findIndex((s) => s.id === workflowStageRef.current);
+    if (curIdx > 0) {
+      transitionToWorkflowStage(MOUNTAIN_WORKFLOW_STEPS[curIdx - 1].id);
+    }
+  };
+
+  const resetWorkflow = () => {
+    setIsAutoWorkflowRunning(false);
+    isAutoWorkflowRunningRef.current = false;
+    setSourceVaultVolumeL(1200);
+    sourceVaultVolumeLRef.current = 1200;
+    setCollectionTankVolumeL(0);
+    collectionTankVolumeLRef.current = 0;
+    setCakeVolumeL(0);
+    setFiltrateVolumeL(0);
+    setCompactionRatio(1.0);
+    transitionToWorkflowStage('1_DRIVE_TO_SITE');
+  };
+
+  const toggleAutoWorkflow = () => {
+    const nextRunning = !isAutoWorkflowRunning;
+    setIsAutoWorkflowRunning(nextRunning);
+    isAutoWorkflowRunningRef.current = nextRunning;
+    if (nextRunning && workflowStage === '10_RESUME_DRIVING') {
+      resetWorkflow();
+      setIsAutoWorkflowRunning(true);
+      isAutoWorkflowRunningRef.current = true;
+    }
+  };
+
   // Launch Full Automated Desludging Mission at target worksite
   const startDesludgingMission = (worksite: 'alley' | 'station' | 'summit' = selectedWorksite) => {
     runStressTest('none');
@@ -4822,12 +5237,20 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
           <div className="space-y-1.5 font-mono text-[11px]">
             <div className="flex justify-between">
-              <span className="text-slate-400">Road Gradient:</span>
-              <span className="text-white font-bold">{currentInclineDeg}°</span>
+              <span className="text-slate-400">Ground Speed:</span>
+              <span className="text-emerald-400 font-bold">
+                {vehicleSpeedKmh} km/h · <span className="text-cyan-400">{driveMode.toUpperCase().replace('_', ' ')}</span>
+              </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Ground Speed:</span>
-              <span className="text-emerald-400 font-bold">{vehicleSpeedKmh} km/h</span>
+              <span className="text-slate-400">Mission Workflow:</span>
+              <span className="text-amber-400 font-bold">
+                {MOUNTAIN_WORKFLOW_STEPS.find((s) => s.id === workflowStage)?.shortName || workflowStage}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Road Gradient:</span>
+              <span className="text-white font-bold">{currentInclineDeg}°</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Target Worksite:</span>
@@ -4839,50 +5262,64 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                   : 'Summit Vault (0.98)'}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Payload Volume:</span>
-              <span className="text-slate-200">
-                {driveMode === 'desludge' ? `${pumpedVolumeLiters}L / 400L` : `${payloadLiters}L (440 kg)`}
-              </span>
+
+            {/* Source Vault & Vehicle Collection Tank Mass Balance */}
+            <div className="pt-1.5 mt-1 border-t border-slate-800 space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Source Septic Vault:</span>
+                <span className="text-amber-400 font-bold">{sourceVaultVolumeL} L / 1200 L</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Collection Tank Fill:</span>
+                <span className="text-cyan-400 font-bold">
+                  {collectionTankVolumeL} L / 400 L ({((collectionTankVolumeL / 400) * 100).toFixed(0)}%)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Extraction Flow:</span>
+                <span className="text-cyan-300 font-bold">
+                  {extractionRateLpm > 0 ? `${extractionRateLpm.toFixed(1)} L/min (${suctionVacuumKpa.toFixed(1)} kPa)` : 'OFF (0.0 L/min)'}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Anti-Slosh Baffles:</span>
-              <span className="text-emerald-400 font-bold">
-                {hasBaffles ? 'ACTIVE (-88.9%)' : 'DISABLED (SURGE)'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Liquid Surge Shift:</span>
-              <span className={hasBaffles ? 'text-emerald-400' : 'text-rose-400 font-bold'}>
-                +{currentSurgeCm} cm
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Center of Mass Height:</span>
-              <span className="text-slate-200 font-bold">{hasLowComBattery ? '0.42 m' : '0.58 m'}</span>
-            </div>
-            <div className="flex justify-between pt-1 border-t border-slate-800">
-              <span className="text-slate-400">Critical Tip Limit:</span>
-              <span className="text-white font-bold">{criticalRolloverAngle.toFixed(1)}°</span>
-            </div>
-            <div className="flex justify-between pt-1 border-t border-slate-800">
-              <span className="text-slate-400">Rollover Stability:</span>
-              <span
-                className={`font-bold ${
-                  stabilityMarginPct >= 50
-                    ? 'text-emerald-400'
-                    : stabilityMarginPct >= 25
-                    ? 'text-amber-400'
-                    : 'text-rose-400 animate-pulse'
-                }`}
-              >
-                {stabilityMarginPct}%
-              </span>
+
+            {/* Anti-Slosh & Vehicle Dynamics */}
+            <div className="pt-1.5 mt-1 border-t border-slate-800 space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Anti-Slosh Baffles:</span>
+                <span className="text-emerald-400 font-bold">
+                  {hasBaffles ? 'ACTIVE (-88.9%)' : 'DISABLED (SURGE)'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Liquid Surge Shift:</span>
+                <span className={hasBaffles ? 'text-emerald-400' : 'text-rose-400 font-bold'}>
+                  +{currentSurgeCm} cm
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Center of Mass Height:</span>
+                <span className="text-slate-200 font-bold">{hasLowComBattery ? '0.42 m' : '0.58 m'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Rollover Stability:</span>
+                <span
+                  className={`font-bold ${
+                    stabilityMarginPct >= 50
+                      ? 'text-emerald-400'
+                      : stabilityMarginPct >= 25
+                      ? 'text-amber-400'
+                      : 'text-rose-400 animate-pulse'
+                  }`}
+                >
+                  {stabilityMarginPct}% (Tip: {criticalRolloverAngle.toFixed(1)}°)
+                </span>
+              </div>
             </div>
 
             {/* Hydraulic Sludge-Compaction & Dewatering Telemetry */}
-            <div className="pt-2 mt-2 border-t border-slate-800 space-y-1">
-              <div className="flex items-center justify-between mb-1">
+            <div className="pt-1.5 mt-1 border-t border-slate-800 space-y-1">
+              <div className="flex items-center justify-between mb-0.5">
                 <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center space-x-1">
                   <Cog className="w-3 h-3 text-emerald-400" />
                   <span>Compaction Piston</span>
@@ -4912,10 +5349,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 <span className="text-amber-400 font-bold">{compactionForceKn.toFixed(1)} kN</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Sludge Type:</span>
-                <span className="text-emerald-400 font-bold uppercase">{sludgeType.replace('_', ' ')}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-slate-400">Cake / Filtrate Vol:</span>
                 <span className="text-slate-200">
                   {cakeVolumeL}L cake · {filtrateVolumeL}L filtrate
@@ -4924,7 +5357,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Compaction Ratio:</span>
                 <span className="text-emerald-400 font-bold">
-                  {compactionRatio.toFixed(2)}× ({((1 - cakeVolumeL / 400) * 100).toFixed(1)}% red.)
+                  {compactionRatio.toFixed(2)}× ({((1 - cakeVolumeL / Math.max(1, collectionTankVolumeL || 400)) * 100).toFixed(1)}% red.)
                 </span>
               </div>
               <div className="flex justify-between pt-0.5">
@@ -4934,13 +5367,17 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 </span>
               </div>
               <div className="flex justify-between pt-0.5">
-                <span className="text-slate-400">Transport Interlock:</span>
+                <span className="text-slate-400">Transport Readiness:</span>
                 <span
                   className={`font-bold ${
-                    isTransportLocked ? 'text-emerald-400' : 'text-rose-400 animate-pulse'
+                    isTransportReady && isTransportLocked && pistonStrokeMm <= 0
+                      ? 'text-emerald-400'
+                      : 'text-rose-400 animate-pulse'
                   }`}
                 >
-                  {isTransportLocked ? 'READY (SAFE)' : 'BLOCKED (INTERLOCK)'}
+                  {isTransportReady && isTransportLocked && pistonStrokeMm <= 0
+                    ? 'READY (CERTIFIED)'
+                    : 'BLOCKED (OPS ACTIVE)'}
                 </span>
               </div>
             </div>
@@ -5115,7 +5552,125 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </div>
           </div>
 
-          {/* Drive & Mission Mode Action Buttons */}
+          {/* 10-Stage Mechanized Desludging & Dewatering Mission Workflow */}
+          <div className="p-3 bg-slate-950 border border-emerald-700/60 rounded-lg space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-emerald-400 text-xs flex items-center space-x-1.5">
+                <Rotate3d className="w-4 h-4 text-emerald-400" />
+                <span>10-Stage Mission Workflow</span>
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">
+                Step {MOUNTAIN_WORKFLOW_STEPS.find((s) => s.id === workflowStage)?.num || 1} / 10
+              </span>
+            </div>
+
+            {/* Stage Title & Operational Description */}
+            <div className="p-2 bg-slate-900/90 rounded border border-slate-800 text-[11px] font-mono">
+              <div className="text-white font-bold flex items-center space-x-1">
+                <span className="text-amber-400">
+                  {MOUNTAIN_WORKFLOW_STEPS.find((s) => s.id === workflowStage)?.name}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {MOUNTAIN_WORKFLOW_STEPS.find((s) => s.id === workflowStage)?.description}
+              </p>
+            </div>
+
+            {/* 10 Clickable Sequenced Stage Pills */}
+            <div className="grid grid-cols-5 gap-1 font-mono text-[10px]">
+              {MOUNTAIN_WORKFLOW_STEPS.map((step) => {
+                const curIdx = MOUNTAIN_WORKFLOW_STEPS.findIndex((s) => s.id === workflowStage);
+                const isCurrent = step.id === workflowStage;
+                const isPassed = step.num < (curIdx + 1);
+
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => transitionToWorkflowStage(step.id)}
+                    className={`py-1 px-1 rounded flex flex-col items-center justify-center transition border ${
+                      isCurrent
+                        ? 'bg-emerald-600 text-white font-bold border-emerald-400 shadow-md shadow-emerald-600/30 ring-1 ring-emerald-300'
+                        : isPassed
+                        ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/80 hover:bg-emerald-900/50'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                    }`}
+                    title={`${step.num}. ${step.name}: ${step.description}`}
+                  >
+                    <span className="text-[11px] font-bold">{step.num}</span>
+                    <span className="text-[8px] truncate max-w-[50px]">{step.shortName.split('. ')[1]}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Workflow Navigation Controls: Prev, Next, Auto-Run, Reset */}
+            <div className="flex items-center space-x-1.5 pt-1">
+              <button
+                onClick={prevWorkflowStep}
+                disabled={workflowStage === '1_DRIVE_TO_SITE'}
+                className="py-1 px-2 rounded font-bold text-[10px] bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center space-x-1"
+                title="Go to previous operational workflow step"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                <span>Prev</span>
+              </button>
+
+              <button
+                onClick={toggleAutoWorkflow}
+                className={`flex-1 py-1 px-2 rounded font-bold text-[10px] flex items-center justify-center space-x-1 transition ${
+                  isAutoWorkflowRunning
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 animate-pulse'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md'
+                }`}
+                title={isAutoWorkflowRunning ? 'Pause automated 10-stage progression' : 'Execute 10-stage automated workflow'}
+              >
+                {isAutoWorkflowRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                <span>{isAutoWorkflowRunning ? 'Pause Auto' : 'Auto Run (10-Stage)'}</span>
+              </button>
+
+              <button
+                onClick={advanceWorkflowStep}
+                disabled={workflowStage === '10_RESUME_DRIVING'}
+                className="py-1 px-2 rounded font-bold text-[10px] bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center space-x-1"
+                title="Advance to next operational workflow step"
+              >
+                <span>Next</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+
+              <button
+                onClick={resetWorkflow}
+                className="p-1 rounded bg-slate-800 text-slate-400 hover:text-white transition"
+                title="Reset mission workflow to Stage 1"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Mass Balance & Dewatering Tracking */}
+            <div className="p-2 bg-slate-900/80 rounded border border-slate-800 text-[10px] font-mono space-y-1">
+              <div className="flex justify-between items-center text-slate-400">
+                <span>Material Conservation:</span>
+                <span className="text-emerald-400 font-bold">1200 L (Strict 100%)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Source Vault (1200L):</span>
+                <span className="text-amber-400 font-bold">{sourceVaultVolumeL} L</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Collection Tank (400L):</span>
+                <span className="text-cyan-400 font-bold">{collectionTankVolumeL} L</span>
+              </div>
+              <div className="flex justify-between pt-0.5 border-t border-slate-800">
+                <span className="text-slate-400">Cake / Filtrate Separation:</span>
+                <span className="text-slate-200 font-bold">
+                  {cakeVolumeL} L cake · {filtrateVolumeL} L liquid
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Drive Mode Action Buttons */}
           <div className="flex items-center space-x-1.5">
             <button
               onClick={() => {
@@ -5134,20 +5689,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               }`}
             >
               {driveMode === 'auto_climb' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-              <span>{driveMode === 'auto_climb' ? 'Halt' : 'Auto Climb'}</span>
-            </button>
-
-            <button
-              onClick={() => startDesludgingMission(selectedWorksite)}
-              className={`flex-1 py-1.5 rounded font-bold text-xs flex items-center justify-center space-x-1 transition ${
-                driveMode === 'desludge'
-                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
-                  : 'bg-slate-800 text-cyan-300 hover:bg-slate-700'
-              }`}
-              title="Execute full 7-stage desludging & dewatering mission"
-            >
-              <Droplet className="w-3.5 h-3.5" />
-              <span>Mission Demo</span>
+              <span>{driveMode === 'auto_climb' ? 'Halt Drive' : 'Auto Climb'}</span>
             </button>
 
             <button
@@ -5160,68 +5702,25 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 }
                 setDriveMode('manual');
               }}
-              className={`px-2.5 py-1.5 rounded font-semibold text-xs transition ${
+              className={`flex-1 py-1.5 rounded font-semibold text-xs transition ${
                 driveMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              Manual
+              Manual (WASD)
+            </button>
+
+            <button
+              onClick={() => {
+                setDriveMode('parked');
+                setVehicleSpeedKmh(0);
+              }}
+              className={`px-3 py-1.5 rounded font-semibold text-xs transition ${
+                driveMode === 'parked' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              Parked
             </button>
           </div>
-
-          {/* Full-Scale Sequenced Desludging & Compaction Operation Modal Card */}
-          {driveMode === 'desludge' && (
-            <div className="p-2.5 bg-slate-950 border border-cyan-800/60 rounded-lg space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-cyan-400 font-bold flex items-center space-x-1">
-                  <Droplet className="w-3.5 h-3.5 animate-bounce text-cyan-400" />
-                  <span>
-                    {missionStage === 'stabilizing'
-                      ? 'Stage 1/7: Deploying Outriggers & Boom...'
-                      : missionStage === 'priming'
-                      ? 'Stage 2/7: Priming Macerator Pump...'
-                      : missionStage === 'extracting'
-                      ? `Stage 3/7: Vacuum Transferring Sludge (${pumpedVolumeLiters}L)...`
-                      : missionStage === 'settling'
-                      ? 'Stage 4/7: Settling Period (Bed Clarification)...'
-                      : missionStage === 'compacting'
-                      ? `Stage 5/7: Compaction Platen Pressing (${pistonStrokeMm}mm · ${appliedPressureBar.toFixed(0)} bar)...`
-                      : missionStage === 'securing'
-                      ? 'Stage 6/7: Retracting Platen & Engaging Lock Pins...'
-                      : 'Stage 7/7: Desludging & Dewatering Complete!'}
-                  </span>
-                </span>
-                <span className="text-white font-bold">{desludgeProgressPct}%</span>
-              </div>
-              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-cyan-500 via-emerald-400 to-amber-400 transition-all duration-300"
-                  style={{
-                    width: `${
-                      missionStage === 'stabilizing'
-                        ? 14
-                        : missionStage === 'priming'
-                        ? 28
-                        : missionStage === 'extracting'
-                        ? 28 + (desludgeProgressPct * 0.3)
-                        : missionStage === 'settling'
-                        ? 60
-                        : missionStage === 'compacting'
-                        ? 60 + ((pistonStrokeMm / 520) * 25)
-                        : missionStage === 'securing'
-                        ? 88
-                        : 100
-                    }%`
-                  }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300 font-mono">
-                <div>Sludge Cake: <span className="text-amber-400 font-bold">{cakeVolumeL} L</span></div>
-                <div>Filtrate Sheen: <span className="text-cyan-400 font-bold">{filtrateVolumeL} L</span></div>
-                <div>Compaction Thrust: <span className="text-white font-bold">{compactionForceKn.toFixed(1)} kN</span></div>
-                <div>Volume Red.: <span className="text-emerald-400 font-bold">{compactionRatio.toFixed(2)}×</span></div>
-              </div>
-            </div>
-          )}
 
           {/* Hydraulic Sludge-Compaction Piston Dedicated Control Box */}
           <div className="p-2.5 bg-slate-950/90 border border-slate-700/80 rounded-lg space-y-2">
