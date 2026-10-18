@@ -238,6 +238,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const hemiLightRef = useRef<THREE.HemisphereLight | null>(null);
   const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
   const chassisMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const tankMatRef = useRef<THREE.MeshPhysicalMaterial | THREE.MeshStandardMaterial | null>(null);
   const batteryCaseMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const foamTexRef = useRef<THREE.CanvasTexture | null>(null);
 
@@ -383,8 +384,16 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (driveMode !== 'manual') return;
       if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        if (pistonStrokeMmRef.current > 5 || !isTransportLockedRef.current) {
+          setInterlockWarning('TRANSPORT INTERLOCK: Platen extended! Return to 0mm & engage Lock Pins before driving.');
+          return;
+        }
         manualThrottleRef.current = 1;
       } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        if (pistonStrokeMmRef.current > 5 || !isTransportLockedRef.current) {
+          setInterlockWarning('TRANSPORT INTERLOCK: Platen extended! Return to 0mm & engage Lock Pins before driving.');
+          return;
+        }
         manualThrottleRef.current = -1;
       } else if (e.key === ' ') {
         manualThrottleRef.current = 0;
@@ -1663,349 +1672,327 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     });
 
     // =========================================================================
-    // Rugged Alpine Exploration Rover Cab (Emerald Livery with Clearcoat)
+    // SIH 26258 PURPOSE-BUILT TRACKED MECHANIZED DESLUDGING SUPERSTRUCTURE
+    // Dedicated Sanitation Equipment Platform (Zero Passenger Cabin / No Cockpit)
     // =========================================================================
-    const cab = new THREE.Mesh(
-      new THREE.BoxGeometry(0.96, 0.64, 0.76),
-      new THREE.MeshPhysicalMaterial({
-        color: isXRayMode ? 0x06b6d4 : 0x059669,
-        metalness: 0.55,
-        roughness: 0.24,
-        clearcoat: 0.92,
-        clearcoatRoughness: 0.14,
-        transparent: isXRayMode,
-        opacity: isXRayMode ? 0.4 : 1.0
-      })
+
+    // 1. Structural Industrial Equipment Deck & Diamond-Plate Walkway
+    const deckMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.35
+    });
+    const equipmentDeck = new THREE.Mesh(
+      new THREE.BoxGeometry(1.04, 0.05, 1.15),
+      deckMat
     );
-    cab.position.set(0, 0.42, 0.68);
-    cab.castShadow = true;
-    chassisGroup.add(cab);
+    equipmentDeck.position.set(0, 0.12, 0.65);
+    equipmentDeck.castShadow = true;
+    equipmentDeck.receiveShadow = true;
+    chassisGroup.add(equipmentDeck);
 
-    // Angled Armored Cockpit Brow / Sun Visor
-    const cabBrow = new THREE.Mesh(
-      new THREE.BoxGeometry(0.98, 0.06, 0.22),
-      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.3 })
-    );
-    cabBrow.position.set(0, 0.74, 0.84);
-    cabBrow.rotation.x = -0.18;
-    chassisGroup.add(cabBrow);
+    // Front & Side Equipment Grab Rails (Safety Yellow & Galvanized)
+    [-0.48, 0.48].forEach((rx) => {
+      const railPost1 = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.42, 8), galvanizedMat);
+      railPost1.position.set(rx, 0.32, 0.18);
+      chassisGroup.add(railPost1);
 
-    // Reinforced Chamfered Front Grille & High-Tensile Mesh
-    const grille = new THREE.Mesh(
-      new THREE.BoxGeometry(0.74, 0.24, 0.03),
-      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.92, roughness: 0.35 })
-    );
-    grille.position.set(0, 0.28, 1.07);
-    chassisGroup.add(grille);
+      const railPost2 = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.42, 8), galvanizedMat);
+      railPost2.position.set(rx, 0.32, 1.12);
+      chassisGroup.add(railPost2);
 
-    for (let g = 0; g < 4; g++) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.018, 0.02), galvanizedMat);
-      bar.position.set(0, 0.19 + g * 0.055, 1.085);
-      chassisGroup.add(bar);
-    }
-
-    const sihEmblem = new THREE.Mesh(
-      new THREE.CircleGeometry(0.048, 16),
-      new THREE.MeshBasicMaterial({ color: 0x10b981 })
-    );
-    sihEmblem.position.set(0, 0.28, 1.09);
-    chassisGroup.add(sihEmblem);
-
-    // Lower Bumper Amber Penetrating Fog / Rock Spotlights
-    [-0.44, 0.44].forEach((fx) => {
-      const fogBezel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.045, 0.04, 16),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
-      );
-      fogBezel.rotation.x = Math.PI / 2;
-      fogBezel.position.set(fx, 0.06, 1.25);
-      chassisGroup.add(fogBezel);
-
-      const fog = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.036, 0.036, 0.02, 16),
-        new THREE.MeshBasicMaterial({ color: 0xf59e0b })
-      );
-      fog.rotation.x = Math.PI / 2;
-      fog.position.set(fx, 0.06, 1.27);
-      chassisGroup.add(fog);
+      const topRail = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.98, 8), galvanizedMat);
+      topRail.rotation.x = Math.PI / 2;
+      topRail.position.set(rx, 0.52, 0.65);
+      chassisGroup.add(topRail);
     });
 
-    // Door Decals (Swachh Bharat Mission / SIH-26258) on Driver & Passenger Doors
-    const decalMat = new THREE.MeshStandardMaterial({
-      map: swachhDecal,
-      transparent: true,
-      roughness: 0.3
-    });
-    [-0.486, 0.486].forEach((xPos) => {
-      const doorDecal = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.24), decalMat);
-      doorDecal.rotation.y = xPos > 0 ? Math.PI / 2 : -Math.PI / 2;
-      doorDecal.position.set(xPos, 0.42, 0.68);
-      chassisGroup.add(doorDecal);
-    });
+    // 2. Weatherproof Sealed Operator Control & Hydraulic Logic Cabinet (Front Left: x = -0.32, z = 0.68)
+    const cabinetGroup = new THREE.Group();
+    cabinetGroup.position.set(-0.32, 0.38, 0.65);
+    chassisGroup.add(cabinetGroup);
 
-    // Multi-Pane Ballistic Armored Windshield
-    const windshield = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.82, 0.38),
-      new THREE.MeshPhysicalMaterial({
-        color: 0x38bdf8,
-        transparent: true,
-        opacity: 0.65,
-        roughness: 0.06,
-        metalness: 0.92,
-        transmission: 0.52
-      })
+    const cabinetBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.38, 0.48, 0.34),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.28 })
     );
-    windshield.position.set(0, 0.48, 1.07);
-    windshield.rotation.x = -0.16;
-    chassisGroup.add(windshield);
+    cabinetBody.castShadow = true;
+    cabinetGroup.add(cabinetBody);
 
-    // Heavy-Duty Articulated Windshield Wipers
-    [-0.2, 0.2].forEach((wx) => {
-      const wiper = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.008, 0.008, 0.26, 8),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })
-      );
-      wiper.rotation.z = Math.PI / 4;
-      wiper.position.set(wx, 0.38, 1.08);
-      chassisGroup.add(wiper);
-    });
-
-    // Aerodynamic Armored Side Sensor / Camera Pods (replacing mirrors)
-    [-0.56, 0.56].forEach((mx) => {
-      const podArm = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.016, 0.016, 0.16, 8),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
-      );
-      podArm.rotation.z = mx > 0 ? Math.PI / 3 : -Math.PI / 3;
-      podArm.position.set(mx * 0.9, 0.48, 0.85);
-      chassisGroup.add(podArm);
-
-      const podHousing = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.10, 0.12),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.25 })
-      );
-      podHousing.position.set(mx, 0.52, 0.85);
-      chassisGroup.add(podHousing);
-
-      // Forward-facing wide optical aperture lens
-      const lens = new THREE.Mesh(
-        new THREE.CircleGeometry(0.024, 16),
-        new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.95, roughness: 0.05 })
-      );
-      lens.position.set(mx + (mx > 0 ? 0.031 : -0.031), 0.52, 0.89);
-      lens.rotation.y = mx > 0 ? Math.PI / 6 : -Math.PI / 6;
-      chassisGroup.add(lens);
-    });
-
-    // Cockpit Interior: Twin Contoured High-Back Bucket Seats with Headrests
-    [-0.22, 0.22].forEach((sx) => {
-      const seatBase = new THREE.Mesh(
-        new THREE.BoxGeometry(0.28, 0.10, 0.30),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 })
-      );
-      seatBase.position.set(sx, 0.24, 0.62);
-      chassisGroup.add(seatBase);
-
-      const seatBack = new THREE.Mesh(
-        new THREE.BoxGeometry(0.28, 0.34, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 })
-      );
-      seatBack.position.set(sx, 0.44, 0.48);
-      chassisGroup.add(seatBack);
-
-      const headrest = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.10, 0.06),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b })
-      );
-      headrest.position.set(sx, 0.64, 0.48);
-      chassisGroup.add(headrest);
-    });
-
-    // Off-Road Steering Yoke & Glowing Digital Tactical HUD Console
-    const steeringYoke = new THREE.Mesh(
-      new THREE.TorusGeometry(0.09, 0.016, 8, 16),
-      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 })
+    // Cabinet Faceplate in Industrial Warning Amber
+    const faceplate = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.34, 0.44),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.25, metalness: 0.4 })
     );
-    steeringYoke.rotation.x = Math.PI / 3;
-    steeringYoke.position.set(-0.2, 0.42, 0.82);
-    chassisGroup.add(steeringYoke);
+    faceplate.position.set(0, 0, 0.172);
+    cabinetGroup.add(faceplate);
 
-    const hudGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.26, 0.11),
+    // Diagnostic Digital Telemetry LCD Screen (Glowing Cyan Display)
+    const lcdScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.24, 0.12),
       new THREE.MeshBasicMaterial({ color: 0x06b6d4 })
     );
-    hudGlow.rotation.x = -Math.PI / 4;
-    hudGlow.position.set(-0.2, 0.40, 0.94);
-    chassisGroup.add(hudGlow);
+    lcdScreen.position.set(0, 0.10, 0.175);
+    cabinetGroup.add(lcdScreen);
 
-    // =========================================================================
-    // Tubular High-Strength Exoskeleton Roll Cage (ROPS) wrapping Cab & Tank
-    // =========================================================================
-    const cageMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      metalness: 0.92,
-      roughness: 0.2
-    });
-
-    // A-Pillar Upright Bars
-    [-0.50, 0.50].forEach((cx) => {
-      const aPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.72, 12), cageMat);
-      aPillar.position.set(cx, 0.45, 1.02);
-      aPillar.rotation.x = -0.16;
-      chassisGroup.add(aPillar);
-    });
-
-    // B-Pillar Central Arch Bars
-    [-0.50, 0.50].forEach((cx) => {
-      const bPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.68, 12), cageMat);
-      bPillar.position.set(cx, 0.48, 0.32);
-      chassisGroup.add(bPillar);
-    });
-
-    // Lateral Roof Halo Connecting Tubes
-    [-0.50, 0.50].forEach((cx) => {
-      const sideHalo = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.020, 0.74, 12), cageMat);
-      sideHalo.rotation.x = Math.PI / 2;
-      sideHalo.position.set(cx, 0.78, 0.67);
-      chassisGroup.add(sideHalo);
-    });
-
-    // Transverse Roof Bars
-    [0.34, 0.98].forEach((cz) => {
-      const crossHalo = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.020, 1.0, 12), cageMat);
-      crossHalo.rotation.z = Math.PI / 2;
-      crossHalo.position.set(0, 0.79, cz);
-      chassisGroup.add(crossHalo);
-    });
-
-    // Rear Tank Protector Hoops
-    [-0.50, 0.50].forEach((cx) => {
-      const rearLong = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.020, 1.45, 12), cageMat);
-      rearLong.rotation.x = Math.PI / 2;
-      rearLong.position.set(cx, 0.68, -0.42);
-      chassisGroup.add(rearLong);
-    });
-
-    // =========================================================================
-    // Autonomous Sensor Mast (360° LiDAR Puck, Stereo AI Cameras, GNSS RTK Dome)
-    // =========================================================================
-    const mastPylon = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.032, 0.045, 0.22, 12),
-      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+    // Emergency Stop Mushroom Button (Red on High-Visibility Yellow Collar)
+    const eStopCollar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.032, 0.032, 0.015, 16),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15 })
     );
-    mastPylon.position.set(0, 0.88, 0.68);
-    chassisGroup.add(mastPylon);
+    eStopCollar.rotation.x = Math.PI / 2;
+    eStopCollar.position.set(-0.08, -0.06, 0.18);
+    cabinetGroup.add(eStopCollar);
 
-    // Continuous 360-Degree Spinning LiDAR Puck Turret
-    const lidarPuck = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.075, 0.075, 0.09, 20),
-      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.95, roughness: 0.15 })
+    const eStopMushroom = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.026, 0.022, 0.025, 16),
+      new THREE.MeshBasicMaterial({ color: 0xdc2626 })
     );
-    lidarPuck.position.set(0, 1.02, 0.68);
-    chassisGroup.add(lidarPuck);
-    lidarTurretRef.current = lidarPuck;
+    eStopMushroom.rotation.x = Math.PI / 2;
+    eStopMushroom.position.set(-0.08, -0.06, 0.195);
+    cabinetGroup.add(eStopMushroom);
 
-    // Glowing Green Laser Optical Ring on spinning LiDAR
-    const laserAperture = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.076, 0.076, 0.022, 20),
-      new THREE.MeshBasicMaterial({ color: 0x10b981 })
-    );
-    laserAperture.position.set(0, 0, 0);
-    lidarPuck.add(laserAperture);
-
-    // Forward and Rear Stereoscopic AI Depth Vision Cameras
-    [0.10, -0.10].forEach((camZ) => {
-      const camBar = new THREE.Mesh(
-        new THREE.BoxGeometry(0.24, 0.045, 0.06),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
+    // Dual Analog Pressure Gauges (Cylinder Line 0-250 bar & Vacuum Line)
+    [-0.05, 0.05].forEach((gx) => {
+      const dial = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.028, 0.028, 0.015, 16),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.1, metalness: 0.9 })
       );
-      camBar.position.set(0, 0.94, 0.68 + camZ);
-      chassisGroup.add(camBar);
+      dial.rotation.x = Math.PI / 2;
+      dial.position.set(gx + 0.05, -0.06, 0.18);
+      cabinetGroup.add(dial);
 
-      // Dual stereoscopic optical lenses per bar
-      [-0.09, 0.09].forEach((lx) => {
-        const lens = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.016, 0.016, 0.012, 12),
-          new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
-        );
-        lens.rotation.x = Math.PI / 2;
-        lens.position.set(lx, 0.94, 0.68 + camZ + (camZ > 0 ? 0.032 : -0.032));
-        chassisGroup.add(lens);
-      });
-    });
-
-    // GNSS RTK High-Precision Satellite Navigation Dome
-    const gnssBase = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.06, 0.02, 16),
-      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8 })
-    );
-    gnssBase.position.set(0.28, 0.81, 0.62);
-    chassisGroup.add(gnssBase);
-
-    const gnssDome = new THREE.Mesh(
-      new THREE.SphereGeometry(0.055, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
-      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.15 })
-    );
-    gnssDome.position.set(0.28, 0.82, 0.62);
-    chassisGroup.add(gnssDome);
-
-    // High-Intensity 12-LED Roof Brow Off-Road Light Bar
-    const lightBarHousing = new THREE.Mesh(
-      new THREE.BoxGeometry(0.72, 0.05, 0.06),
-      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.95, roughness: 0.2 })
-    );
-    lightBarHousing.position.set(0, 0.81, 0.98);
-    chassisGroup.add(lightBarHousing);
-
-    for (let led = 0; led < 12; led++) {
-      const emitter = new THREE.Mesh(
-        new THREE.BoxGeometry(0.035, 0.025, 0.015),
-        new THREE.MeshBasicMaterial({ color: isNightMode ? 0xfffae0 : 0xf8fafc })
-      );
-      emitter.position.set(-0.30 + led * 0.055, 0.81, 1.012);
-      chassisGroup.add(emitter);
-    }
-
-    // Dual Communication High-Frequency Whip Antennas
-    [-0.38, 0.38].forEach((ax) => {
-      const springBase = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.014, 0.014, 0.06, 8),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
-      );
-      springBase.position.set(ax, 0.80, 0.38);
-      chassisGroup.add(springBase);
-
-      const whip = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.004, 0.008, 0.65, 8),
+      const dialBezel = new THREE.Mesh(
+        new THREE.TorusGeometry(0.03, 0.005, 8, 16),
         galvanizedMat
       );
-      whip.rotation.x = -0.15;
-      whip.position.set(ax, 1.10, 0.34);
-      chassisGroup.add(whip);
+      dialBezel.position.set(gx + 0.05, -0.06, 0.188);
+      cabinetGroup.add(dialBezel);
     });
 
-    // Cab Roof Emergency LED Strobe Beacon
-    const beacon = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.06, 0.08, 16),
-      new THREE.MeshBasicMaterial({ color: isRolloverTriggered ? 0xef4444 : 0xf59e0b })
+    // 4-Bank Hydraulic Manual Control Levers (Spool Valve Bank)
+    for (let l = 0; l < 4; l++) {
+      const leverStem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.004, 0.004, 0.055, 8),
+        galvanizedMat
+      );
+      leverStem.rotation.x = Math.PI / 6;
+      leverStem.position.set(-0.10 + l * 0.065, -0.14, 0.19);
+      cabinetGroup.add(leverStem);
+
+      const knob = new THREE.Mesh(
+        new THREE.SphereGeometry(0.009, 8, 8),
+        new THREE.MeshStandardMaterial({ color: l === 0 ? 0xdc2626 : 0x0284c7 })
+      );
+      knob.position.set(-0.10 + l * 0.065, -0.115, 0.205);
+      cabinetGroup.add(knob);
+    }
+
+    // High-Mounted Rotating Amber Hazard Strobe Beacon
+    const beaconPost = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8),
+      galvanizedMat
     );
-    beacon.position.set(-0.28, 0.83, 0.62);
-    chassisGroup.add(beacon);
+    beaconPost.position.set(0.12, 0.38, 0);
+    cabinetGroup.add(beaconPost);
+
+    const beacon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.08, 16),
+      new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+    );
+    beacon.position.set(0.12, 0.58, 0);
+    cabinetGroup.add(beacon);
     roofBeaconRef.current = beacon;
 
-    // 400L Sludge Vacuum Holding Tank (Photorealistic Clearcoat PBR)
+    // Compact Autonomous Sensor Mast (Turret with spinning LiDAR)
+    const sensorMast = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.28, 8),
+      galvanizedMat
+    );
+    sensorMast.position.set(-0.12, 0.35, 0);
+    cabinetGroup.add(sensorMast);
+
+    const lidarPuck = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.07, 16),
+      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.9, roughness: 0.2 })
+    );
+    lidarPuck.position.set(-0.12, 0.52, 0);
+    cabinetGroup.add(lidarPuck);
+    lidarTurretRef.current = lidarPuck;
+
+    const laserRing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.062, 0.062, 0.015, 16),
+      new THREE.MeshBasicMaterial({ color: 0x10b981 })
+    );
+    lidarPuck.add(laserRing);
+
+    // 3. High-Torque Macerator & Progressive Cavity Slurry Pump (Front Right: x = 0.28, z = 0.65)
+    const pumpGroup = new THREE.Group();
+    pumpGroup.position.set(0.28, 0.26, 0.65);
+    chassisGroup.add(pumpGroup);
+
+    // Cast-Iron Pump Barrel & Stator in Industrial Amber
+    const pcPumpBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 0.44, 16),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.3 })
+    );
+    pcPumpBody.rotation.x = Math.PI / 2;
+    pcPumpBody.castShadow = true;
+    pumpGroup.add(pcPumpBody);
+
+    // Tungsten Carbide Rotary Chopper Cutting Chamber
+    const chopperChamber = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.12, 16),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.95, roughness: 0.2 })
+    );
+    chopperChamber.rotation.x = Math.PI / 2;
+    chopperChamber.position.set(0, 0, 0.26);
+    pumpGroup.add(chopperChamber);
+
+    // Rotating Tungsten Cutter Blade Disc (spins with pump flow)
+    const chopperBlade = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 0.03, 8),
+      new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.95 })
+    );
+    chopperBlade.rotation.x = Math.PI / 2;
+    chopperBlade.position.set(0, 0, 0.33);
+    pumpGroup.add(chopperBlade);
+    maceratorBladesRef.current = chopperBlade;
+
+    // 3.5 kW Brushless Drive Motor with Heat-Dissipation Fins
+    const pumpMotor = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.10, 0.10, 0.26, 16),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.35 })
+    );
+    pumpMotor.rotation.x = Math.PI / 2;
+    pumpMotor.position.set(0, 0, -0.32);
+    pumpGroup.add(pumpMotor);
+
+    // Steel Braided Slurry Hose connecting Pump to Tank Intake
+    const pumpDischargePipe = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 0.65, 12),
+      galvanizedMat
+    );
+    pumpDischargePipe.rotation.x = Math.PI / 3;
+    pumpDischargePipe.position.set(-0.12, 0.18, -0.15);
+    pumpGroup.add(pumpDischargePipe);
+
+    // 4. Motorized Heavy-Duty Hose Reel Assembly (Mounted Centrally: x = 0, y = 0.42, z = 0.78)
+    const reelGroup = new THREE.Group();
+    reelGroup.position.set(0, 0.42, 0.78);
+    chassisGroup.add(reelGroup);
+
+    [-0.22, 0.22].forEach((bx) => {
+      const aFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.34, 0.22),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85 })
+      );
+      aFrame.position.set(bx, 0, 0);
+      reelGroup.add(aFrame);
+
+      const drumDisc = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.24, 0.02, 24),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 })
+      );
+      drumDisc.rotation.z = Math.PI / 2;
+      drumDisc.position.set(bx > 0 ? 0.18 : -0.18, 0.08, 0);
+      reelGroup.add(drumDisc);
+    });
+
+    const hoseCoil = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.22, 0.34, 20),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.45, metalness: 0.1 })
+    );
+    hoseCoil.rotation.z = Math.PI / 2;
+    hoseCoil.position.set(0, 0.08, 0);
+    reelGroup.add(hoseCoil);
+
+    // 5. Articulated 2-Segment Robotic Crane Suction Boom Arm (Front Center: x = 0, y = 0.30, z = 1.10)
+    const boomGroup = new THREE.Group();
+    boomGroup.position.set(0, 0.30, 1.10);
+    chassisGroup.add(boomGroup);
+    suctionArmRef.current = boomGroup;
+
+    // Turntable Slewing Pedestal
+    const slewingRing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.14, 0.08, 16),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
+    );
+    boomGroup.add(slewingRing);
+
+    // Primary Boom Arm (Industrial Safety Amber)
+    const primaryBoom = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.08, 0.72),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.25 })
+    );
+    primaryBoom.rotation.x = Math.PI / 4;
+    primaryBoom.position.set(0, 0.26, 0.24);
+    primaryBoom.castShadow = true;
+    boomGroup.add(primaryBoom);
+
+    // Chrome Hydraulic Lift Cylinder for Boom
+    const boomRamCyl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.026, 0.026, 0.38, 12),
+      galvanizedMat
+    );
+    boomRamCyl.rotation.x = Math.PI / 3;
+    boomRamCyl.position.set(0.06, 0.16, 0.14);
+    boomGroup.add(boomRamCyl);
+
+    const boomRamRod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.016, 0.016, 0.24, 12),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.98, roughness: 0.05 })
+    );
+    boomRamRod.rotation.x = Math.PI / 3;
+    boomRamRod.position.set(0.06, 0.25, 0.22);
+    boomGroup.add(boomRamRod);
+
+    // Secondary Articulated Jib Arm
+    const secondaryJib = new THREE.Mesh(
+      new THREE.BoxGeometry(0.065, 0.065, 0.58),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.25 })
+    );
+    secondaryJib.rotation.x = -Math.PI / 6;
+    secondaryJib.position.set(0, 0.46, 0.62);
+    boomGroup.add(secondaryJib);
+
+    // Flexible Extraction Hose routed along boom
+    const boomHose = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.034, 0.034, 1.15, 16),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 })
+    );
+    boomHose.rotation.x = Math.PI / 4;
+    boomHose.position.set(0, 0.28, 0.40);
+    boomGroup.add(boomHose);
+
+    // Heavy Cast Stainless Steel Suction Nozzle at Boom Tip
+    const suctionNozzle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.036, 0.18, 16),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.95, roughness: 0.15 })
+    );
+    suctionNozzle.rotation.x = Math.PI / 2;
+    suctionNozzle.position.set(0, 0.38, 0.88);
+    boomGroup.add(suctionNozzle);
+
+    // =========================================================================
+    // 400L SLUDGE VACUUM HOLDING TANK WITH ADVANCED CUTAWAY INSPECTION PROFILE
+    // =========================================================================
     const tankRadius = 0.38;
     const tankLength = 1.35;
+    const isCutawayMode = cutawayOpacity < 0.85;
+
     const tankMat = new THREE.MeshPhysicalMaterial({
-      color: isXRayMode ? 0x06b6d4 : 0x0284c7,
-      metalness: 0.35,
-      roughness: 0.18,
-      transmission: 0.75,
-      transparent: true,
-      opacity: cutawayOpacity,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.1
+      color: isCutawayMode ? 0x38bdf8 : 0x0f766e,
+      metalness: isCutawayMode ? 0.2 : 0.6,
+      roughness: isCutawayMode ? 0.1 : 0.28,
+      transparent: isCutawayMode,
+      opacity: isCutawayMode ? Math.max(0.18, cutawayOpacity) : 1.0,
+      depthWrite: !isCutawayMode,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.12
     });
+    tankMatRef.current = tankMat;
+
     const tankCylinder = new THREE.Mesh(
       new THREE.CylinderGeometry(tankRadius, tankRadius, tankLength, 32),
       tankMat
@@ -2473,61 +2460,28 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     batteryMeshRef.current = batteryCase;
     chassisGroup.add(batteryGroup);
 
-    // Progressive Cavity Macerator Pump & Cutter Blades
-    const pumpMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.42, 0.34, 0.3),
-      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.7, roughness: 0.3 })
+    // Rear Hydraulic Power Unit (HPU) Oil Reservoir & High-Pressure Filtration Manifold
+    const hpuTank = new THREE.Mesh(
+      new THREE.BoxGeometry(0.38, 0.28, 0.24),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3 })
     );
-    pumpMesh.position.set(0, 0.22, -1.02);
-    chassisGroup.add(pumpMesh);
+    hpuTank.position.set(0, 0.22, -1.02);
+    chassisGroup.add(hpuTank);
 
-    const bladeMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.12, 0.04, 8),
-      new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.95 })
-    );
-    bladeMesh.rotation.x = Math.PI / 2;
-    bladeMesh.position.set(0, 0.22, -1.18);
-    maceratorBladesRef.current = bladeMesh;
-    chassisGroup.add(bladeMesh);
-
-    // Dual Hose Reels: Vacuum Hose Reel & Hydro-Jetting Auxiliary Reel
-    const reelMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.25, 0.25, 0.32, 16),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 })
-    );
-    reelMesh.rotation.z = Math.PI / 2;
-    reelMesh.position.set(0, 0.44, -1.02);
-    chassisGroup.add(reelMesh);
-
-    // Deployable Articulated Robotic Suction Arm & Corrugated Hose
-    const suctionArmGroup = new THREE.Group();
-    suctionArmRef.current = suctionArmGroup;
-    suctionArmGroup.position.set(0, 0.55, -1.02);
-    chassisGroup.add(suctionArmGroup);
-
-    const boomArm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.04, 0.04, 0.8, 12),
-      new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.8 })
-    );
-    boomArm.rotation.x = Math.PI / 4;
-    boomArm.position.set(0, 0.3, -0.3);
-    suctionArmGroup.add(boomArm);
-
-    // Double-acting hydraulic cylinder on boom arm
-    const boomCylinder = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.025, 0.025, 0.45, 12),
+    const hpuFilter = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.045, 0.18, 12),
       galvanizedMat
     );
-    boomCylinder.rotation.x = Math.PI / 3;
-    boomCylinder.position.set(0.06, 0.2, -0.2);
-    suctionArmGroup.add(boomCylinder);
+    hpuFilter.position.set(0.14, 0.26, -1.14);
+    chassisGroup.add(hpuFilter);
 
-    const hoseMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035, 0.035, 1.2, 16),
-      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35 })
+    const hpuMotor = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.065, 0.065, 0.18, 16),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
     );
-    hoseMesh.position.set(0, -0.2, -0.6);
-    suctionArmGroup.add(hoseMesh);
+    hpuMotor.rotation.x = Math.PI / 2;
+    hpuMotor.position.set(-0.12, 0.24, -1.14);
+    chassisGroup.add(hpuMotor);
 
     // 4 Articulated Hydraulic Outrigger Stabilizer Legs with Swivel Footpads attached to Rams
     outriggersRef.current = [];
@@ -3319,8 +3273,8 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             }
 
             const manifoldPt = vehicleGroupRef.current
-              ? vehicleGroupRef.current.localToWorld(new THREE.Vector3(0, 0.55, -1.02))
-              : activeWorksitePt.clone().add(new THREE.Vector3(0, 0.98, -1.28));
+              ? vehicleGroupRef.current.localToWorld(new THREE.Vector3(0, 0.45, 1.10))
+              : activeWorksitePt.clone().add(new THREE.Vector3(0, 0.98, 1.10));
 
             const dynamicHoseCurve = new THREE.CatmullRomCurve3([
               activeWorksitePt,
@@ -4144,9 +4098,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       }
     }
 
-    // Tank Transparency
-    if (tankCylinderRef.current) {
-      (tankCylinderRef.current.material as THREE.MeshPhysicalMaterial).opacity = cutawayOpacity;
+    // Tank Transparency & Cutaway Shader Settings
+    if (tankMatRef.current) {
+      const isCutaway = cutawayOpacity < 0.85;
+      tankMatRef.current.transparent = isCutaway;
+      tankMatRef.current.opacity = isCutaway ? Math.max(0.18, cutawayOpacity) : 1.0;
+      tankMatRef.current.depthWrite = !isCutaway;
+      tankMatRef.current.color.setHex(isCutaway ? 0x38bdf8 : 0x0f766e);
+      tankMatRef.current.needsUpdate = true;
     }
 
     // 3D Floating CAD Dimensions & Rollover Safety Pyramid Visibility
@@ -4265,14 +4224,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     setInterlockWarning(null);
   };
 
-  // Manual Piston Handlers with Interlocks
+  // Manual Piston Handlers with Strict Interlocks
   const handleExtendPiston = () => {
-    if (driveMode !== 'parked' && driveMode !== 'desludge') {
-      setInterlockWarning('MOTION INTERLOCK: Compaction piston operation blocked while vehicle is in motion!');
+    if (driveMode !== 'parked' || vehicleSpeedKmh > 0.1) {
+      setInterlockWarning('MOTION INTERLOCK: Compaction piston operation prohibited while vehicle is in motion!');
       return;
     }
-    if (desludgeStage === 'pumping') {
-      setInterlockWarning('SUCTION INTERLOCK: Cannot compact sludge bed during active vacuum extraction!');
+    if (desludgeStage === 'pumping' || missionStage === 'extracting') {
+      setInterlockWarning('SUCTION INTERLOCK: Cannot compact sludge bed while extraction pump is actively pumping!');
       return;
     }
     setInterlockWarning(null);
@@ -5011,8 +4970,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 step="5"
                 value={pistonStrokeMm}
                 onChange={(e) => {
-                  if (driveMode !== 'parked') {
+                  if (driveMode !== 'parked' || vehicleSpeedKmh > 0.1) {
                     setInterlockWarning('MOTION INTERLOCK: Cannot manually adjust piston while vehicle is moving.');
+                    return;
+                  }
+                  if (desludgeStage === 'pumping' || missionStage === 'extracting') {
+                    setInterlockWarning('SUCTION INTERLOCK: Cannot manually adjust piston while extraction pump is operating.');
                     return;
                   }
                   const val = parseInt(e.target.value);
@@ -5083,7 +5046,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             <div className="pt-2 border-t border-slate-800">
               <div className="flex items-center justify-center space-x-2">
                 <button
-                  onMouseDown={() => { manualThrottleRef.current = -1; }}
+                  onMouseDown={() => {
+                    if (pistonStrokeMm > 5 || !isTransportLocked) {
+                      setInterlockWarning('TRANSPORT INTERLOCK: Platen extended! Return to 0mm & engage Lock Pins before driving.');
+                      return;
+                    }
+                    manualThrottleRef.current = -1;
+                  }}
                   onMouseUp={() => { manualThrottleRef.current = 0; }}
                   className="p-2 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold"
                   title="Reverse Downhill (Down / S)"
@@ -5091,7 +5060,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                   <ArrowDown className="w-4 h-4" />
                 </button>
                 <button
-                  onMouseDown={() => { manualThrottleRef.current = 1; }}
+                  onMouseDown={() => {
+                    if (pistonStrokeMm > 5 || !isTransportLocked) {
+                      setInterlockWarning('TRANSPORT INTERLOCK: Platen extended! Return to 0mm & engage Lock Pins before driving.');
+                      return;
+                    }
+                    manualThrottleRef.current = 1;
+                  }}
                   onMouseUp={() => { manualThrottleRef.current = 0; }}
                   className="p-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
                   title="Accelerate Uphill (Up / W)"
@@ -5148,18 +5123,21 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 className={`py-1 px-1 text-[10px] font-semibold rounded text-center transition ${
                   cameraMode === 'cockpit' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
-                title="Driver cab interior perspective"
+                title="Front operator console and slurry pump perspective"
               >
-                Cockpit
+                Operator
               </button>
               <button
-                onClick={() => setCameraMode('tank')}
+                onClick={() => {
+                  setCameraMode('tank');
+                  setCutawayOpacity(0.35);
+                }}
                 className={`py-1 px-1 text-[10px] font-semibold rounded text-center transition ${
                   cameraMode === 'tank' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
-                title="Lateral cutaway view of fluid & baffles"
+                title="Close-up cutaway inspection of internal piston and sludge bed"
               >
-                Tank Cut
+                Tank Cutaway
               </button>
               <button
                 onClick={() => setCameraMode('desludge')}

@@ -59,8 +59,27 @@ export const App: React.FC = () => {
   const activeView = useSimulationStore((s) => s.activeView);
   const setActiveView = useSimulationStore((s) => s.setActiveView);
 
-  // Field scenario view overlay (if user switches to canyon / mountain / legacy tools)
-  const [legacyView, setLegacyView] = useState<string | null>(null);
+  // Field scenario view overlay (defaults to 'simulation3d' so Mountain Terrain Sim loads immediately at localhost:3000)
+  const [legacyView, setLegacyView] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlView = params.get('view') || params.get('sim');
+      if (urlView === 'mountain' || urlView === 'simulation3d') return 'simulation3d';
+      if (urlView === 'canyon' || urlView === 'canyon3d') return 'canyon3d';
+      if (urlView === 'dashboard') return 'dashboard';
+      if (urlView === 'control' || urlView === 'digitaltwin') return null;
+      const stored = localStorage.getItem('sih_legacy_view');
+      if (stored !== null) return stored === 'none' ? null : stored;
+    }
+    return 'simulation3d';
+  });
+
+  const handleSetLegacyView = (view: string | null) => {
+    setLegacyView(view);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sih_legacy_view', view || 'none');
+    }
+  };
 
   const [site, setSite] = useState<SiteConditions>(DEFAULT_SITE);
   const [weights, setWeights] = useState<EvaluationWeights>(DEFAULT_WEIGHTS);
@@ -106,7 +125,7 @@ export const App: React.FC = () => {
             <span className="font-semibold uppercase">Field Scenario View: {legacyView}</span>
           </div>
           <button
-            onClick={() => setLegacyView(null)}
+            onClick={() => handleSetLegacyView(null)}
             className="flex items-center gap-1.5 px-3 py-1 rounded bg-graphite-800 hover:bg-graphite-700 text-white border border-slate-700 transition"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-safety-400" />
@@ -123,8 +142,8 @@ export const App: React.FC = () => {
               site={site}
               setSite={setSite}
               topChoice={topChoice}
-              onSwitchToMountainSim={() => setLegacyView('simulation3d')}
-              onSwitchToVaultSim={() => setLegacyView('vault3d')}
+              onSwitchToMountainSim={() => handleSetLegacyView('simulation3d')}
+              onSwitchToVaultSim={() => handleSetLegacyView('vault3d')}
             />
           )}
 
@@ -133,8 +152,8 @@ export const App: React.FC = () => {
               site={site}
               setSite={setSite}
               topChoice={topChoice}
-              onSwitchToVaultSim={() => setLegacyView('vault3d')}
-              onSwitchToCanyonSim={() => setLegacyView('canyon3d')}
+              onSwitchToVaultSim={() => handleSetLegacyView('vault3d')}
+              onSwitchToCanyonSim={() => handleSetLegacyView('canyon3d')}
             />
           )}
 
@@ -143,8 +162,8 @@ export const App: React.FC = () => {
               site={site}
               setSite={setSite}
               topChoice={topChoice}
-              onSwitchToMountainSim={() => setLegacyView('simulation3d')}
-              onSwitchToCanyonSim={() => setLegacyView('canyon3d')}
+              onSwitchToMountainSim={() => handleSetLegacyView('simulation3d')}
+              onSwitchToCanyonSim={() => handleSetLegacyView('canyon3d')}
             />
           )}
 
@@ -158,7 +177,7 @@ export const App: React.FC = () => {
                 narrative={recommendationData.ai_narrative}
                 recentScenarios={presets}
                 onSelectScenario={(sc) => setSite(sc.site_conditions)}
-                onNavigateTab={(tab) => setLegacyView(tab)}
+                onNavigateTab={(tab) => handleSetLegacyView(tab)}
               />
             </div>
           )}
@@ -166,7 +185,7 @@ export const App: React.FC = () => {
       ) : (
         <div className="flex-1 flex overflow-hidden">
           {/* Left Navigation Rail */}
-          <LeftNavigation onOpenLegacyView={(viewId) => setLegacyView(viewId)} />
+          <LeftNavigation onOpenLegacyView={(viewId) => handleSetLegacyView(viewId)} />
 
           {/* Primary View Display */}
           <main className="flex-1 flex flex-col overflow-hidden bg-graphite-950">
