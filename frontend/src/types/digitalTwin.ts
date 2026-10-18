@@ -93,3 +93,34 @@ export interface ComponentInspectionData {
   description: string;
   specifications: Record<string, string>;
 }
+
+export type DemoStageId =
+  | 'idle_staging'
+  | 'deploy_stabilizers'
+  | 'prime_pump'
+  | 'extract_sludge'
+  | 'discharge_transfer'
+  | 'complete_summary';
+
+export interface DemoStageInfo {
+  id: DemoStageId;
+  stepNumber: number;
+  title: string;
+  subtitle: string;
+  operatingStateTarget: string;
+  cameraPreset: CameraPreset;
+  selectedComponent: string | null;
+  durationSec: number;
+  overview: string;
+  engineeringContext: string;
+  keyMetrics: string[];
+  sensors: string[];
+}
+
+export interface GuidedDemoState {
+  isActive: boolean;
+  currentStageIndex: number;
+  stageProgressPct: number;
+  isAutoAdvancing: boolean;
+  stageElapsedSec: number;
+}

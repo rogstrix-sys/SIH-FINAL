@@ -33,6 +33,7 @@ export const Simulation3DView: React.FC = () => {
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
   const telemetry = useSimulationStore((s) => s.telemetry);
   const parameters = useSimulationStore((s) => s.parameters);
+  const startGuidedDemo = useSimulationStore((s) => s.startGuidedDemo);
 
   const selectedScenario = useSimulationStore((s) => s.selectedScenario);
   const setTerrainScenario = useSimulationStore((s) => s.setTerrainScenario);
@@ -106,6 +107,14 @@ export const Simulation3DView: React.FC = () => {
             >
               <TableProperties className="w-3 h-3" />
               Compare
+            </button>
+            <button
+              onClick={startGuidedDemo}
+              title="Launch step-by-step interactive guided demonstration tour"
+              className="text-amber-400 hover:text-amber-300 px-1.5 py-1 text-[11px] flex items-center gap-1 border-l border-slate-800 pl-2 font-semibold"
+            >
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              Demo Tour
             </button>
           </div>
 

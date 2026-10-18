@@ -15,7 +15,13 @@ export const HoseNozzle: React.FC = () => {
   const waterJetEnabled = useSimulationStore((s) => s.parameters.waterJetEnabled);
   const wireframe = useSimulationStore((s) => s.displayOptions.wireframe);
 
+  const deployProgress = useSimulationStore((s) => s.kinematics.deployProgress);
   const isSelected = selectedComponentId === 'nozzle';
+
+  const p = Math.max(0.05, Math.min(1.0, deployProgress));
+  const nozzleX = THREE.MathUtils.lerp(0.95, 2.9, p);
+  const nozzleY = THREE.MathUtils.lerp(0.85, -1.25, p);
+  const nozzleZ = THREE.MathUtils.lerp(-0.45, -1.6, p);
 
   useFrame((_, delta) => {
     // Spin internal cutter blades if enabled during extraction
@@ -26,7 +32,7 @@ export const HoseNozzle: React.FC = () => {
 
   return (
     <group
-      position={[2.9, -1.25, -1.6]}
+      position={[nozzleX, nozzleY, nozzleZ]}
       onClick={(e) => {
         e.stopPropagation();
         setSelectedComponent('nozzle');

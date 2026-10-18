@@ -10,7 +10,8 @@ import {
   Layers,
   OctagonAlert,
   ArrowRightCircle,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { Button } from './ui/Button';
@@ -24,6 +25,9 @@ export const Header: React.FC = () => {
   const elapsedTime = useSimulationStore((s) => s.telemetry.elapsedTimeSeconds);
   const simSpeed = useSimulationStore((s) => s.simSpeed);
   const alarmsActive = useSimulationStore((s) => s.alarmsActive);
+  const guidedDemo = useSimulationStore((s) => s.guidedDemo);
+  const startGuidedDemo = useSimulationStore((s) => s.startGuidedDemo);
+  const stopGuidedDemo = useSimulationStore((s) => s.stopGuidedDemo);
   
   const startSimulation = useSimulationStore((s) => s.startSimulation);
   const pauseSimulation = useSimulationStore((s) => s.pauseSimulation);
@@ -123,6 +127,18 @@ export const Header: React.FC = () => {
 
       {/* Right: Master Simulation Controls */}
       <div className="flex items-center gap-2">
+        {/* Guided Demonstration Tour Trigger */}
+        <Button
+          variant={guidedDemo.isActive ? 'primary' : 'secondary'}
+          size="sm"
+          onClick={guidedDemo.isActive ? stopGuidedDemo : startGuidedDemo}
+          icon={<Sparkles className={`w-3.5 h-3.5 ${guidedDemo.isActive ? 'text-amber-300' : 'text-safety-400'}`} />}
+          title="Launch step-by-step interactive engineering demonstration tour"
+          className={guidedDemo.isActive ? 'bg-safety-600 hover:bg-safety-500 font-bold border-safety-400 shadow-md shadow-safety-950/50' : 'border-safety-600/40 text-safety-300 hover:bg-safety-950/40'}
+        >
+          <span className="hidden sm:inline">{guidedDemo.isActive ? 'Demo Active' : 'Guided Demo'}</span>
+        </Button>
+
         {/* Start / Pause Button */}
         {operatingState !== 'FAULT' ? (
           <Button

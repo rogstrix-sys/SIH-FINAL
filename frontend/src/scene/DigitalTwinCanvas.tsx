@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useSimulationStore } from '../store/useSimulationStore';
@@ -164,6 +164,23 @@ export const DigitalTwinCanvas: React.FC<DigitalTwinCanvasProps> = ({ className 
         {/* Secondary Warm Under-Chassis Fill Light */}
         <directionalLight position={[-10, 6, -8]} intensity={0.4} color="#fed7aa" />
 
+        {/* Crisp Edge / Silhouette Rim Backlight */}
+        <directionalLight position={[0, 8, -14]} intensity={0.5} color="#38bdf8" />
+
+        {/* Soft Warm Chassis Undercarriage Glow */}
+        <pointLight position={[0, 0.45, 0]} intensity={0.6} distance={4} color="#fb923c" />
+
+        {/* Ground Occlusion Contact Shadows */}
+        <ContactShadows
+          position={[0, -0.01, 0]}
+          opacity={0.65}
+          scale={24}
+          blur={2.2}
+          far={4.5}
+          resolution={1024}
+          color="#030712"
+        />
+
         {/* Spotlight shining down the Septic Tank Access Chimney */}
         {godRays && (
           <spotLight
@@ -178,7 +195,7 @@ export const DigitalTwinCanvas: React.FC<DigitalTwinCanvasProps> = ({ className 
         )}
 
         {/* Subterranean Cyan Worklight for Septic Vault */}
-        <pointLight position={[2.9, -0.6, -1.6]} intensity={1.5} distance={5} color="#06b6d4" />
+        <pointLight position={[2.9, -0.6, -1.6]} intensity={1.8} distance={5.5} color="#06b6d4" />
 
         {/* Complete Plausible Mechanized Desludging Unit & Scene */}
         <MachineDigitalTwinScene />

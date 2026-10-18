@@ -14,8 +14,10 @@ import {
   TelemetryPoint,
   EventLogItem,
   DisplayOptions,
-  ComponentInspectionData
+  ComponentInspectionData,
+  GuidedDemoState
 } from '../types/digitalTwin';
+import { DEMO_STAGES } from '../simulation/guidedDemoData';
 import {
   OperatingState,
   EngineState,
@@ -279,6 +281,15 @@ export interface SimulationStore {
   setTerrainScenario: (id: TerrainScenarioId) => void;
   updateTerrainParams: (partial: Partial<TerrainParameters>) => void;
   updateStabilityThresholds: (partial: Partial<StabilityThresholds>) => void;
+
+  // Guided Demonstration Tour
+  guidedDemo: GuidedDemoState;
+  startGuidedDemo: () => void;
+  stopGuidedDemo: () => void;
+  nextDemoStage: () => void;
+  prevDemoStage: () => void;
+  setDemoStage: (stageIndex: number) => void;
+  toggleDemoAutoAdvance: () => void;
 }
 
 function syncEngineParamsFromDigitalTwin(
@@ -404,6 +415,14 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       initialParams.hoseDiameterMm,
       DEFAULT_STABILITY_THRESHOLDS
     ),
+
+    guidedDemo: {
+      isActive: false,
+      currentStageIndex: 0,
+      stageProgressPct: 0,
+      isAutoAdvancing: true,
+      stageElapsedSec: 0
+    },
 
     startSimulation: () => {
       const { engine, addEvent } = get();
@@ -803,6 +822,29 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         alarmsActive: alarmCount,
         feasibility: nextFeasibility
       });
+
+      // Update Guided Demo timer & auto-advance
+      if (state.guidedDemo.isActive) {
+        const stage = DEMO_STAGES[state.guidedDemo.currentStageIndex];
+        if (stage) {
+          const nextElapsed = state.guidedDemo.stageElapsedSec + effectiveDt;
+          const nextProgress = Math.min(100, (nextElapsed / stage.durationSec) * 100);
+
+          if (nextElapsed >= stage.durationSec && state.guidedDemo.isAutoAdvancing) {
+            setTimeout(() => {
+              get().nextDemoStage();
+            }, 0);
+          } else {
+            set((s) => ({
+              guidedDemo: {
+                ...s.guidedDemo,
+                stageElapsedSec: nextElapsed,
+                stageProgressPct: nextProgress
+              }
+            }));
+          }
+        }
+      }
     },
 
     addEvent: (level, source, message) => {
@@ -917,6 +959,101 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           feasibility: nextFeasibility
         };
       });
+    },
+
+    startGuidedDemo: () => {
+      const { resetSimulation, setSimSpeed, setCameraPreset, setSelectedComponent, addEvent } = get();
+      resetSimulation();
+      setSimSpeed(2);
+      const stage = DEMO_STAGES[0];
+      setCameraPreset(stage.cameraPreset);
+      setSelectedComponent(stage.selectedComponent);
+      set({
+        guidedDemo: {
+          isActive: true,
+          currentStageIndex: 0,
+          stageProgressPct: 0,
+          isAutoAdvancing: true,
+          stageElapsedSec: 0
+        }
+      });
+      addEvent('info', 'DEMO_MODE', 'Guided demonstration tour activated: Stage 1 Machine Staging.');
+    },
+
+    stopGuidedDemo: () => {
+      set((s) => ({
+        guidedDemo: {
+          ...s.guidedDemo,
+          isActive: false
+        }
+      }));
+      get().setSimSpeed(1);
+      get().addEvent('info', 'DEMO_MODE', 'Guided demonstration tour concluded. Standard manual control restored.');
+    },
+
+    setDemoStage: (index: number) => {
+      const targetIdx = Math.max(0, Math.min(DEMO_STAGES.length - 1, index));
+      const stage = DEMO_STAGES[targetIdx];
+      const {
+        setCameraPreset,
+        setSelectedComponent,
+        triggerDeploy,
+        triggerPrime,
+        triggerExtract,
+        triggerDischarge,
+        resetSimulation,
+        addEvent
+      } = get();
+
+      setCameraPreset(stage.cameraPreset);
+      setSelectedComponent(stage.selectedComponent);
+
+      if (targetIdx === 0) {
+        resetSimulation();
+      } else if (targetIdx === 1) {
+        triggerDeploy();
+      } else if (targetIdx === 2) {
+        triggerPrime();
+      } else if (targetIdx === 3) {
+        triggerExtract();
+      } else if (targetIdx === 4) {
+        triggerDischarge();
+      }
+
+      set((s) => ({
+        guidedDemo: {
+          ...s.guidedDemo,
+          currentStageIndex: targetIdx,
+          stageElapsedSec: 0,
+          stageProgressPct: 0
+        }
+      }));
+      addEvent('info', 'DEMO_MODE', `Demonstration stage: ${stage.title}`);
+    },
+
+    nextDemoStage: () => {
+      const { guidedDemo, setDemoStage, stopGuidedDemo } = get();
+      if (guidedDemo.currentStageIndex < DEMO_STAGES.length - 1) {
+        setDemoStage(guidedDemo.currentStageIndex + 1);
+      } else {
+        stopGuidedDemo();
+      }
+    },
+
+    prevDemoStage: () => {
+      const { guidedDemo, setDemoStage } = get();
+      if (guidedDemo.currentStageIndex > 0) {
+        setDemoStage(guidedDemo.currentStageIndex - 1);
+      }
+    },
+
+    toggleDemoAutoAdvance: () => {
+      set((s) => ({
+        guidedDemo: {
+          ...s.guidedDemo,
+          isAutoAdvancing: !s.guidedDemo.isAutoAdvancing
+        }
+      }));
     }
   };
 });

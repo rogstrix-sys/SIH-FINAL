@@ -123,9 +123,11 @@ export const ReceiverTank: React.FC = () => {
 
       {/* Flexible Discharge Transfer Conduit (Machine to Receiver) */}
       <mesh position={[1.5, 0.18, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.05, 0.05, 0.8, 16]} />
+        <cylinderGeometry args={[0.055, 0.055, 0.8, 16]} />
         <meshStandardMaterial
-          color={operatingState === 'DISCHARGE' ? '#0284c7' : '#1e293b'}
+          color={operatingState === 'DISCHARGE' ? '#0369a1' : '#1e293b'}
+          emissive={operatingState === 'DISCHARGE' ? '#0284c7' : '#000000'}
+          emissiveIntensity={operatingState === 'DISCHARGE' ? 0.55 : 0.0}
           roughness={0.7}
         />
       </mesh>

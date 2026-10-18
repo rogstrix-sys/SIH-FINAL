@@ -27,7 +27,8 @@ import {
   Mountain,
   Compass,
   Ruler,
-  TableProperties
+  TableProperties,
+  Sparkles
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -96,6 +97,7 @@ export const OverviewDashboard: React.FC = () => {
   const updateParameter = useSimulationStore((s) => s.updateParameter);
   const updateEngineParameter = useSimulationStore((s) => s.updateEngineParameter);
   const setActiveView = useSimulationStore((s) => s.setActiveView);
+  const startGuidedDemo = useSimulationStore((s) => s.startGuidedDemo);
 
   // Viewport / Inspection
   const cameraPreset = useSimulationStore((s) => s.cameraPreset);
@@ -316,7 +318,17 @@ export const OverviewDashboard: React.FC = () => {
               <Cpu className="w-3.5 h-3.5 text-safety-500" />
               Machine Operating Sequence
             </span>
-            <span className="text-[10px] text-slate-400">Deterministic Engine (Δt = 0.05s)</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-400 hidden sm:inline">Δt = 0.05s</span>
+              <button
+                onClick={startGuidedDemo}
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-safety-500/20 hover:bg-safety-500/30 text-safety-400 border border-safety-500/40 text-[10px] font-mono transition"
+                title="Launch Guided Demonstration Tour"
+              >
+                <Sparkles className="w-3 h-3 text-safety-400" />
+                <span>Guided Tour</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">

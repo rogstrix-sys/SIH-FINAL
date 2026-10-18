@@ -6,6 +6,7 @@ import { Simulation3DView } from './components/views/Simulation3DView';
 import { SensorsView } from './components/views/SensorsView';
 import { ParametersView } from './components/views/ParametersView';
 import { ReportsView } from './components/views/ReportsView';
+import { GuidedDemoTour } from './components/GuidedDemoTour';
 
 // Field / Scenario exploration components
 import { CanyonExpedition3D } from './components/canyonSimulation/CanyonExpedition3D';
@@ -89,6 +90,9 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-graphite-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden">
       {/* 1. Global Header */}
       <Header />
+
+      {/* Interactive Guided Demonstration Overlay */}
+      <GuidedDemoTour />
 
       {/* Legacy / Field Scenario Overlay banner if active */}
       {legacyView && (
