@@ -35,6 +35,23 @@ export const DEFAULT_PARAMETERS: SimulationParameters = {
 };
 
 export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
+  chassis: {
+    id: 'chassis',
+    name: 'Heavy-Duty 4-Wheel Mobile Chassis',
+    type: 'Mobility Platform',
+    status: 'nominal',
+    temperatureC: 24.5,
+    pressureBar: 0,
+    vibrationMmS: 0.6,
+    description: 'Narrow-gauge welded box-section steel chassis engineered for restricted-access alleyways and steep mountain slopes.',
+    specifications: {
+      'Track Width': '1.35 m restricted access',
+      'Wheelbase': '2.20 m articulated',
+      'Tires': '26x12.00-12 Heavy Lug Agricultural',
+      'Stabilizers': '4x Hydraulic outrigger pads',
+      'Ground Clearance': '320 mm'
+    }
+  },
   pump: {
     id: 'pump',
     name: 'Tri-Lobe Positive Displacement Vacuum Pump',
@@ -46,30 +63,62 @@ export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
     description: 'Direct-drive rotary lobe pump designed for non-Newtonian viscous septage evacuation without mechanical air lock.',
     specifications: {
       'Displacement': '36 m³/h nominal',
-      'Max Vacuum': '-88 kPa',
+      'Max Vacuum': '-88 kPa continuous',
       'Shaft Power': '11.0 kW rated',
       'Lobe Geometry': 'Helical tri-lobe polyurethane'
     }
   },
-  crawler: {
-    id: 'crawler',
-    name: 'Bandicoot Subsurface Dredging ROV',
-    type: 'Robotic Agitator',
+  tank: {
+    id: 'tank',
+    name: 'On-Board Sludge Collection Vessel',
+    type: 'Containment Vessel',
     status: 'nominal',
-    temperatureC: 22.0,
-    pressureBar: 1.2,
-    vibrationMmS: 1.8,
-    description: 'Tracked submersible robotic crawler equipped with rotary cutter bar and rotating LiDAR obstacle mapping.',
+    temperatureC: 21.0,
+    pressureBar: -0.72,
+    vibrationMmS: 0.4,
+    description: 'Cylindrical pressure-vacuum certified collection tank with sight-glass level tube and hydraulic dump door.',
     specifications: {
-      'Traction': 'Twin independent rubber tracks',
-      'Cutter Speed': '0 - 600 RPM variable',
-      'Submersible Rating': 'IP68 (5m head)',
-      'Telemetry': 'RS-485 umbilical bus'
+      'Working Volume': '2,400 Liters rated',
+      'Shell Thickness': '6.0 mm structural carbon steel',
+      'Sight Gauge': 'Direct optical borosilicate tube',
+      'Inspection Hatch': '450 mm top dome with wing clamps'
+    }
+  },
+  hosereel: {
+    id: 'hosereel',
+    name: 'Powered Hydraulic Hose Reel',
+    type: 'Hose Management',
+    status: 'nominal',
+    temperatureC: 28.0,
+    pressureBar: 120,
+    vibrationMmS: 0.9,
+    description: 'High-torque hydraulic motor reel spooling 35m of heavy-duty spiral wire-reinforced extraction hose.',
+    specifications: {
+      'Drum Capacity': '45 m of Ø100mm hose',
+      'Drive': 'Orbit hydraulic motor with auto-brake',
+      'Swivel Joint': 'Dual O-ring high-vacuum swivel',
+      'Guide Arms': 'Four-roller fairlead guide'
+    }
+  },
+  boom: {
+    id: 'boom',
+    name: 'Articulated Dual-Joint Support Boom',
+    type: 'Hydraulic Manipulator',
+    status: 'nominal',
+    temperatureC: 32.0,
+    pressureBar: 160,
+    vibrationMmS: 1.2,
+    description: '360° slew hydraulic crane arm supporting extraction hose over septic tank opening with twin lift cylinders.',
+    specifications: {
+      'Reach Radius': '4.20 m maximum',
+      'Rotation Range': '270° slew bearing',
+      'Lift Capacity': '250 kg at maximum extension',
+      'Actuation': 'Twin chrome hydraulic cylinders'
     }
   },
   hose: {
     id: 'hose',
-    name: 'Heavy-Duty Reinforced Suction Hose',
+    name: 'Reinforced Suction Hose Conduit',
     type: 'Fluid Conduit',
     status: 'nominal',
     temperatureC: 19.2,
@@ -83,20 +132,36 @@ export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
       'Length': '35 m operational'
     }
   },
-  vault: {
-    id: 'vault',
-    name: 'Reinforced Concrete Subsurface Vault',
-    type: 'Containment Chamber',
+  nozzle: {
+    id: 'nozzle',
+    name: 'Submerged Slurry Jetting Nozzle',
+    type: 'Suction & Agitation Head',
+    status: 'nominal',
+    temperatureC: 17.5,
+    pressureBar: 140,
+    vibrationMmS: 2.8,
+    description: 'Heavy steel suction bell with circular peripheral hydro-jetting manifold for breaking consolidated sludge layers.',
+    specifications: {
+      'Intake Aperture': 'Ø110 mm flared inlet',
+      'Jetting Nozzles': '6x fan carbide inserts',
+      'Jet Pressure': 'Up to 250 bar rated',
+      'Agitation Radius': '0.8 m fluidized cone'
+    }
+  },
+  septictank: {
+    id: 'septictank',
+    name: 'Demonstration Septic Tank (Cutaway)',
+    type: 'Sanitation Vault',
     status: 'nominal',
     temperatureC: 16.5,
     pressureBar: 1.01,
     vibrationMmS: 0.1,
-    description: 'Dual-compartment municipal septic holding chamber with cast-iron access chimney.',
+    description: 'Dual-compartment municipal septic tank model demonstrating sludge settling and supernatant liquid stratification.',
     specifications: {
       'Gross Capacity': '4,200 Liters',
-      'Design Depth': '2.2 m total depth',
-      'Access Chimney': '600 mm clear opening',
-      'Atmosphere': 'Confined Space Category 1'
+      'Baffle Wall': 'Concrete dividing weir',
+      'Access Opening': '600 mm manhole chimney',
+      'Cutaway Wall': 'Architectural cross-section profile'
     }
   }
 };
@@ -196,7 +261,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       showAnnotations: false,
       showParticles: true,
       godRays: true,
-      soundEnabled: false
+      soundEnabled: false,
+      showGrid: true
     },
     selectedComponentId: null,
 

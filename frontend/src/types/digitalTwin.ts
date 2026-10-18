@@ -2,7 +2,7 @@ export type SimulationStatus = 'idle' | 'running' | 'paused' | 'alarm' | 'comple
 
 export type NavView = 'overview' | 'simulation3d' | 'sensors' | 'parameters' | 'reports';
 
-export type CameraPreset = 'iso' | 'cutaway' | 'crawler' | 'pump' | 'top';
+export type CameraPreset = 'reset' | 'iso' | 'top' | 'side' | 'boom' | 'nozzle' | 'cutaway';
 
 export interface SimulationParameters {
   pumpRpm: number;                 // 0 - 3600 RPM
@@ -74,6 +74,7 @@ export interface DisplayOptions {
   showParticles: boolean;
   godRays: boolean;
   soundEnabled: boolean;
+  showGrid: boolean;
 }
 
 export interface ComponentInspectionData {

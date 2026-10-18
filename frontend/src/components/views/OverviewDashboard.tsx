@@ -60,11 +60,13 @@ export const OverviewDashboard: React.FC = () => {
 
   // Camera presets list
   const presets: { id: CameraPreset; label: string }[] = [
-    { id: 'iso', label: 'Isometric' },
-    { id: 'cutaway', label: 'Section Cut' },
-    { id: 'crawler', label: 'ROV Crawler' },
-    { id: 'pump', label: 'Vacuum Skid' },
-    { id: 'top', label: 'Plan View' }
+    { id: 'reset', label: 'Reset' },
+    { id: 'iso', label: 'ISO' },
+    { id: 'top', label: 'Top' },
+    { id: 'side', label: 'Side' },
+    { id: 'boom', label: 'Boom' },
+    { id: 'nozzle', label: 'Nozzle' },
+    { id: 'cutaway', label: 'Cutaway' }
   ];
 
   const gasStatus = telemetry.h2sConcentrationPpm >= 15 || telemetry.ch4ConcentrationPct >= 1.5
@@ -206,6 +208,15 @@ export const OverviewDashboard: React.FC = () => {
                 className="text-[10px] py-1 px-2"
               >
                 <Eye className="w-3 h-3" />
+              </Button>
+              <Button
+                variant={displayOptions.showGrid ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => toggleDisplayOption('showGrid')}
+                title="Toggle Ground Grid"
+                className="text-[10px] py-1 px-2"
+              >
+                Grid
               </Button>
               <Button
                 variant={displayOptions.wireframe ? 'secondary' : 'ghost'}

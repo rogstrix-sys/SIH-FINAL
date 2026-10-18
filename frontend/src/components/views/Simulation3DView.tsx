@@ -28,11 +28,13 @@ export const Simulation3DView: React.FC = () => {
   const parameters = useSimulationStore((s) => s.parameters);
 
   const presets: { id: CameraPreset; label: string; desc: string }[] = [
-    { id: 'iso', label: 'Isometric Overview', desc: 'Standard 45° engineering perspective' },
-    { id: 'cutaway', label: 'Section Cutout', desc: 'Direct elevation view into vault rebar interior' },
-    { id: 'crawler', label: 'Bandicoot ROV Focus', desc: 'Tracking close-up of crawler cutter & intake' },
-    { id: 'pump', label: 'Surface Skid Unit', desc: 'Close-up of vacuum pump and drive motor' },
-    { id: 'top', label: 'Top-down Plan View', desc: 'Orthographic plant layout view' }
+    { id: 'reset', label: 'Reset', desc: 'Standard machine overview perspective' },
+    { id: 'iso', label: 'Isometric', desc: '45° engineering axonometric angle' },
+    { id: 'top', label: 'Top', desc: 'Orthographic plant layout view' },
+    { id: 'side', label: 'Side', desc: 'Direct elevation profile view' },
+    { id: 'boom', label: 'Boom', desc: 'Close-up on crane arm and hose reel' },
+    { id: 'nozzle', label: 'Nozzle', desc: 'Focused on submerged nozzle and slurry fluid' },
+    { id: 'cutaway', label: 'Cutaway', desc: 'Front elevation view into septic vault interior' }
   ];
 
   const selectedData = selectedComponentId ? INSPECTABLE_COMPONENTS[selectedComponentId] : null;
@@ -80,6 +82,14 @@ export const Simulation3DView: React.FC = () => {
               title="Toggle 3D Sensor Callouts"
             >
               Tags
+            </Button>
+            <Button
+              variant={displayOptions.showGrid ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => toggleDisplayOption('showGrid')}
+              title="Toggle Ground Grid"
+            >
+              Grid
             </Button>
             <Button
               variant={displayOptions.godRays ? 'secondary' : 'ghost'}
