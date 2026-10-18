@@ -4279,7 +4279,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-700/50 px-2.5 py-0.5 rounded flex items-center space-x-1">
                 <Rotate3d className="w-3.5 h-3.5" />
-                <span>SIH-26258: 3D Mechanized Desludging Simulator</span>
+                <span>SIH 26258 | Tracked Desludging Vehicle</span>
               </span>
               <span className="text-xs text-slate-400 font-mono">
                 Forward Drive · Paved Mountain Switchback · Zero-Entry Desludging
@@ -4287,7 +4287,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </div>
             <h1 className="text-lg font-bold text-white mt-1 flex items-center space-x-2">
               <Mountain className="w-5 h-5 text-emerald-400" />
-              <span>Full-Physics Mountain Desludging Vehicle & Septic Vault Simulation</span>
+              <span>SIH 26258 | Tracked Desludging Vehicle</span>
             </h1>
             <p className="text-xs text-slate-400 mt-0.5 max-w-2xl">
               Simulating the 1.4m narrow mechanized desludging unit navigating extreme 20°–30° gradients. Features dual longitudinal anti-slosh baffles (-88.9% surge suppression), low-CoM under-chassis battery, and automated zero-entry extraction.
@@ -4710,7 +4710,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           <div className="flex items-center justify-between">
             <span className="font-bold text-white flex items-center space-x-1.5">
               <Activity className="w-4 h-4 text-emerald-400" />
-              <span>Drive & Mission Control</span>
+              <span>SIH 26258 | Tracked Desludging Vehicle</span>
             </span>
             <span
               className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${

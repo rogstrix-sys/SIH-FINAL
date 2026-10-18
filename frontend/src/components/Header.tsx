@@ -76,7 +76,7 @@ export const Header: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-sm sm:text-base font-bold tracking-tight text-white flex items-center gap-2">
-              <span>SIH 26258 | Adaptive Mechanized Desludging Digital Twin</span>
+              <span>SIH 26258 | Tracked Desludging Vehicle</span>
             </h1>
             <Badge variant="safety" size="sm">
               SIH 26258
