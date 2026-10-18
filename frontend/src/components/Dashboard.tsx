@@ -19,7 +19,8 @@ import {
   ShieldAlert,
   Sliders,
   ChevronRight,
-  Box
+  Box,
+  Compass
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { EquipmentRecommendation, SiteConditions, SafetyAssessmentResult, AiNarrative, ScenarioItem } from '../types';
@@ -112,6 +113,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             >
               <Rotate3d className="w-4 h-4" />
               <span>Mountain 3D Sim</span>
+            </button>
+
+            <button
+              onClick={() => onNavigateTab('canyon3d')}
+              className="inline-flex items-center space-x-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-lg shadow-orange-900/30 transition transform hover:-translate-y-0.5"
+            >
+              <Compass className="w-4 h-4" />
+              <span>Canyon Expedition 3D</span>
             </button>
 
             <button

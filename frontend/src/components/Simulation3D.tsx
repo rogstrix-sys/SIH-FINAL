@@ -84,13 +84,15 @@ interface Simulation3DProps {
   setSite?: React.Dispatch<React.SetStateAction<SiteConditions>>;
   topChoice?: EquipmentRecommendation;
   onSwitchToVaultSim?: () => void;
+  onSwitchToCanyonSim?: () => void;
 }
 
 export const Simulation3D: React.FC<Simulation3DProps> = ({
   site,
   setSite,
   topChoice,
-  onSwitchToVaultSim
+  onSwitchToVaultSim,
+  onSwitchToCanyonSim
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -3777,8 +3779,19 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </p>
           </div>
 
-          {/* Quick Actions: Switch to Vault Sim, Audio, X-Ray, Fullscreen */}
+          {/* Quick Actions: Switch to Canyon Sim, Switch to Vault Sim, Audio, X-Ray, Fullscreen */}
           <div className="flex items-center space-x-2 shrink-0">
+            {onSwitchToCanyonSim && (
+              <button
+                onClick={onSwitchToCanyonSim}
+                className="px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center space-x-1.5 transition bg-orange-950/80 border-orange-500/70 text-orange-300 hover:bg-orange-900 shadow-sm"
+                title="Switch to Himalayan Canyon Gorge & Suspension Bridge Expedition"
+              >
+                <Compass className="w-4 h-4 text-orange-400" />
+                <span>Switch to Canyon Sim</span>
+              </button>
+            )}
+
             {onSwitchToVaultSim && (
               <button
                 onClick={onSwitchToVaultSim}

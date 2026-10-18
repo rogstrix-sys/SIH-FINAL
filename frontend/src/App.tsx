@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import { SiteAssessmentForm } from './components/SiteAssessmentForm';
 import { TerrainSimulationSVG } from './components/TerrainSimulationSVG';
 import { Simulation3D } from './components/Simulation3D';
+import { CanyonExpedition3D } from './components/canyonSimulation/CanyonExpedition3D';
 import { SubsurfaceVaultSim3D } from './components/vaultSimulation/SubsurfaceVaultSim3D';
 import { RouteAccessPlanner } from './components/RouteAccessPlanner';
 import { EquipmentComparison } from './components/EquipmentComparison';
@@ -208,6 +209,16 @@ export const App: React.FC = () => {
                 setSite={setSite}
                 topChoice={topChoice}
                 onSwitchToVaultSim={() => setActiveTab('vault3d')}
+                onSwitchToCanyonSim={() => setActiveTab('canyon3d')}
+              />
+            )}
+
+            {activeTab === 'canyon3d' && (
+              <CanyonExpedition3D
+                site={site}
+                setSite={setSite}
+                topChoice={topChoice}
+                onSwitchToMountainSim={() => setActiveTab('simulation3d')}
               />
             )}
 

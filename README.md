@@ -71,6 +71,12 @@ sih 26258/
 │   │   │   ├── SiteAssessmentForm.tsx # Input form with physical bounds checks
 │   │   │   ├── TerrainSimulationSVG.tsx# 2D cross-section SVG simulation
 │   │   │   ├── Simulation3D.tsx       # 3D Mountain Road & Vehicle Stability Simulator
+│   │   │   ├── canyonSimulation/     # 3D Canyon Gorge & Wooden Suspension Bridge Expedition
+│   │   │   │   ├── CanyonExpedition3D.tsx # Primary expedition simulation & WASD manual drive HUD
+│   │   │   │   ├── canyonLandscape.ts # Canyon gorge, wooden suspension bridge & river meshes
+│   │   │   │   ├── canyonVehicle.ts   # 6x6 heavy expedition carrier with independent suspension
+│   │   │   │   ├── canyonParticles.ts # GPU tire dust spray, exhaust soot & waterfall mist
+│   │   │   │   └── canyonAudio.ts     # Procedural diesel engine, turbo whine & air brake synthesizer
 │   │   │   ├── vaultSimulation/       # Complete 3D Subsurface Vault & Robotics Simulator
 │   │   │   │   ├── SubsurfaceVaultSim3D.tsx # Primary vault simulation & HUD component
 │   │   │   │   ├── vaultGeometry.ts   # Dual-chamber vault, Bandicoot ROV & gantry meshes
