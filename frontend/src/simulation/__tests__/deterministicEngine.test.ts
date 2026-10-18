@@ -274,5 +274,135 @@ describe('Deterministic Simulation Engine', () => {
     expect(resetState.kinematics.stabilizerExtension).toBe(0);
     expect(resetState.alarms.emergencyStopActive).toBe(false);
   });
+
+  it('11. Advances through canonical state aliases (IDLE -> DEPLOYMENT -> PRIMING -> EXTRACTION -> DISCHARGE -> COMPLETE)', () => {
+    let state = createInitialEngineState({
+      initialSourceVolumeL: 1000,
+      collectionTankCapacityL: 200,
+      targetExtractionVolumeL: 200
+    });
+    expect(state.operatingState).toBe('IDLE');
+
+    // Set canonical state name DEPLOYMENT
+    state.operatingState = 'DEPLOYMENT';
+    while (state.operatingState === 'DEPLOYMENT') {
+      state = stepSimulationEngine(state, 0.1);
+    }
+    expect(state.operatingState).toBe('PRIMING');
+    expect(state.interlocks.isDeployed).toBe(true);
+
+    while (state.operatingState === 'PRIMING') {
+      state = stepSimulationEngine(state, 0.1);
+    }
+    expect(state.operatingState).toBe('EXTRACTION');
+    expect(state.interlocks.isPrimed).toBe(true);
+
+    while (state.operatingState === 'EXTRACTION') {
+      state = stepSimulationEngine(state, 0.1);
+    }
+    expect(state.operatingState).toBe('DISCHARGE');
+
+    while (state.operatingState === 'DISCHARGE') {
+      state = stepSimulationEngine(state, 0.1);
+    }
+    expect(state.operatingState).toBe('COMPLETE');
+    expect(state.materialBalance.collectionVolumeL).toBe(0);
+    expect(state.materialBalance.receiverVolumeL).toBeCloseTo(200, 1);
+    expect(state.materialBalance.massBalanceDiscrepancyL).toBeLessThan(1e-4);
+  });
+
+  it('12. Blocks DISCHARGE when receiving destination is full or missing (interlock protection)', () => {
+    // Case A: Receiver capacity is zero (missing destination)
+    let stateZeroDest = createInitialEngineState({
+      collectionTankCapacityL: 500,
+      receiverTankCapacityL: 0
+    });
+    stateZeroDest.materialBalance.collectionVolumeL = 300;
+    stateZeroDest = triggerDischarge(stateZeroDest);
+    expect(stateZeroDest.interlocks.preventDischargeNoDestination).toBe(true);
+    expect(stateZeroDest.operatingState).not.toBe('DISCHARGE');
+
+    // Case B: Receiver tanker is already full
+    let stateFullDest = createInitialEngineState({
+      collectionTankCapacityL: 500,
+      receiverTankCapacityL: 2000
+    });
+    stateFullDest.materialBalance.collectionVolumeL = 300;
+    stateFullDest.materialBalance.receiverVolumeL = 2000;
+    stateFullDest = triggerDischarge(stateFullDest);
+    expect(stateFullDest.interlocks.preventDischargeNoDestination).toBe(true);
+    expect(stateFullDest.alarms.receiverTankFull).toBe(true);
+    expect(stateFullDest.operatingState).not.toBe('DISCHARGE');
+
+    // Case C: Receiver fills during active discharge -> auto-halts into FAULT
+    let stateRunningDischarge = createInitialEngineState({
+      collectionTankCapacityL: 500,
+      receiverTankCapacityL: 100 // small receiver capacity
+    });
+    stateRunningDischarge.materialBalance.collectionVolumeL = 300;
+    stateRunningDischarge.materialBalance.receiverVolumeL = 90;
+    stateRunningDischarge.operatingState = 'DISCHARGE';
+
+    // Step discharge until receiver is full
+    for (let i = 0; i < 20; i++) {
+      stateRunningDischarge = stepSimulationEngine(stateRunningDischarge, 0.1);
+    }
+    expect(stateRunningDischarge.operatingState).toBe('FAULT');
+    expect(stateRunningDischarge.interlocks.preventDischargeNoDestination).toBe(true);
+    expect(stateRunningDischarge.alarms.receiverTankFull).toBe(true);
+  });
+
+  it('13. Elevation difference directly increases static head and suction vacuum', () => {
+    const lowElevParams = {
+      ...createInitialEngineState().parameters,
+      elevationDifferenceM: 1.0
+    };
+    const highElevParams = {
+      ...createInitialEngineState().parameters,
+      elevationDifferenceM: 5.0
+    };
+
+    let stateLow = createInitialEngineState(lowElevParams);
+    stateLow.operatingState = 'EXTRACT';
+    stateLow.interlocks.isDeployed = true;
+    stateLow.interlocks.isPrimed = true;
+    stateLow = stepSimulationEngine(stateLow, 0.05);
+
+    let stateHigh = createInitialEngineState(highElevParams);
+    stateHigh.operatingState = 'EXTRACT';
+    stateHigh.interlocks.isDeployed = true;
+    stateHigh.interlocks.isPrimed = true;
+    stateHigh = stepSimulationEngine(stateHigh, 0.05);
+
+    expect(stateHigh.telemetry.staticLiftKpa).toBeGreaterThan(stateLow.telemetry.staticLiftKpa);
+    expect(stateHigh.telemetry.suctionPressureKpa).toBeGreaterThan(stateLow.telemetry.suctionPressureKpa);
+  });
+
+  it('14. PAUSED operating state halts motion and restores previous state on resume', () => {
+    let state = createInitialEngineState();
+    state = triggerStart(state);
+    state.operatingState = 'EXTRACT';
+    state.interlocks.isDeployed = true;
+    state.interlocks.isPrimed = true;
+    state = stepSimulationEngine(state, 0.1);
+    expect(state.telemetry.flowRateLpm).toBeGreaterThan(0);
+
+    // Operator pauses
+    state = triggerPause(state);
+    expect(state.operatingState).toBe('PAUSED');
+    expect(state.isPaused).toBe(true);
+
+    // Step while paused - volume and time unchanged
+    const simTime = state.simulatedTimeSec;
+    const vol = state.materialBalance.collectionVolumeL;
+    state = stepSimulationEngine(state, 0.5);
+    expect(state.simulatedTimeSec).toBe(simTime);
+    expect(state.materialBalance.collectionVolumeL).toBe(vol);
+
+    // Operator resumes
+    state = triggerResume(state);
+    expect(state.operatingState).toBe('EXTRACT');
+    expect(state.isPaused).toBe(false);
+  });
 });
 

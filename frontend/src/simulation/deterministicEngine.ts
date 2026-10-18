@@ -25,6 +25,7 @@ export const DEFAULT_ENGINE_PARAMS: EngineParameters = {
   hoseDiameterMm: 100.0,         // 4 inch (0.100 m)
   hoseLengthM: 35.0,
   pipeRoughnessMm: 0.045,        // Commercial steel / smooth composite
+  elevationDifferenceM: 2.5,     // 2.5 m static lift between septic vault floor and pump inlet
 
   sludgeConsistency: 'viscous',
   sludgeViscosityCp: 450.0,      // 450 cP
@@ -49,6 +50,28 @@ export const DEFAULT_ALARM_LIMITS: AlarmLimits = {
   maxVacuumKpa: 84.0,            // Alarm when suction vacuum >= 84 kPa
   maxMotorPowerKw: 14.5          // Alarm when motor power >= 14.5 kW
 };
+
+/**
+ * Physical Assumptions & Documented Limitations of Simplified Hydraulic Model:
+ * 1. Fluid Rheology: Uses Darcy-Weisbach friction approximation with Swamee-Jain explicit turbulent factor
+ *    and Hagen-Poiseuille laminar law. Real septage / faecal sludge exhibits non-Newtonian shear-thinning
+ *    Bingham plastic or Herschel-Bulkley behavior with yield stress (tau_0) and thixotropic breakdown under shear.
+ * 2. Homogeneous Density: Assumes uniform slurry density (rho = 1,180 kg/m³), neglecting vertical density
+ *    stratification (heavy sand/grit sedimentation at bottom vs. floating buoyant scum at top).
+ * 3. Lumped Minor Losses: Minor loss coefficient K_minor = 2.5 aggregates entry strainer head loss, 90-deg bends,
+ *    quick-camlock couplings, and suction check valve without transient vortex analysis.
+ * 4. Hydro-Jetting Assist: Modeled via an empirical shear-thinning dilution factor (up to 55% effective viscosity reduction)
+ *    rather than two-phase computational fluid dynamics (CFD).
+ * 5. Isothermal Flow: Neglects viscous dissipation heating and temperature-dependent thermal convection along the umbilical hose.
+ */
+export const HYDRAULIC_MODEL_LIMITATIONS: readonly string[] = [
+  'Darcy-Weisbach assumes Newtonian continuum; real faecal sludge is non-Newtonian Bingham plastic with yield stress (tau_0).',
+  'Slurry density is modeled as uniform (1,180 kg/m³), ignoring gravitational grit/scum stratification.',
+  'Turbulent friction factor calculated via Swamee-Jain approximation without acoustic wave or transient water-hammer modeling.',
+  'Lumped minor losses (K=2.5) aggregate hose coil bends, quick-camlock couplings, and suction check valve.',
+  'Hydro-jetting sludge fluidization is approximated by empirical shear reduction factor, not multi-phase CFD.',
+  'Isothermal assumption: does not compute viscous shear thermal dissipation into the fluid stream.'
+] as const;
 
 /**
  * Format simulation seconds into MM:SS display
@@ -131,16 +154,20 @@ export function createInitialEngineState(
       flowRateM3H: 0.0,
       suctionPressureKpa: 0.0,
       dischargePressureKpa: 0.0,
+      staticLiftKpa: 0.0,
+      frictionHeadKpa: 0.0,
       cavitationIndex: 0.0,
       motorPowerKw: 0.0,
       cumulativeEnergyKwh: 0.0,
       specificEnergyKwhM3: 0.0,
-      estimatedRemainingTimeSec: 0
+      estimatedRemainingTimeSec: 0,
+      hydraulicModelLimitations: HYDRAULIC_MODEL_LIMITATIONS
     },
 
     alarms: {
       lowSourceLevel: false,
       collectionTankFull: false,
+      receiverTankFull: false,
       excessiveVacuum: false,
       motorOverload: false,
       emergencyStopActive: false
@@ -153,6 +180,7 @@ export function createInitialEngineState(
       preventExtractNotPrimed: false,
       preventExtractTankFull: false,
       preventExtractSourceEmpty: false,
+      preventDischargeNoDestination: false,
       emergencyStopLatched: false
     },
 
@@ -191,6 +219,7 @@ export function calculateFluidDynamics(
   velocityMs: number;
   reynolds: number;
   frictionHeadKpa: number;
+  staticLiftKpa: number;
   suctionVacuumKpa: number;
   motorPowerKw: number;
   cavitationRisk: number;
@@ -221,8 +250,9 @@ export function calculateFluidDynamics(
   const headLossM = (f * (params.hoseLengthM / dM) + 2.5) * velocityHeadM;
   const frictionHeadKpa = (params.sludgeDensityKgM3 * g * headLossM) / 1000.0;
 
-  // Suction Vacuum: Static lift + Friction + Inlet acceleration
-  const staticLiftKpa = (params.sludgeDensityKgM3 * g * Math.max(0.5, suctionLiftM)) / 1000.0;
+  // Suction Vacuum: Static elevation lift head + Friction head + Inlet acceleration
+  const effectiveLiftM = Math.max(0.5, suctionLiftM);
+  const staticLiftKpa = (params.sludgeDensityKgM3 * g * effectiveLiftM) / 1000.0;
   const suctionVacuumKpa = flowLpm > 5.0 ? staticLiftKpa + frictionHeadKpa : 0.0;
 
   // Hydraulic & Motor Power: P = (deltaP * Q) / 1000 (kW)
@@ -238,6 +268,7 @@ export function calculateFluidDynamics(
     velocityMs,
     reynolds: Math.round(reynolds),
     frictionHeadKpa,
+    staticLiftKpa,
     suctionVacuumKpa,
     motorPowerKw,
     cavitationRisk
@@ -249,7 +280,7 @@ export function calculateFluidDynamics(
  * All state mutations are deterministic, strictly preserving mass balance.
  */
 export function stepSimulationEngine(state: EngineState, dtSeconds: number): EngineState {
-  if (state.isPaused) {
+  if (state.isPaused || state.operatingState === 'PAUSED') {
     return state;
   }
 
@@ -272,10 +303,12 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
   let deployTimer = state.deployTimerSec;
   let primeTimer = state.primeTimerSec;
 
-  // Helper to append simulation events
+  // Deterministic helper to append simulation events
+  let eventSeq = state.events.length;
   const addEvt = (level: SimulationEvent['level'], source: string, message: string) => {
+    eventSeq++;
     newEvents.push({
-      id: `evt-${Math.round(newSimTime * 1000)}-${Math.random().toString(36).substring(2, 6)}`,
+      id: `evt-${Math.round(newSimTime * 1000)}-${eventSeq}`,
       simTimeSec: newSimTime,
       formattedTime,
       state: nextState,
@@ -295,6 +328,8 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
       tel.flowRateLpm = 0.0;
       tel.flowRateM3H = 0.0;
       tel.suctionPressureKpa = 0.0;
+      tel.staticLiftKpa = 0.0;
+      tel.frictionHeadKpa = 0.0;
       tel.motorPowerKw = 0.0;
       kin.isMaterialFlowing = false;
       kin.materialFlowVelocityMs = 0.0;
@@ -303,7 +338,8 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
       break;
     }
 
-    case 'DEPLOY': {
+    case 'DEPLOY':
+    case 'DEPLOYMENT': {
       // Stabilizers extend to ground and boom pivots over septic tank
       deployTimer += dt;
       const DEPLOY_DURATION = 3.5; // seconds
@@ -318,13 +354,14 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
       if (progress >= 1.0 && !itl.isDeployed) {
         itl.isDeployed = true;
         addEvt('info', 'AUTOMATION_SEQ', 'Deployment complete: Stabilizers planted, articulated boom deployed over septic tank.');
-        nextState = 'PRIME';
+        nextState = state.operatingState === 'DEPLOYMENT' ? 'PRIMING' : 'PRIME';
         primeTimer = 0.0;
       }
       break;
     }
 
-    case 'PRIME': {
+    case 'PRIME':
+    case 'PRIMING': {
       // Pump priming and suction line integrity check
       primeTimer += dt;
       const PRIME_DURATION = 2.5; // seconds
@@ -338,12 +375,13 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
       if (progress >= 1.0 && !itl.isPrimed) {
         itl.isPrimed = true;
         addEvt('info', 'AUTOMATION_SEQ', 'Suction line primed and sealed: Vacuum integrity verified.');
-        nextState = 'EXTRACT';
+        nextState = state.operatingState === 'PRIMING' ? 'EXTRACTION' : 'EXTRACT';
       }
       break;
     }
 
-    case 'EXTRACT': {
+    case 'EXTRACT':
+    case 'EXTRACTION': {
       // Interlock checks
       if (!itl.isDeployed) {
         itl.preventExtractNotDeployed = true;
@@ -413,9 +451,12 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
       kin.hoseReelRpm = (params.pumpRpm / params.pumpMaxRpm) * 8.0;
 
       // Fluid dynamics solution
-      const suctionLiftM = Math.max(0.5, 2.5 - mat.sourceLevelM);
+      const drawdownM = Math.max(0.0, 1.85 - mat.sourceLevelM);
+      const suctionLiftM = Math.max(0.5, (params.elevationDifferenceM ?? 2.5) + drawdownM);
       const fd = calculateFluidDynamics(targetFlowLpm, params, effVisc, suctionLiftM);
       tel.suctionPressureKpa = fd.suctionVacuumKpa;
+      tel.staticLiftKpa = fd.staticLiftKpa;
+      tel.frictionHeadKpa = fd.frictionHeadKpa;
       tel.dischargePressureKpa = 45.0;
       tel.motorPowerKw = fd.motorPowerKw;
       tel.cavitationIndex = fd.cavitationRisk;
@@ -458,10 +499,20 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
     }
 
     case 'DISCHARGE': {
+      // Interlock: check receiving destination validity & capacity
+      if (params.receiverTankCapacityL <= 0 || mat.receiverVolumeL >= params.receiverTankCapacityL) {
+        itl.preventDischargeNoDestination = true;
+        alm.receiverTankFull = true;
+        nextState = 'FAULT';
+        addEvt('critical', 'INTERLOCK_VIOLATION', `Discharge blocked: Receiving destination full or invalid (${mat.receiverVolumeL.toFixed(0)} / ${params.receiverTankCapacityL} L).`);
+        break;
+      }
+
       // Transfer material from mobile collection tank to receiver disposal tanker
       const dischargeRate = params.dischargeRateLpm;
       const deltaL = dischargeRate * (dt / 60.0);
-      const actualDischargeL = Math.min(deltaL, mat.collectionVolumeL);
+      const remainingReceiverCapacity = params.receiverTankCapacityL - mat.receiverVolumeL;
+      const actualDischargeL = Math.min(deltaL, mat.collectionVolumeL, remainingReceiverCapacity);
 
       mat.collectionVolumeL = Math.max(0.0, mat.collectionVolumeL - actualDischargeL);
       mat.receiverVolumeL = Math.min(params.receiverTankCapacityL, mat.receiverVolumeL + actualDischargeL);
@@ -478,6 +529,15 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
         tel.motorPowerKw = 0.0;
         addEvt('success', 'CYCLE_COMPLETE', 'Discharge complete: Collection tank evacuated. Entire desludging cycle finished.');
         nextState = 'COMPLETE';
+        break;
+      }
+
+      // If receiver filled up to maximum during discharge
+      if (mat.receiverVolumeL >= params.receiverTankCapacityL) {
+        itl.preventDischargeNoDestination = true;
+        alm.receiverTankFull = true;
+        nextState = 'FAULT';
+        addEvt('critical', 'CAPACITY_LIMIT', `Discharge interrupted: Receiving tanker filled to maximum capacity (${params.receiverTankCapacityL} L).`);
         break;
       }
 
@@ -588,17 +648,29 @@ export function triggerStart(state: EngineState): EngineState {
 }
 
 export function triggerPause(state: EngineState): EngineState {
-  if (state.isPaused || state.operatingState === 'IDLE' || state.operatingState === 'COMPLETE') {
+  if (state.isPaused || state.operatingState === 'PAUSED' || state.operatingState === 'IDLE' || state.operatingState === 'COMPLETE' || state.operatingState === 'FAULT') {
     return state;
   }
-  const next = { ...state, isPaused: true };
+  const next: EngineState = {
+    ...state,
+    isPaused: true,
+    previousState: state.operatingState,
+    operatingState: 'PAUSED'
+  };
   return appendEvent(next, 'warning', 'OPERATOR_CMD', 'Simulation paused by operator.');
 }
 
 export function triggerResume(state: EngineState): EngineState {
-  if (!state.isPaused) return state;
-  const next = { ...state, isPaused: false };
-  return appendEvent(next, 'info', 'OPERATOR_CMD', 'Simulation resumed.');
+  if (!state.isPaused && state.operatingState !== 'PAUSED') return state;
+  const resumedState: OperatingState = state.previousState && state.previousState !== 'PAUSED'
+    ? state.previousState
+    : 'EXTRACT';
+  const next: EngineState = {
+    ...state,
+    isPaused: false,
+    operatingState: resumedState
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', `Simulation resumed: Returning to ${resumedState} state.`);
 }
 
 export function triggerEmergencyStop(state: EngineState): EngineState {
@@ -619,6 +691,8 @@ export function triggerEmergencyStop(state: EngineState): EngineState {
       flowRateLpm: 0.0,
       flowRateM3H: 0.0,
       suctionPressureKpa: 0.0,
+      staticLiftKpa: 0.0,
+      frictionHeadKpa: 0.0,
       motorPowerKw: 0.0
     },
     kinematics: {
@@ -641,13 +715,15 @@ export function triggerResolveFault(state: EngineState): EngineState {
       ...state.alarms,
       emergencyStopActive: false,
       excessiveVacuum: false,
-      motorOverload: false
+      motorOverload: false,
+      receiverTankFull: false
     },
     interlocks: {
       ...state.interlocks,
       emergencyStopLatched: false,
       preventExtractNotDeployed: false,
-      preventExtractNotPrimed: false
+      preventExtractNotPrimed: false,
+      preventDischargeNoDestination: false
     }
   };
   return appendEvent(next, 'info', 'FAULT_RESET', 'Fault acknowledged and reset by operator. Machine restored to IDLE.');
@@ -707,13 +783,29 @@ export function triggerExtract(state: EngineState): EngineState {
 
 export function triggerDischarge(state: EngineState): EngineState {
   if (state.operatingState === 'FAULT') return state;
+  if (!state.parameters.receiverTankCapacityL || state.parameters.receiverTankCapacityL <= 0) {
+    const next = {
+      ...state,
+      interlocks: { ...state.interlocks, preventDischargeNoDestination: true }
+    };
+    return appendEvent(next, 'critical', 'INTERLOCK_BLOCK', 'Cannot DISCHARGE: No valid receiving destination configured (receiver capacity <= 0).');
+  }
+  if (state.materialBalance.receiverVolumeL >= state.parameters.receiverTankCapacityL) {
+    const next = {
+      ...state,
+      interlocks: { ...state.interlocks, preventDischargeNoDestination: true },
+      alarms: { ...state.alarms, receiverTankFull: true }
+    };
+    return appendEvent(next, 'critical', 'INTERLOCK_BLOCK', `Cannot DISCHARGE: Receiving tanker destination is full (${state.parameters.receiverTankCapacityL} L).`);
+  }
   if (state.materialBalance.collectionVolumeL <= 0.5) {
     return appendEvent(state, 'warning', 'DISCHARGE_BLOCK', 'Cannot DISCHARGE: Collection tank has no material to transfer.');
   }
   const next: EngineState = {
     ...state,
     operatingState: 'DISCHARGE',
-    isPaused: false
+    isPaused: false,
+    interlocks: { ...state.interlocks, preventDischargeNoDestination: false }
   };
   return appendEvent(next, 'info', 'OPERATOR_CMD', 'DISCHARGE initiated: Evacuating collection tank to external receiver.');
 }
@@ -733,7 +825,7 @@ function appendEvent(
   message: string
 ): EngineState {
   const newEvt: SimulationEvent = {
-    id: `evt-${Math.round(state.simulatedTimeSec * 1000)}-${Math.random().toString(36).substring(2, 6)}`,
+    id: `evt-${Math.round(state.simulatedTimeSec * 1000)}-${state.events.length + 1}`,
     simTimeSec: state.simulatedTimeSec,
     formattedTime: formatSimTime(state.simulatedTimeSec),
     state: state.operatingState,

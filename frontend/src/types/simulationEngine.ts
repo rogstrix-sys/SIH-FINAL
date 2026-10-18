@@ -15,10 +15,14 @@
 export type OperatingState =
   | 'IDLE'
   | 'DEPLOY'
+  | 'DEPLOYMENT'
   | 'PRIME'
+  | 'PRIMING'
   | 'EXTRACT'
+  | 'EXTRACTION'
   | 'DISCHARGE'
   | 'COMPLETE'
+  | 'PAUSED'
   | 'FAULT';
 
 export type SludgeConsistency = 'liquid' | 'slurry' | 'viscous' | 'thick_crust';
@@ -31,10 +35,11 @@ export interface EngineParameters {
   pumpEfficiency: number;          // 0.0 - 1.0 (default 0.75)
   motorEfficiency: number;         // 0.0 - 1.0 (default 0.88)
   
-  // Umbilical Hose Conduit
+  // Umbilical Hose Conduit & Elevation
   hoseDiameterMm: number;          // 50, 75, 100, 150 mm
   hoseLengthM: number;             // 10 - 100 m
   pipeRoughnessMm: number;         // 0.045 mm (standard steel/PVC)
+  elevationDifferenceM: number;    // Elevation difference between source and collection equipment (m)
   
   // Rheology & Material
   sludgeConsistency: SludgeConsistency;
@@ -66,6 +71,7 @@ export interface AlarmLimits {
 export interface ActiveAlarms {
   lowSourceLevel: boolean;
   collectionTankFull: boolean;
+  receiverTankFull: boolean;
   excessiveVacuum: boolean;
   motorOverload: boolean;
   emergencyStopActive: boolean;
@@ -78,6 +84,7 @@ export interface SafetyInterlocks {
   preventExtractNotPrimed: boolean;
   preventExtractTankFull: boolean;
   preventExtractSourceEmpty: boolean;
+  preventDischargeNoDestination: boolean; // Interlock: blocks discharge if receiver full or missing
   emergencyStopLatched: boolean;
 }
 
@@ -116,6 +123,8 @@ export interface ProcessTelemetryState {
   flowRateM3H: number;             // m³/h (flowRateLpm * 0.06)
   suctionPressureKpa: number;      // Inlet vacuum (-kPa)
   dischargePressureKpa: number;    // Outlet head pressure (+kPa)
+  staticLiftKpa: number;           // Static elevation lift pressure (kPa)
+  frictionHeadKpa: number;         // Dynamic Darcy-Weisbach friction loss (kPa)
   cavitationIndex: number;         // 0.0 (none) - 1.0 (severe)
   
   // Power & Energy (Simulated)
@@ -125,6 +134,9 @@ export interface ProcessTelemetryState {
   
   // Time Estimates
   estimatedRemainingTimeSec: number;
+
+  // Engineering assumptions & limitations reference
+  hydraulicModelLimitations?: readonly string[];
 }
 
 export interface SimulationEvent {
