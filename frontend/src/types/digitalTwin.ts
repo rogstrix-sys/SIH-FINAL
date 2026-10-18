@@ -59,6 +59,7 @@ export interface TelemetryPoint {
   flowRateLpm: number;         // L/min
   vacuum: number;              // kPa
   power: number;               // kW
+  energyKwh?: number;          // kWh
   motorLoadPct: number;        // %
   h2s: number;
   ch4: number;

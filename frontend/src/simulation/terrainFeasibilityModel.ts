@@ -39,8 +39,11 @@ import {
   TerrainParameters,
   StabilityThresholds,
   EngineeringFeasibilityEstimate,
-  ScenarioComparisonItem
+  ScenarioComparisonItem,
+  TaskComparisonResult,
+  DualScenarioComparison
 } from '../types/terrainScenarios';
+import { HYDRAULIC_MODEL_LIMITATIONS } from './deterministicEngine';
 
 export const TERRAIN_SCENARIOS: Record<TerrainScenarioId, TerrainScenarioConfig> = {
   level_paved: {
@@ -517,4 +520,130 @@ export function evaluateAllScenariosComparison(
       mitigationRecommendation
     };
   });
+}
+
+/**
+ * Evaluates and compares the same desludging task under two distinct operating scenarios
+ * using strictly consistent starting volumes, target volumes, and physics equations.
+ */
+export function compareDesludgingTasks(
+  baselineId: TerrainScenarioId,
+  comparisonId: TerrainScenarioId,
+  options?: {
+    taskVolumeL?: number;
+    initialVaultVolumeL?: number;
+    pumpRpm?: number;
+    hoseDiameterMm?: number;
+    slurryDensityKgM3?: number;
+    baseViscosityCp?: number;
+    stabilizerExtension?: number;
+  }
+): DualScenarioComparison {
+  const taskVolumeL = options?.taskVolumeL ?? 2400;
+  const initialVaultVolumeL = options?.initialVaultVolumeL ?? 3800;
+  const pumpRpm = options?.pumpRpm ?? 2100;
+  const hoseDiameterMm = options?.hoseDiameterMm ?? 100;
+  const slurryDensityKgM3 = options?.slurryDensityKgM3 ?? 1180;
+  const baseViscosityCp = options?.baseViscosityCp ?? 450;
+  const stabilizerExtension = options?.stabilizerExtension ?? 1.0;
+
+  const evaluateScenario = (id: TerrainScenarioId): TaskComparisonResult => {
+    const defaultParams = getScenarioDefaultParams(id);
+    const estimate = calculateTerrainFeasibility(
+      defaultParams,
+      stabilizerExtension,
+      defaultParams.configuredHoseLengthM,
+      slurryDensityKgM3,
+      baseViscosityCp,
+      hoseDiameterMm
+    );
+
+    // Dynamic temperature & viscosity effects
+    const effVisc = estimate.effectiveSlurryViscosityCp;
+    const rpmFraction = pumpRpm / 3000.0;
+    const viscPenalty = Math.max(0.25, 1.0 - (effVisc / 6000.0));
+    const diaFactor = Math.pow(hoseDiameterMm / 100.0, 1.6);
+    const flowRateLpm = Math.max(20.0, 500.0 * rpmFraction * viscPenalty * diaFactor);
+
+    // Extraction duration
+    const extractionDurationSec = Math.round((taskVolumeL / flowRateLpm) * 60.0);
+    const mins = Math.floor(extractionDurationSec / 60);
+    const secs = extractionDurationSec % 60;
+    const extractionDurationFormatted = `${mins}m ${secs.toString().padStart(2, '0')}s`;
+
+    // Power & Energy
+    const totalDeltaPKpa = estimate.totalRoutingLossKpa + 60.0;
+    const hydraulicPowerKw = (totalDeltaPKpa * (flowRateLpm / 60.0)) / 1000.0;
+    const idlePowerKw = 0.85 * (pumpRpm / 3000.0);
+    const motorPowerKw = hydraulicPowerKw / (0.75 * 0.88) + idlePowerKw;
+    const estimatedEnergyKwh = parseFloat((motorPowerKw * (extractionDurationSec / 3600.0)).toFixed(3));
+    const specificEnergyKwhM3 = parseFloat((estimatedEnergyKwh / (taskVolumeL / 1000.0)).toFixed(2));
+
+    let feasibilityRating: 'FEASIBLE' | 'CONDITIONAL' | 'HIGH_RISK' = 'FEASIBLE';
+    if (estimate.stabilityStatus === 'critical_unstable' || estimate.isAltitudeDerated) {
+      feasibilityRating = 'HIGH_RISK';
+    } else if (
+      estimate.stabilityStatus === 'caution' ||
+      estimate.clearanceConflictDetected ||
+      !estimate.hoseLengthAdequate ||
+      estimate.groundClearanceRisk ||
+      estimate.isTemperatureCritical ||
+      estimate.isTractionSlipRisk
+    ) {
+      feasibilityRating = 'CONDITIONAL';
+    }
+
+    return {
+      scenarioId: id,
+      scenarioName: TERRAIN_SCENARIOS[id].name,
+      slopeDeg: defaultParams.slopeDeg,
+      effectiveTiltDeg: estimate.effectiveTiltDeg,
+      pathWidthM: defaultParams.pathWidthM,
+      lateralClearanceMarginM: estimate.lateralClearanceMarginM,
+      groundClearanceRisk: estimate.groundClearanceRisk,
+      clearanceConflict: estimate.clearanceConflictDetected,
+      requiredHoseM: estimate.requiredHoseLengthM,
+      hoseAdequate: estimate.hoseLengthAdequate,
+      elevationDiffM: estimate.verticalElevationDiffM,
+      totalRoutingLossKpa: estimate.totalRoutingLossKpa,
+      effectiveViscosityCp: effVisc,
+      flowRateLpm: parseFloat(flowRateLpm.toFixed(1)),
+      extractionDurationSec,
+      extractionDurationFormatted,
+      estimatedEnergyKwh,
+      specificEnergyKwhM3,
+      feasibilityRating,
+      stabilityStatus: estimate.stabilityStatus,
+      warnings: estimate.warnings
+    };
+  };
+
+  const baseline = evaluateScenario(baselineId);
+  const comparison = evaluateScenario(comparisonId);
+
+  const deltaDurationSec = comparison.extractionDurationSec - baseline.extractionDurationSec;
+  const deltaMins = Math.floor(Math.abs(deltaDurationSec) / 60);
+  const deltaSecs = Math.abs(deltaDurationSec) % 60;
+  const sign = deltaDurationSec >= 0 ? '+' : '-';
+  const deltaDurationFormatted = `${sign}${deltaMins}m ${deltaSecs.toString().padStart(2, '0')}s`;
+
+  const deltaEnergyKwh = parseFloat((comparison.estimatedEnergyKwh - baseline.estimatedEnergyKwh).toFixed(3));
+  const deltaEnergyPct = baseline.estimatedEnergyKwh > 0
+    ? parseFloat((((comparison.estimatedEnergyKwh - baseline.estimatedEnergyKwh) / baseline.estimatedEnergyKwh) * 100).toFixed(1))
+    : 0;
+  const deltaLossKpa = parseFloat((comparison.totalRoutingLossKpa - baseline.totalRoutingLossKpa).toFixed(1));
+
+  return {
+    taskVolumeL,
+    initialVaultVolumeL,
+    sludgeDensityKgM3: slurryDensityKgM3,
+    baseline,
+    comparison,
+    deltaDurationSec,
+    deltaDurationFormatted,
+    deltaEnergyKwh,
+    deltaEnergyPct,
+    deltaLossKpa,
+    documentedAssumptions: HYDRAULIC_MODEL_LIMITATIONS
+  };
 }

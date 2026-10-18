@@ -28,7 +28,9 @@ import {
   Compass,
   Ruler,
   TableProperties,
-  Sparkles
+  Sparkles,
+  BatteryCharging,
+  Info
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -53,6 +55,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { CameraPreset } from '../../types/digitalTwin';
 import { TerrainScenarioId } from '../../types/terrainScenarios';
 import { TERRAIN_SCENARIOS, PRELIMINARY_ESTIMATE_DISCLAIMER } from '../../simulation/terrainFeasibilityModel';
+import { HYDRAULIC_MODEL_LIMITATIONS } from '../../simulation/deterministicEngine';
 import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
 import { formatDuration } from '../../utils/units';
 import { downloadTelemetryCsv, downloadEventsCsv } from '../../utils/csvExport';
@@ -109,9 +112,10 @@ export const OverviewDashboard: React.FC = () => {
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
 
   // Local UI State
-  const [activeChartTab, setActiveChartTab] = useState<'flowMotor' | 'tankBalance'>('flowMotor');
+  const [activeChartTab, setActiveChartTab] = useState<'flowRate' | 'tankBalance' | 'powerEnergy' | 'eventTimeline'>('flowRate');
   const [paramPanelTab, setParamPanelTab] = useState<'machine' | 'terrain'>('machine');
   const [showComparisonPanel, setShowComparisonPanel] = useState(false);
+  const [showModelLimitations, setShowModelLimitations] = useState(false);
 
   const selectedData = selectedComponentId ? INSPECTABLE_COMPONENTS[selectedComponentId] : null;
 
@@ -412,8 +416,8 @@ export const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Exactly 8 Live Industrial KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+      {/* 2. Complete 10 Live Engineering KPI Cards (Connected directly to Deterministic Simulation Engine) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2.5">
         {/* KPI 1: Extraction Flow Rate (L/min) */}
         <KpiCard
           label="Extraction Flow"
@@ -421,12 +425,12 @@ export const OverviewDashboard: React.FC = () => {
           unit="L/min"
           icon={<Activity className="w-4 h-4 text-safety-400" />}
           status={engine.telemetry.flowRateLpm > 0 ? 'nominal' : 'neutral'}
-          tooltip={`Simulated Extraction Flow: ${engine.telemetry.flowRateM3H.toFixed(2)} m³/h`}
+          tooltip={`Simulated Extraction Flow: ${engine.telemetry.flowRateM3H.toFixed(2)} m³/h (${engine.telemetry.flowRateLpm.toFixed(1)} L/min)`}
         />
 
         {/* KPI 2: Total Volume Extracted (L) */}
         <KpiCard
-          label="Volume Extracted"
+          label="Extracted Vol"
           value={Math.round(materialBalance.collectionVolumeL)}
           unit="L"
           icon={<Droplets className="w-4 h-4 text-cyan-400" />}
@@ -435,7 +439,7 @@ export const OverviewDashboard: React.FC = () => {
             current: materialBalance.collectionVolumeL,
             max: engineParams.collectionTankCapacityL
           }}
-          tooltip={`On-board tank: ${Math.round(materialBalance.collectionVolumeL)} / ${engineParams.collectionTankCapacityL} L`}
+          tooltip={`On-board tank: ${Math.round(materialBalance.collectionVolumeL)} / ${engineParams.collectionTankCapacityL} L (Target: ${engineParams.targetExtractionVolumeL} L)`}
         />
 
         {/* KPI 3: Source Tank Remaining Volume (L) */}
@@ -449,7 +453,7 @@ export const OverviewDashboard: React.FC = () => {
             current: materialBalance.sourceVolumeL,
             max: engineParams.initialSourceVolumeL
           }}
-          tooltip={`Initial: ${engineParams.initialSourceVolumeL} L | Level: ${materialBalance.sourceLevelM.toFixed(2)} m`}
+          tooltip={`Initial: ${engineParams.initialSourceVolumeL} L | Depth: ${materialBalance.sourceLevelM.toFixed(2)} m`}
         />
 
         {/* KPI 4: Collection Tank Fill (%) */}
@@ -469,10 +473,40 @@ export const OverviewDashboard: React.FC = () => {
             current: materialBalance.collectionFillPct,
             max: 100
           }}
-          tooltip={`Collection vessel capacity limit: ${engineParams.collectionTankCapacityL} L`}
+          tooltip={`Collection vessel capacity limit: ${engineParams.collectionTankCapacityL} L | Interlock: 95% full`}
         />
 
-        {/* KPI 5: Simulated Inlet Vacuum (kPa) */}
+        {/* KPI 5: Estimated Pump Power (kW) */}
+        <KpiCard
+          label="Pump Power"
+          value={engine.telemetry.motorPowerKw.toFixed(2)}
+          unit="kW"
+          icon={<Zap className="w-4 h-4 text-yellow-400" />}
+          status={
+            engine.telemetry.motorPowerKw >= 14.0
+              ? 'alert'
+              : engine.telemetry.motorPowerKw >= 11.0
+              ? 'warning'
+              : 'nominal'
+          }
+          progress={{
+            current: engine.telemetry.motorPowerKw,
+            max: 15.0
+          }}
+          tooltip={`Simulated hydraulic shaft power: ${engine.telemetry.motorPowerKw.toFixed(2)} kW / 15.0 kW rated`}
+        />
+
+        {/* KPI 6: Estimated Energy Consumption (kWh) */}
+        <KpiCard
+          label="Energy Used"
+          value={(engine.telemetry.cumulativeEnergyKwh || 0).toFixed(3)}
+          unit="kWh"
+          icon={<BatteryCharging className="w-4 h-4 text-emerald-400" />}
+          status="nominal"
+          tooltip={`Cumulative integrated energy: ∫ P dt = ${(engine.telemetry.cumulativeEnergyKwh || 0).toFixed(3)} kWh`}
+        />
+
+        {/* KPI 7: Simulated Inlet Vacuum (kPa) */}
         <KpiCard
           label="Inlet Vacuum"
           value={Math.abs(engine.telemetry.suctionPressureKpa).toFixed(1)}
@@ -489,15 +523,15 @@ export const OverviewDashboard: React.FC = () => {
             current: Math.abs(engine.telemetry.suctionPressureKpa),
             max: 90
           }}
-          tooltip={`Target: ${parameters.targetVacuumKpa} kPa | Cavitation Risk: ${(engine.telemetry.cavitationIndex * 100).toFixed(0)}%`}
+          tooltip={`Dynamic vacuum (Darcy-Weisbach + static lift) | Cavitation Risk: ${(engine.telemetry.cavitationIndex * 100).toFixed(0)}%`}
         />
 
-        {/* KPI 6: Motor Load (%) */}
+        {/* KPI 8: Motor Load (%) */}
         <KpiCard
           label="Motor Load"
           value={motorLoadPct.toFixed(1)}
           unit="%"
-          icon={<Zap className="w-4 h-4 text-yellow-400" />}
+          icon={<Activity className="w-4 h-4 text-orange-400" />}
           status={motorLoadPct >= 90 ? 'alert' : motorLoadPct >= 75 ? 'warning' : 'neutral'}
           progress={{
             current: motorLoadPct,
@@ -506,7 +540,7 @@ export const OverviewDashboard: React.FC = () => {
           tooltip={`Power: ${engine.telemetry.motorPowerKw.toFixed(1)} kW / 15.0 kW rated (${telemetry.motorCurrentAmps.toFixed(1)} A)`}
         />
 
-        {/* KPI 7: Estimated Time Remaining */}
+        {/* KPI 9: Estimated Time Remaining */}
         <KpiCard
           label="Est. Time Left"
           value={timeRemainingStr}
@@ -516,20 +550,23 @@ export const OverviewDashboard: React.FC = () => {
           tooltip={`Based on dynamic flow rate (${engine.telemetry.flowRateLpm.toFixed(1)} L/min)`}
         />
 
-        {/* KPI 8: Current Operating State */}
+        {/* KPI 10: Selected Terrain & Operating State */}
         <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow-md">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span className="font-medium tracking-wide uppercase text-[10px] truncate">OPERATING STATE</span>
-            <Cpu className="w-3.5 h-3.5 text-safety-400 shrink-0" />
+            <span className="font-medium tracking-wide uppercase text-[10px] truncate">TERRAIN / STATE</span>
+            <Mountain className="w-3.5 h-3.5 text-safety-400 shrink-0" />
           </div>
-          <div className="my-1 flex items-center">
-            <Badge variant={stateVariant[operatingState] || 'slate'} size="md">
-              {operatingState}
+          <div className="my-0.5 flex flex-col gap-1">
+            <Badge variant={stateVariant[operatingState] || 'slate'} size="sm">
+              {operatingState} ({status})
             </Badge>
+            <span className="text-[10px] font-mono text-cyan-300 font-semibold truncate" title={selectedScenario}>
+              {selectedScenario.replace('_', ' ').toUpperCase()}
+            </span>
           </div>
-          <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between">
-            <span>Status:</span>
-            <span className="font-semibold text-slate-300 uppercase">{status}</span>
+          <div className="text-[9px] font-mono text-slate-400 flex items-center justify-between">
+            <span>FIDELITY:</span>
+            <span className="text-safety-400 font-bold">SIMULATED</span>
           </div>
         </div>
       </div>
@@ -909,6 +946,19 @@ export const OverviewDashboard: React.FC = () => {
                   description="Lobe pump displacement cycle frequency."
                 />
 
+                {/* 1b. Pump Displacement Capacity (L/min) */}
+                <Slider
+                  id="param-pump-capacity"
+                  label="Pump Displacement Capacity"
+                  value={engineParams.pumpRatedFlowLpm}
+                  min={100}
+                  max={1000}
+                  step={25}
+                  unit="L/min"
+                  onChange={(val) => updateEngineParameter('pumpRatedFlowLpm', val)}
+                  description="Nominal displacement capacity at maximum rated speed."
+                />
+
                 {/* 2. Hose Length (m) */}
                 <Slider
                   id="param-hose-length"
@@ -935,19 +985,68 @@ export const OverviewDashboard: React.FC = () => {
                   description="Inner bore diameter (larger bore reduces friction)."
                 />
 
-                {/* 4. Sludge Consistency / Viscosity (cP) */}
+                {/* 3b. Static Geodetic Elevation Difference (m) */}
                 <Slider
-                  id="param-viscosity"
-                  label="Sludge Viscosity"
-                  value={parameters.slurryViscosityCp}
-                  min={100}
-                  max={3000}
-                  step={50}
-                  unit="cP"
-                  onChange={(val) => updateParameter('slurryViscosityCp', val)}
-                  dangerThreshold={2200}
-                  description="Dynamic rheology (water = 1 cP, thick slurry = 1500+ cP)."
+                  id="param-elevation"
+                  label="Static Elevation Lift"
+                  value={engineParams.elevationDifferenceM}
+                  min={0}
+                  max={12}
+                  step={0.5}
+                  unit="m"
+                  onChange={(val) => updateEngineParameter('elevationDifferenceM', val)}
+                  dangerThreshold={6.5}
+                  description="Static elevation difference between septic vault floor and pump inlet."
                 />
+
+                {/* 4. Sludge Consistency Presets + Fine Viscosity (cP) */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-[11px] text-slate-300 font-medium">
+                    <span>Sludge Consistency Presets</span>
+                    <span className="font-mono text-safety-400 font-bold">{parameters.slurryViscosityCp} cP</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1 font-mono text-[10px]">
+                    {[
+                      { label: 'Liquid (50cP)', cp: 50, type: 'liquid' },
+                      { label: 'Slurry (250cP)', cp: 250, type: 'slurry' },
+                      { label: 'Viscous (450cP)', cp: 450, type: 'viscous' },
+                      { label: 'Crust (1800cP)', cp: 1800, type: 'thick_crust' }
+                    ].map((preset) => (
+                      <button
+                        key={preset.type}
+                        type="button"
+                        onClick={() => {
+                          updateParameter('slurryViscosityCp', preset.cp);
+                          updateEngineParameter('sludgeViscosityCp', preset.cp);
+                          updateEngineParameter('sludgeConsistency', preset.type as any);
+                        }}
+                        className={`px-1 py-1 rounded border text-center transition truncate ${
+                          Math.abs(parameters.slurryViscosityCp - preset.cp) < 25
+                            ? 'bg-safety-500/20 border-safety-400 text-safety-300 font-bold'
+                            : 'bg-graphite-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                        title={preset.label}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <Slider
+                    id="param-viscosity"
+                    label="Fine Viscosity Slider"
+                    value={parameters.slurryViscosityCp}
+                    min={50}
+                    max={3000}
+                    step={25}
+                    unit="cP"
+                    onChange={(val) => {
+                      updateParameter('slurryViscosityCp', val);
+                      updateEngineParameter('sludgeViscosityCp', val);
+                    }}
+                    dangerThreshold={2200}
+                    description="Dynamic rheology (water = 1 cP, thick slurry = 1500+ cP)."
+                  />
+                </div>
 
                 {/* 5. Collection Tank Capacity (L) */}
                 <Slider
@@ -1197,28 +1296,36 @@ export const OverviewDashboard: React.FC = () => {
         <div className="lg:col-span-7 flex flex-col gap-3">
           <Card
             title={
-              activeChartTab === 'flowMotor'
+              activeChartTab === 'flowRate'
                 ? 'Extraction Flow & Motor Load Telemetry'
-                : 'Tank Volume Mass Balance History'
+                : activeChartTab === 'tankBalance'
+                ? 'Tank Volume Mass Balance History'
+                : activeChartTab === 'powerEnergy'
+                ? 'Pump Power & Cumulative Energy Telemetry'
+                : 'Chronological Event & Alarm Timeline'
             }
             subtitle={
-              activeChartTab === 'flowMotor'
+              activeChartTab === 'flowRate'
                 ? 'Simulated flow rate (L/min) and motor load (%)'
-                : 'Source vault, on-board tank, and external receiver volumes (L)'
+                : activeChartTab === 'tankBalance'
+                ? 'Source vault, on-board tank, and external receiver volumes (L)'
+                : activeChartTab === 'powerEnergy'
+                ? 'Simulated motor power (kW) and cumulative integrated electrical energy (kWh)'
+                : 'Chronological operating transitions, safety trips, and actuator interlocks'
             }
             icon={<Activity className="w-4 h-4 text-safety-500" />}
             headerAction={
               <div className="flex items-center gap-1.5">
                 <div className="flex items-center bg-graphite-950 p-0.5 rounded-lg border border-slate-800">
                   <button
-                    onClick={() => setActiveChartTab('flowMotor')}
+                    onClick={() => setActiveChartTab('flowRate')}
                     className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
-                      activeChartTab === 'flowMotor'
+                      activeChartTab === 'flowRate'
                         ? 'bg-safety-500 text-white font-semibold'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    Flow & Load
+                    Flow
                   </button>
                   <button
                     onClick={() => setActiveChartTab('tankBalance')}
@@ -1228,7 +1335,27 @@ export const OverviewDashboard: React.FC = () => {
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    Tank Balance
+                    Tanks
+                  </button>
+                  <button
+                    onClick={() => setActiveChartTab('powerEnergy')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                      activeChartTab === 'powerEnergy'
+                        ? 'bg-amber-600 text-white font-semibold'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Power/Energy
+                  </button>
+                  <button
+                    onClick={() => setActiveChartTab('eventTimeline')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                      activeChartTab === 'eventTimeline'
+                        ? 'bg-purple-600 text-white font-semibold'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Timeline
                   </button>
                 </div>
                 <Badge variant="cyan" size="sm">
@@ -1238,107 +1365,225 @@ export const OverviewDashboard: React.FC = () => {
             }
           >
             <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                {activeChartTab === 'flowMotor' ? (
-                  <AreaChart data={history} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="flowLpmGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#f97316" stopOpacity={0.0} />
-                      </linearGradient>
-                      <linearGradient id="motorLoadGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#eab308" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#eab308" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis
-                      yAxisId="left"
-                      stroke="#f97316"
-                      tick={{ fontSize: 10 }}
-                      domain={[0, 'auto']}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="#eab308"
-                      tick={{ fontSize: 10 }}
-                      domain={[0, 100]}
-                    />
-                    <ChartTooltip
-                      contentStyle={{
-                        backgroundColor: '#0b0f17',
-                        borderColor: '#334155',
-                        fontSize: '11px',
-                        fontFamily: 'monospace'
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'monospace' }} />
-                    <Area
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="flowRateLpm"
-                      stroke="#f97316"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#flowLpmGrad)"
-                      name="Flow Rate (L/min)"
-                    />
-                    <Area
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="motorLoadPct"
-                      stroke="#eab308"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#motorLoadGrad)"
-                      name="Motor Load (%)"
-                    />
-                  </AreaChart>
-                ) : (
-                  <LineChart data={history} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <ChartTooltip
-                      contentStyle={{
-                        backgroundColor: '#0b0f17',
-                        borderColor: '#334155',
-                        fontSize: '11px',
-                        fontFamily: 'monospace'
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'monospace' }} />
-                    <Line
-                      type="monotone"
-                      dataKey="sourceVolumeL"
-                      stroke="#f59e0b"
-                      strokeWidth={2}
-                      dot={false}
-                      name="Vault Source (L)"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="collectionVolumeL"
-                      stroke="#06b6d4"
-                      strokeWidth={2}
-                      dot={false}
-                      name="Collection Vessel (L)"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="receiverVolumeL"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      dot={false}
-                      name="Disposal Tanker (L)"
-                    />
-                  </LineChart>
-                )}
-              </ResponsiveContainer>
+              {activeChartTab === 'eventTimeline' ? (
+                <div className="h-full overflow-y-auto pr-2 space-y-2 scrollbar-thin">
+                  <div className="text-[11px] font-mono text-slate-400 flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span>Simulation Event Milestones ({eventLog.length} recorded events)</span>
+                    <span className="text-safety-400">Sequential Telemetry</span>
+                  </div>
+                  {eventLog.length === 0 ? (
+                    <div className="h-44 flex items-center justify-center text-slate-500 text-xs font-mono">
+                      No timeline events recorded yet. Run simulation cycle to record transitions and alarms.
+                    </div>
+                  ) : (
+                    <div className="relative pl-6 border-l-2 border-slate-800 space-y-3 py-1">
+                      {eventLog.map((evt) => {
+                        const dotColor = {
+                          critical: 'bg-rose-500 border-rose-300 ring-rose-500/30',
+                          warning: 'bg-amber-500 border-amber-300 ring-amber-500/30',
+                          success: 'bg-emerald-500 border-emerald-300 ring-emerald-500/30',
+                          info: 'bg-cyan-500 border-cyan-300 ring-cyan-500/30'
+                        }[evt.level];
+
+                        return (
+                          <div key={evt.id} className="relative group">
+                            <div
+                              className={`absolute -left-[31px] top-1 w-3 h-3 rounded-full border-2 ring-4 ${dotColor}`}
+                            />
+                            <div className="bg-graphite-950 p-2 rounded-lg border border-slate-800/80 font-mono text-xs hover:border-slate-700 transition">
+                              <div className="flex items-center justify-between text-[10px] mb-1">
+                                <span className="font-bold text-slate-200">{evt.source}</span>
+                                <span className="text-slate-400">{evt.timestamp}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-300 leading-tight">{evt.message}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {activeChartTab === 'flowRate' ? (
+                    <AreaChart data={history} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="flowLpmGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.0} />
+                        </linearGradient>
+                        <linearGradient id="motorLoadGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#eab308" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#eab308" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <YAxis
+                        yAxisId="left"
+                        stroke="#f97316"
+                        tick={{ fontSize: 10 }}
+                        domain={[0, 'auto']}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        stroke="#eab308"
+                        tick={{ fontSize: 10 }}
+                        domain={[0, 100]}
+                      />
+                      <ChartTooltip
+                        contentStyle={{
+                          backgroundColor: '#0b0f17',
+                          borderColor: '#334155',
+                          fontSize: '11px',
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'monospace' }} />
+                      <Area
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="flowRateLpm"
+                        stroke="#f97316"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#flowLpmGrad)"
+                        name="Flow Rate (L/min)"
+                      />
+                      <Area
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="motorLoadPct"
+                        stroke="#eab308"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#motorLoadGrad)"
+                        name="Motor Load (%)"
+                      />
+                    </AreaChart>
+                  ) : activeChartTab === 'tankBalance' ? (
+                    <LineChart data={history} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <ChartTooltip
+                        contentStyle={{
+                          backgroundColor: '#0b0f17',
+                          borderColor: '#334155',
+                          fontSize: '11px',
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'monospace' }} />
+                      <Line
+                        type="monotone"
+                        dataKey="sourceVolumeL"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Vault Source (L)"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="collectionVolumeL"
+                        stroke="#06b6d4"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Collection Vessel (L)"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="receiverVolumeL"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Disposal Tanker (L)"
+                      />
+                    </LineChart>
+                  ) : (
+                    <LineChart data={history} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <YAxis
+                        yAxisId="power"
+                        stroke="#eab308"
+                        tick={{ fontSize: 10 }}
+                        domain={[0, 18]}
+                      />
+                      <YAxis
+                        yAxisId="energy"
+                        orientation="right"
+                        stroke="#10b981"
+                        tick={{ fontSize: 10 }}
+                        domain={[0, 'auto']}
+                      />
+                      <ChartTooltip
+                        contentStyle={{
+                          backgroundColor: '#0b0f17',
+                          borderColor: '#334155',
+                          fontSize: '11px',
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'monospace' }} />
+                      <Line
+                        yAxisId="power"
+                        type="monotone"
+                        dataKey="power"
+                        stroke="#eab308"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Motor Power (kW)"
+                      />
+                      <Line
+                        yAxisId="energy"
+                        type="monotone"
+                        dataKey="energyKwh"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Cumulative Energy (kWh)"
+                      />
+                    </LineChart>
+                  )}
+                </ResponsiveContainer>
+              )}
             </div>
           </Card>
+
+          {/* Hydraulic Model Assumptions & Disclaimers Accordion */}
+          <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3 shadow-md font-mono text-xs">
+            <div
+              className="flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setShowModelLimitations(!showModelLimitations)}
+            >
+              <div className="flex items-center gap-1.5 text-slate-300 font-bold text-[11px]">
+                <Info className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Hydraulic Model Assumptions & Limitations</span>
+              </div>
+              <span className="text-[10px] text-cyan-400 font-semibold hover:underline">
+                {showModelLimitations ? 'Collapse ▲' : 'Expand Details ▼'}
+              </span>
+            </div>
+
+            {showModelLimitations && (
+              <div className="mt-2.5 pt-2.5 border-t border-slate-800 space-y-1.5 text-[11px] text-slate-400">
+                <p className="text-slate-300">
+                  Desludge Digital Twin calculates flow using deterministic engineering formulas. Key documented simplifications:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1">
+                  {HYDRAULIC_MODEL_LIMITATIONS.map((lim, i) => (
+                    <li key={`lim-${i}`}>{lim}</li>
+                  ))}
+                </ul>
+                <div className="mt-2 p-2 rounded bg-graphite-950 border border-slate-800 text-[10px] text-amber-300/90 flex items-center justify-between">
+                  <span>DATA FIDELITY: SIMULATED DIGITAL TWIN (PHYSICAL TRANSDUCER PENDING)</span>
+                  <span className="text-slate-400">Fixed integration step Δt = 0.05s</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Timestamped Alarm Panel & Event Log Column */}

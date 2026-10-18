@@ -132,3 +132,41 @@ export interface ScenarioComparisonItem {
   keyConstraint: string;
   mitigationRecommendation: string;
 }
+
+export interface TaskComparisonResult {
+  scenarioId: TerrainScenarioId;
+  scenarioName: string;
+  slopeDeg: number;
+  effectiveTiltDeg: number;
+  pathWidthM: number;
+  lateralClearanceMarginM: number;
+  groundClearanceRisk: boolean;
+  clearanceConflict: boolean;
+  requiredHoseM: number;
+  hoseAdequate: boolean;
+  elevationDiffM: number;
+  totalRoutingLossKpa: number;
+  effectiveViscosityCp: number;
+  flowRateLpm: number;
+  extractionDurationSec: number;
+  extractionDurationFormatted: string;
+  estimatedEnergyKwh: number;
+  specificEnergyKwhM3: number;
+  feasibilityRating: 'FEASIBLE' | 'CONDITIONAL' | 'HIGH_RISK';
+  stabilityStatus: StabilityStatus;
+  warnings: string[];
+}
+
+export interface DualScenarioComparison {
+  taskVolumeL: number;
+  initialVaultVolumeL: number;
+  sludgeDensityKgM3: number;
+  baseline: TaskComparisonResult;
+  comparison: TaskComparisonResult;
+  deltaDurationSec: number;
+  deltaDurationFormatted: string;
+  deltaEnergyKwh: number;
+  deltaEnergyPct: number;
+  deltaLossKpa: number;
+  documentedAssumptions: readonly string[];
+}
