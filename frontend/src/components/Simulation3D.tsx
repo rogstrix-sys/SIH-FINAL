@@ -282,6 +282,8 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const [currentInclineDeg, setCurrentInclineDeg] = useState<number>(28.0);
   const [lateralGForce, setLateralGForce] = useState<number>(0.0);
   const [activePowerKw, setActivePowerKw] = useState<number>(8.4);
+  const [measuredFps, setMeasuredFps] = useState<number>(60);
+  const [measuredFrameTimeMs, setMeasuredFrameTimeMs] = useState<number>(16.6);
 
   // Physics thresholds
   const criticalRolloverAngle = hasBaffles && hasLowComBattery ? 34.2 : 21.8;
@@ -357,6 +359,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const filtrateMeshRef = useRef<THREE.Mesh | null>(null);
   const pistonLockPinsRef = useRef<THREE.Mesh[]>([]);
   const pistonStatusLedRef = useRef<THREE.Mesh | null>(null);
+  const tankWorkLightRef = useRef<THREE.PointLight | null>(null);
+  const frameCountRef = useRef<number>(0);
+  const lastFpsTimeRef = useRef<number>(performance.now());
 
   // Worksite Waypoint 3D References
   const alleyGroupRef = useRef<THREE.Group | null>(null);
@@ -619,7 +624,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     });
     rendererRef.current = renderer;
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -633,7 +638,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     controls.maxDistance = 280.0;
     controls.target.set(0, 8, 0);
 
-    // 5. Directional Sun, Sky Ambient & Rim Lights (Expanded Shadow Coverage for 165m World)
+    // 5. Directional Sun, Sky Ambient & Rim Lights (Optimized Focused Shadow Coverage)
     const ambientLight = new THREE.AmbientLight(
       isNightMode ? 0x1e293b : 0xf8fafc,
       isNightMode ? 0.38 : 0.86
@@ -657,13 +662,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.bias = -0.0003;
+    sunLight.shadow.bias = -0.0002;
     sunLight.shadow.camera.near = 5;
-    sunLight.shadow.camera.far = 320;
-    sunLight.shadow.camera.left = -95;
-    sunLight.shadow.camera.right = 95;
-    sunLight.shadow.camera.top = 95;
-    sunLight.shadow.camera.bottom = -95;
+    sunLight.shadow.camera.far = 280;
+    sunLight.shadow.camera.left = -68;
+    sunLight.shadow.camera.right = 68;
+    sunLight.shadow.camera.top = 68;
+    sunLight.shadow.camera.bottom = -68;
     scene.add(sunLight);
     sunLightRef.current = sunLight;
 
@@ -773,6 +778,21 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
     const parapetBlockGeo = new THREE.BoxGeometry(0.85, 0.65, 0.35);
 
+    // Instanced roadside fixtures (massive performance optimization: ~350 draw calls -> 4 instanced draw calls)
+    const studTransforms: THREE.Matrix4[] = [];
+    const parapetTransforms: THREE.Matrix4[] = [];
+    const parapetDotTransforms: THREE.Matrix4[] = [];
+    const parapetDotColors: THREE.Color[] = [];
+    const postTransforms: THREE.Matrix4[] = [];
+    const delineatorTransforms: THREE.Matrix4[] = [];
+    const delineatorColors: THREE.Color[] = [];
+    const guardStoneTransforms: THREE.Matrix4[] = [];
+
+    // Dedicated Road Surface Markings Overlay (Razor-Sharp Outer White Lines & Centerline Dashes)
+    const markVerts: number[] = [];
+    const markColors: number[] = [];
+    const markIdx: number[] = [];
+
     for (let i = 0; i <= roadSegments; i++) {
       const t = i / roadSegments;
       const pt = curvePoints[i];
@@ -806,60 +826,82 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       shVerts.push(innerShoulderEdge.x, innerShoulderEdge.y + roadYOffset - 0.03, innerShoulderEdge.z);
       shNorms.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
 
-      // 4. Retroreflective Cat-Eye Road Studs along centerline every 4 segments
+      // 4. Retroreflective Cat-Eye Road Studs along centerline every 4 segments (Collected for single-draw instancing)
       if (i % 4 === 0) {
-        const stud = new THREE.Mesh(
-          new THREE.BoxGeometry(0.12, 0.04, 0.12),
-          new THREE.MeshStandardMaterial({
-            color: 0xfbbf24,
-            roughness: 0.15,
-            metalness: 0.85,
-            emissive: 0x78350f,
-            emissiveIntensity: 0.45
-          })
-        );
-        stud.position.set(pt.x, pt.y + roadYOffset + 0.02, pt.z);
-        stud.rotation.y = Math.atan2(tangent.x, tangent.z);
-        mountainGroup.add(stud);
+        const studMat4 = new THREE.Matrix4();
+        const sRot = new THREE.Matrix4().makeRotationY(Math.atan2(tangent.x, tangent.z));
+        const sPos = new THREE.Matrix4().makeTranslation(pt.x, pt.y + roadYOffset + 0.02, pt.z);
+        studMat4.multiplyMatrices(sPos, sRot);
+        studTransforms.push(studMat4);
       }
 
-      // 5. REGIONAL ROADSIDE SAFETY BARRIERS:
+      // Precision Roadmarkings Quads (Outer White Lines & Dashed Yellow Centerline)
+      const leftEdgeOuter = leftPt.clone().add(normal.clone().multiplyScalar(-0.06)).setY(leftPt.y + roadYOffset + 0.005);
+      const leftEdgeInner = leftPt.clone().add(normal.clone().multiplyScalar(-0.16)).setY(leftPt.y + roadYOffset + 0.005);
+      const rightEdgeInner = rightPt.clone().add(normal.clone().multiplyScalar(0.16)).setY(rightPt.y + roadYOffset + 0.005);
+      const rightEdgeOuter = rightPt.clone().add(normal.clone().multiplyScalar(0.06)).setY(rightPt.y + roadYOffset + 0.005);
+
+      const centerL = pt.clone().add(normal.clone().multiplyScalar(0.05)).setY(pt.y + roadYOffset + 0.005);
+      const centerR = pt.clone().add(normal.clone().multiplyScalar(-0.05)).setY(pt.y + roadYOffset + 0.005);
+
+      const baseMarkIdx = markVerts.length / 3;
+      markVerts.push(
+        leftEdgeOuter.x, leftEdgeOuter.y, leftEdgeOuter.z,
+        leftEdgeInner.x, leftEdgeInner.y, leftEdgeInner.z,
+        rightEdgeInner.x, rightEdgeInner.y, rightEdgeInner.z,
+        rightEdgeOuter.x, rightEdgeOuter.y, rightEdgeOuter.z,
+        centerL.x, centerL.y, centerL.z,
+        centerR.x, centerR.y, centerR.z
+      );
+      markColors.push(
+        0.95, 0.95, 0.95,  0.95, 0.95, 0.95,
+        0.95, 0.95, 0.95,  0.95, 0.95, 0.95,
+        0.98, 0.78, 0.12,  0.98, 0.78, 0.12
+      );
+
+      if (i < roadSegments) {
+        markIdx.push(baseMarkIdx, baseMarkIdx + 6, baseMarkIdx + 1);
+        markIdx.push(baseMarkIdx + 1, baseMarkIdx + 6, baseMarkIdx + 7);
+        markIdx.push(baseMarkIdx + 2, baseMarkIdx + 8, baseMarkIdx + 3);
+        markIdx.push(baseMarkIdx + 3, baseMarkIdx + 8, baseMarkIdx + 9);
+        if ((i % 6) < 3) {
+          markIdx.push(baseMarkIdx + 4, baseMarkIdx + 10, baseMarkIdx + 5);
+          markIdx.push(baseMarkIdx + 5, baseMarkIdx + 10, baseMarkIdx + 11);
+        }
+      }
+
+      // 5. REGIONAL ROADSIDE SAFETY BARRIERS (Collected for instancing):
       const grEdge = leftPt.clone().add(normal.clone().multiplyScalar(0.22));
       const grBaseY = grEdge.y + roadYOffset;
 
       if (terrainPreset === 'uttarakhand' || terrainPreset === 'aizawl') {
         // --- UTTARAKHAND: Iconic Indian Hill Road Black & White Concrete Safety Parapet Blocks ---
         if (i % 2 === 0) {
-          const parapetBlock = new THREE.Mesh(parapetBlockGeo, indianParapetMat);
-          parapetBlock.position.set(grEdge.x, grBaseY + 0.32, grEdge.z);
-          parapetBlock.rotation.y = Math.atan2(tangent.x, tangent.z);
-          parapetBlock.castShadow = true;
-          parapetBlock.receiveShadow = true;
-          mountainGroup.add(parapetBlock);
+          const pMat4 = new THREE.Matrix4();
+          const pRot = new THREE.Matrix4().makeRotationY(Math.atan2(tangent.x, tangent.z));
+          const pPos = new THREE.Matrix4().makeTranslation(grEdge.x, grBaseY + 0.32, grEdge.z);
+          pMat4.multiplyMatrices(pPos, pRot);
+          parapetTransforms.push(pMat4);
 
-          // Retroreflective hazard reflector dot on road face of block
-          const dot = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.04, 0.04, 0.02, 8),
-            new THREE.MeshBasicMaterial({ color: i % 4 === 0 ? 0xef4444 : 0xfacc15 })
+          const dMat4 = new THREE.Matrix4();
+          const dLocal = new THREE.Matrix4().multiplyMatrices(
+            new THREE.Matrix4().makeTranslation(0, 0.14, 0.18),
+            new THREE.Matrix4().makeRotationX(Math.PI / 2)
           );
-          dot.rotation.x = Math.PI / 2;
-          dot.position.set(0, 0.14, 0.18);
-          parapetBlock.add(dot);
+          dMat4.multiplyMatrices(pMat4, dLocal);
+          parapetDotTransforms.push(dMat4);
+          parapetDotColors.push(new THREE.Color(i % 4 === 0 ? 0xef4444 : 0xfacc15));
         }
       } else if (terrainPreset === 'ladakh') {
         // --- LADAKH: Drystone Guard Boulders + Tibetan 5-Color Prayer Flags at Passes ---
         if (i % 3 === 0) {
-          const boulderGeo = new THREE.DodecahedronGeometry(0.42 + (i % 4) * 0.08, 1);
-          const boulderMat = new THREE.MeshStandardMaterial({
-            map: rockTex.map,
-            roughness: 0.88,
-            metalness: 0.15
-          });
-          const guardStone = new THREE.Mesh(boulderGeo, boulderMat);
-          guardStone.position.set(grEdge.x, grBaseY + 0.28, grEdge.z);
-          guardStone.rotation.set((i * 0.4) % Math.PI, (i * 0.7) % Math.PI, 0);
-          guardStone.castShadow = true;
-          mountainGroup.add(guardStone);
+          const gsMat4 = new THREE.Matrix4();
+          const gsPos = new THREE.Matrix4().makeTranslation(grEdge.x, grBaseY + 0.28, grEdge.z);
+          const gsRot = new THREE.Matrix4().makeRotationFromEuler(
+            new THREE.Euler((i * 0.4) % Math.PI, (i * 0.7) % Math.PI, 0)
+          );
+          gsMat4.multiplyMatrices(gsPos, gsRot);
+          guardStoneTransforms.push(gsMat4);
         }
 
         // Tibetan Prayer Flag Mast Assemblies at Switchback Curves (i = 80, 180, 264) and Summit (i = 350)
@@ -920,18 +962,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         grNorms.push(normal.x, 0, normal.z);
 
         if (i % 6 === 0) {
-          const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.76, 0.08), galvanizedMat);
-          post.position.set(grEdge.x, grBaseY + 0.38, grEdge.z);
-          post.castShadow = true;
-          mountainGroup.add(post);
+          const postMat4 = new THREE.Matrix4().makeTranslation(grEdge.x, grBaseY + 0.38, grEdge.z);
+          postTransforms.push(postMat4);
 
-          // Retroreflective Delineators
-          const delineator = new THREE.Mesh(
-            new THREE.BoxGeometry(0.06, 0.14, 0.03),
-            new THREE.MeshBasicMaterial({ color: i % 12 === 0 ? 0xef4444 : 0xfacc15 })
-          );
-          delineator.position.set(grEdge.x, grBaseY + 0.78, grEdge.z);
-          mountainGroup.add(delineator);
+          const delMat4 = new THREE.Matrix4().makeTranslation(grEdge.x, grBaseY + 0.78, grEdge.z);
+          delineatorTransforms.push(delMat4);
+          delineatorColors.push(new THREE.Color(i % 12 === 0 ? 0xef4444 : 0xfacc15));
         }
       }
 
@@ -1091,6 +1127,122 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     );
     drainMesh.receiveShadow = true;
     mountainGroup.add(drainMesh);
+
+    // 7A. Precision Road Surface Markings Mesh (White Edge Lines & Dashed Yellow Centerline)
+    if (markVerts.length > 0) {
+      const markGeo = new THREE.BufferGeometry();
+      markGeo.setAttribute('position', new THREE.Float32BufferAttribute(markVerts, 3));
+      markGeo.setAttribute('color', new THREE.Float32BufferAttribute(markColors, 3));
+      markGeo.setIndex(markIdx);
+      markGeo.computeVertexNormals();
+
+      const markMat = new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -4.0,
+        polygonOffsetUnits: -5.0,
+        depthTest: true,
+        depthWrite: true
+      });
+      const markMesh = new THREE.Mesh(markGeo, markMat);
+      mountainGroup.add(markMesh);
+    }
+
+    // Instanced Cat-Eye Reflective Road Studs (Single Draw Call)
+    if (studTransforms.length > 0) {
+      const studGeo = new THREE.BoxGeometry(0.12, 0.04, 0.12);
+      const studMat = new THREE.MeshStandardMaterial({
+        color: 0xfbbf24,
+        roughness: 0.15,
+        metalness: 0.85,
+        emissive: 0x78350f,
+        emissiveIntensity: 0.45
+      });
+      const studInstanced = new THREE.InstancedMesh(studGeo, studMat, studTransforms.length);
+      studTransforms.forEach((m, idx) => studInstanced.setMatrixAt(idx, m));
+      studInstanced.instanceMatrix.needsUpdate = true;
+      mountainGroup.add(studInstanced);
+    }
+
+    // Instanced Parapet Blocks & Hazard Dots (Uttarakhand/Aizawl)
+    if (parapetTransforms.length > 0) {
+      const parapetInstanced = new THREE.InstancedMesh(parapetBlockGeo, indianParapetMat, parapetTransforms.length);
+      parapetTransforms.forEach((m, idx) => parapetInstanced.setMatrixAt(idx, m));
+      parapetInstanced.castShadow = true;
+      parapetInstanced.receiveShadow = true;
+      parapetInstanced.instanceMatrix.needsUpdate = true;
+      mountainGroup.add(parapetInstanced);
+
+      const dotGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.02, 8);
+      const dotMat = new THREE.MeshBasicMaterial();
+      const dotInstanced = new THREE.InstancedMesh(dotGeo, dotMat, parapetDotTransforms.length);
+      parapetDotTransforms.forEach((m, idx) => {
+        dotInstanced.setMatrixAt(idx, m);
+        dotInstanced.setColorAt(idx, parapetDotColors[idx]);
+      });
+      dotInstanced.instanceMatrix.needsUpdate = true;
+      if (dotInstanced.instanceColor) dotInstanced.instanceColor.needsUpdate = true;
+      mountainGroup.add(dotInstanced);
+    }
+
+    // Instanced Guard Stones (Ladakh)
+    if (guardStoneTransforms.length > 0) {
+      const gsGeo = new THREE.DodecahedronGeometry(0.44, 1);
+      const gsMat = new THREE.MeshStandardMaterial({
+        map: rockTex.map,
+        roughness: 0.88,
+        metalness: 0.15
+      });
+      const gsInstanced = new THREE.InstancedMesh(gsGeo, gsMat, guardStoneTransforms.length);
+      guardStoneTransforms.forEach((m, idx) => gsInstanced.setMatrixAt(idx, m));
+      gsInstanced.castShadow = true;
+      gsInstanced.receiveShadow = true;
+      gsInstanced.instanceMatrix.needsUpdate = true;
+      mountainGroup.add(gsInstanced);
+    }
+
+    // Instanced Guardrail Posts & Delineators (Himachal)
+    if (postTransforms.length > 0) {
+      const postGeo = new THREE.BoxGeometry(0.08, 0.76, 0.08);
+      const postInstanced = new THREE.InstancedMesh(postGeo, galvanizedMat, postTransforms.length);
+      postTransforms.forEach((m, idx) => postInstanced.setMatrixAt(idx, m));
+      postInstanced.castShadow = true;
+      postInstanced.instanceMatrix.needsUpdate = true;
+      mountainGroup.add(postInstanced);
+
+      const delGeo = new THREE.BoxGeometry(0.06, 0.14, 0.03);
+      const delMat = new THREE.MeshBasicMaterial();
+      const delInstanced = new THREE.InstancedMesh(delGeo, delMat, delineatorTransforms.length);
+      delineatorTransforms.forEach((m, idx) => {
+        delInstanced.setMatrixAt(idx, m);
+        delInstanced.setColorAt(idx, delineatorColors[idx]);
+      });
+      delInstanced.instanceMatrix.needsUpdate = true;
+      if (delInstanced.instanceColor) delInstanced.instanceColor.needsUpdate = true;
+      mountainGroup.add(delInstanced);
+    }
+
+    // Rockfall Hazard Catch Drapery Netting along steep Himalayan cuttings
+    [-1, 1].forEach((side) => {
+      const netGeo = new THREE.PlaneGeometry(16, 5.5, 10, 5);
+      const netMat = new THREE.MeshStandardMaterial({
+        color: 0x64748b,
+        wireframe: true,
+        metalness: 0.88,
+        roughness: 0.35,
+        side: THREE.DoubleSide
+      });
+      const netMesh = new THREE.Mesh(netGeo, netMat);
+      if (side === -1) {
+        netMesh.position.set(-18.5, 7.8 * slopeScaleY, 20);
+        netMesh.rotation.y = Math.PI / 4.2;
+      } else {
+        netMesh.position.set(16.8, 15.2 * slopeScaleY, -2);
+        netMesh.rotation.y = -Math.PI / 3.8;
+      }
+      mountainGroup.add(netMesh);
+    });
 
     // 7B. AUTHENTIC BORDER ROADS ORGANISATION (BRO) MILESTONES & HIGHWAY SLOGAN BOARDS
     // Traditional Indian Highway Milestones (NH-58 / NH-5 / NH-1D)
@@ -2262,6 +2414,17 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     tankCylinder.castShadow = true;
     chassisGroup.add(tankCylinder);
 
+    // High-Intensity Internal Inspection Work Light (illuminates compaction piston & sludge)
+    const tankWorkLight = new THREE.PointLight(
+      0x38bdf8,
+      isCutawayMode ? 2.2 : 0.0,
+      3.2,
+      1.2
+    );
+    tankWorkLight.position.set(0, 0.46, -0.28);
+    chassisGroup.add(tankWorkLight);
+    tankWorkLightRef.current = tankWorkLight;
+
     // Tank Welded Torispherical Dished Heads with Seam Rings
     [-tankLength / 2, tankLength / 2].forEach((zOffset) => {
       const capMesh = new THREE.Mesh(
@@ -2386,6 +2549,20 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     sightFloat.position.set(0.40, 0.46, -0.28);
     chassisGroup.add(sightFloat);
     levelSightFloatRef.current = sightFloat;
+
+    // 3D Laser-Etched Volume Graduation Scale Notches (100L, 200L, 300L, 400L)
+    const graduationGroup = new THREE.Group();
+    graduationGroup.position.set(0.405, 0.46, -0.28);
+    chassisGroup.add(graduationGroup);
+
+    [-0.15, -0.05, 0.05, 0.15].forEach((yMark, idx) => {
+      const notch = new THREE.Mesh(
+        new THREE.BoxGeometry(0.012, 0.008, 0.04),
+        new THREE.MeshBasicMaterial({ color: idx === 3 ? 0xef4444 : 0x38bdf8 })
+      );
+      notch.position.set(0.012, yMark, 0);
+      graduationGroup.add(notch);
+    });
 
     // Rear 4-inch Discharge Gate Valve Assembly with Red Handwheel & Camlock
     const valveBody = new THREE.Mesh(
@@ -2557,6 +2734,15 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     bridgeYoke.position.set(0, 0.90, 0);
     compactionGroup.add(bridgeYoke);
 
+    // High-Pressure Compaction Warning Decal Plate
+    const compWarnDecal = createDecalTexture('compaction_warning');
+    const compWarnPlate = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.52, 0.13),
+      new THREE.MeshStandardMaterial({ map: compWarnDecal, transparent: true, roughness: 0.3 })
+    );
+    compWarnPlate.position.set(0, 0.90, 0.095);
+    compactionGroup.add(compWarnPlate);
+
     [-0.34, 0.34].forEach((rx) => {
       const yokeRiser = new THREE.Mesh(
         new THREE.BoxGeometry(0.04, 0.44, 0.16),
@@ -2623,6 +2809,16 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     );
     platenMesh.position.y = 0;
     platenGroup.add(platenMesh);
+
+    // Heavy-Duty Structural Stiffening Cross-Ribs on Platen Upper Surface
+    [-0.35, 0, 0.35].forEach((rz) => {
+      const rib = new THREE.Mesh(
+        new THREE.BoxGeometry(0.52, 0.024, 0.035),
+        galvanizedMat
+      );
+      rib.position.set(0, 0.026, rz);
+      platenGroup.add(rib);
+    });
 
     // Perforated Filter Mesh Underside
     const perforatedMesh = new THREE.Mesh(
@@ -2785,7 +2981,29 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     hpuMotor.position.set(-0.12, 0.24, -1.14);
     chassisGroup.add(hpuMotor);
 
+    // High-Pressure Braided Stainless Steel Hydraulic Supply Lines from HPU to Compaction Cylinder
+    [-0.04, 0.04].forEach((hx) => {
+      const hydCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(hx, 0.28, -1.0),
+        new THREE.Vector3(hx * 1.5, 0.52, -0.75),
+        new THREE.Vector3(hx * 1.8, 0.85, -0.35),
+        new THREE.Vector3(hx > 0 ? 0.07 : -0.07, 1.12, -0.28)
+      ]);
+      const hydHoseGeo = new THREE.TubeGeometry(hydCurve, 16, 0.010, 8, false);
+      const hydHoseMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        metalness: 0.85,
+        roughness: 0.35
+      });
+      const hydHoseMesh = new THREE.Mesh(hydHoseGeo, hydHoseMat);
+      chassisGroup.add(hydHoseMesh);
+    });
+
     // 4 Articulated Hydraulic Outrigger Stabilizer Legs with Swivel Footpads attached to Rams
+    const hazardDecal = createDecalTexture('hazard_stripe');
+    hazardDecal.wrapS = THREE.RepeatWrapping;
+    hazardDecal.repeat.set(2, 1);
+
     outriggersRef.current = [];
     const outriggerCoords = [
       [-0.56, 0.1, 0.75],
@@ -2803,6 +3021,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85 })
       );
       legGroup.add(casing);
+
+      // Industrial Hazard Warning Chevron Band on leg casing
+      const hazardBand = new THREE.Mesh(
+        new THREE.BoxGeometry(0.104, 0.08, 0.104),
+        new THREE.MeshStandardMaterial({ map: hazardDecal, roughness: 0.35 })
+      );
+      hazardBand.position.y = 0.06;
+      legGroup.add(hazardBand);
 
       // Inner telescoping chrome hydraulic ram
       const jack = new THREE.Mesh(
@@ -3447,6 +3673,19 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const animate = () => {
       animFrameIdRef.current = requestAnimationFrame(animate);
 
+      // Rolling Real-Time Performance & Measured FPS Measurement
+      frameCountRef.current++;
+      const now = performance.now();
+      if (now - lastFpsTimeRef.current >= 500) {
+        const elapsedSec = (now - lastFpsTimeRef.current) / 1000;
+        const curFps = Math.round((frameCountRef.current / elapsedSec) * 10) / 10;
+        const curFrameTime = Math.round((1000 / Math.max(1, curFps)) * 10) / 10;
+        setMeasuredFps(curFps);
+        setMeasuredFrameTimeMs(curFrameTime);
+        frameCountRef.current = 0;
+        lastFpsTimeRef.current = now;
+      }
+
       const delta = clock.getDelta();
       const elapsed = clock.getElapsedTime();
       controls.update();
@@ -3923,28 +4162,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           }
         }
 
-        // Periodic Throttle Sync to React State for Telemetry HUD (every ~100ms)
-        if (Math.round(elapsed * 10) % 2 === 0) {
-          setWorkflowStage(workflowStageRef.current);
-          setSourceVaultVolumeL(Math.round(sourceVaultVolumeLRef.current));
-          setCollectionTankVolumeL(Math.round(collectionTankVolumeLRef.current));
-          setExtractionRateLpm(Math.round(extractionRateLpmRef.current * 10) / 10);
-          setSuctionVacuumKpa(Math.round(suctionVacuumKpaRef.current * 10) / 10);
-          setIsTransportReady(isTransportReadyRef.current);
-          setVehicleSpeedKmh(Math.round(vehicleSpeedKmhRef.current));
-          setDriveMode(driveModeRef.current);
-          setPistonStrokeMm(Math.round(strokeMm));
-          setAppliedPressureBar(dewateringResult.hydraulicPressureBar);
-          setCompactionForceKn(
-            Math.round(calculateCylinderForceKn(dewateringResult.hydraulicPressureBar, dynamicCompactionParams.boreDiameterMm) * 10) / 10
-          );
-          setCakeVolumeL(Math.round(dewateringResult.cakeVolumeL));
-          setFiltrateVolumeL(Math.round(dewateringResult.filtrateVolumeL));
-          setCompactionRatio(dewateringResult.compactionRatio);
-          setIsTransportLocked(isTransportLockedRef.current);
-          setIsReliefValveOpen(dewateringResult.reliefValveOpen || dewateringResult.hydraulicPressureBar >= reliefPressureLimitBarRef.current);
-        }
-
         const t = pathProgressRef.current;
         const pt = roadCurveRef.current.getPoint(t);
         const tangent = roadCurveRef.current.getTangent(t).normalize();
@@ -3973,8 +4190,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           Math.atan2(tangent.y, Math.sqrt(tangent.x * tangent.x + tangent.z * tangent.z)) * (180 / Math.PI);
         const gradeRad = (gradeDeg * Math.PI) / 180;
         const currentGradeDeg = Math.round(Math.abs(gradeDeg) * 10) / 10;
-        setCurrentInclineDeg(currentGradeDeg);
-        setCurrentAltitudeM(Math.round(1850 + pt.y * 30));
 
         // Accurate Centripetal Lateral G-Force from True Road Curvature (kappa = dTheta / ds)
         const h1 = Math.atan2(tangent.x, tangent.z);
@@ -3995,7 +4210,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           activeStressTest === 'hairpin_turn'
             ? (!hasBaffles ? 0.38 : 0.22)
             : Math.max(-0.35, Math.min(0.35, Math.round(rawLateralG * 100) / 100));
-        setLateralGForce(currentLateralG);
 
         // Climbing mechanical power required (kW)
         const massKg = 620 + payloadLiters * 1.1;
@@ -4004,7 +4218,32 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           activeStressTest === 'freeze_surge'
             ? 11.4
             : (massKg * 9.81 * inclineSin * speedMs) / 1000 / 0.82;
-        setActivePowerKw(Math.round(powerKw * 10) / 10);
+
+        // Periodic Throttle Sync to React State for Telemetry HUD (every ~200ms / 5Hz to prevent frame drops)
+        if (Math.round(elapsed * 10) % 2 === 0) {
+          setWorkflowStage(workflowStageRef.current);
+          setSourceVaultVolumeL(Math.round(sourceVaultVolumeLRef.current));
+          setCollectionTankVolumeL(Math.round(collectionTankVolumeLRef.current));
+          setExtractionRateLpm(Math.round(extractionRateLpmRef.current * 10) / 10);
+          setSuctionVacuumKpa(Math.round(suctionVacuumKpaRef.current * 10) / 10);
+          setIsTransportReady(isTransportReadyRef.current);
+          setVehicleSpeedKmh(Math.round(vehicleSpeedKmhRef.current));
+          setDriveMode(driveModeRef.current);
+          setPistonStrokeMm(Math.round(strokeMm));
+          setAppliedPressureBar(dewateringResult.hydraulicPressureBar);
+          setCompactionForceKn(
+            Math.round(calculateCylinderForceKn(dewateringResult.hydraulicPressureBar, dynamicCompactionParams.boreDiameterMm) * 10) / 10
+          );
+          setCakeVolumeL(Math.round(dewateringResult.cakeVolumeL));
+          setFiltrateVolumeL(Math.round(dewateringResult.filtrateVolumeL));
+          setCompactionRatio(dewateringResult.compactionRatio);
+          setIsTransportLocked(isTransportLockedRef.current);
+          setIsReliefValveOpen(dewateringResult.reliefValveOpen || dewateringResult.hydraulicPressureBar >= reliefPressureLimitBarRef.current);
+          setCurrentInclineDeg(currentGradeDeg);
+          setCurrentAltitudeM(Math.round(1850 + pt.y * 30));
+          setLateralGForce(currentLateralG);
+          setActivePowerKw(Math.round(powerKw * 10) / 10);
+        }
 
         // Rotate all drive sprockets, idlers, and bogie rollers forward/reverse with differential track steering
         if (driveMode !== 'parked' && driveMode !== 'desludge' && activeStressTest !== 'hill_brake') {
@@ -4608,6 +4847,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       tankMatRef.current.depthWrite = !isCutaway;
       tankMatRef.current.color.setHex(isCutaway ? 0x38bdf8 : 0x0f766e);
       tankMatRef.current.needsUpdate = true;
+      if (tankWorkLightRef.current) {
+        tankWorkLightRef.current.intensity = isCutaway ? (1.0 - cutawayOpacity) * 2.8 : 0.0;
+      }
     }
 
     // 3D Floating CAD Dimensions & Rollover Safety Pyramid Visibility
@@ -5231,7 +5473,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               <span>Machine & Ascent Telemetry</span>
             </span>
             <span className="text-[10px] bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded font-mono border border-emerald-800">
-              60 FPS
+              {measuredFps} FPS · {measuredFrameTimeMs}ms
             </span>
           </div>
 

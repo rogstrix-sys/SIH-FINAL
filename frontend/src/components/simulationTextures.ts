@@ -486,7 +486,7 @@ export function createCorrugatedTinTexture(baseHex: string): THREE.CanvasTexture
 
 // 5. Decal Generator: Swachh Bharat / SIH Livery & Engineering Markings
 export function createDecalTexture(
-  type: 'swachh_bharat' | 'battery_warning' | 'chevrons' | 'vacuum_gauge'
+  type: 'swachh_bharat' | 'battery_warning' | 'chevrons' | 'vacuum_gauge' | 'hazard_stripe' | 'compaction_warning'
 ): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
 
@@ -623,6 +623,50 @@ export function createDecalTexture(
     ctx.fillText('VACUUM (BAR)', 128, 175);
     ctx.font = 'bold 18px monospace';
     ctx.fillText('-0.82', 128, 198);
+  } else if (type === 'hazard_stripe') {
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#facc15'; // High-visibility safety yellow
+    ctx.fillRect(0, 0, 256, 64);
+
+    // Diagonal pitch black hazard stripes (45 degrees)
+    ctx.fillStyle = '#0f172a';
+    const stripeW = 24;
+    for (let x = -64; x < 256 + 64; x += stripeW * 2) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + stripeW, 0);
+      ctx.lineTo(x + stripeW - 32, 64);
+      ctx.lineTo(x - 32, 64);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (type === 'compaction_warning') {
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, 0, 512, 128);
+
+    // Amber border
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, 504, 120);
+
+    // Caution header
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 20px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠ HIGH-PRESSURE SLUDGE COMPACTOR', 256, 42);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 15px monospace';
+    ctx.fillText('CYLINDER RATING: 210 BAR · 120MM BORE', 256, 75);
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = '13px monospace';
+    ctx.fillText('TRANSPORT LOCK INTERLOCK ACTIVE · ZERO-ENTRY', 256, 105);
   }
 
   return new THREE.CanvasTexture(canvas);
