@@ -255,9 +255,12 @@ export const OverviewDashboard: React.FC = () => {
         <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs">
           {(
             [
-              { id: 'level_paved', label: '1. Level Paved Access' },
-              { id: 'hilly_sloped', label: '2. Sloped Hilly (14°)' },
-              { id: 'narrow_restricted', label: '3. Narrow Alley (1.6m)' }
+              { id: 'level_paved', label: '1. Paved' },
+              { id: 'hilly_sloped', label: '2. Hilly (14°)' },
+              { id: 'uneven_muddy', label: '3. Muddy' },
+              { id: 'narrow_restricted', label: '4. Alley (1.6m)' },
+              { id: 'heavy_rain', label: '5. Heavy Rain' },
+              { id: 'cold_high_altitude', label: '6. Alpine (-8°C)' }
             ] as const
           ).map((env) => (
             <button

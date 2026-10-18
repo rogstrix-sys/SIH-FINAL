@@ -12,7 +12,7 @@ import { DemonstrationSepticTank } from './DemonstrationSepticTank';
 import { ReceiverTank } from './ReceiverTank';
 import { TerrainEnvironment } from './TerrainEnvironment';
 import { AnnotationOverlays } from './AnnotationOverlays';
-import { Compass } from 'lucide-react';
+import { Compass, AlertTriangle } from 'lucide-react';
 
 export const MachineDigitalTwinScene: React.FC = () => {
   const showAnnotations = useSimulationStore((s) => s.displayOptions.showAnnotations);
@@ -25,15 +25,14 @@ export const MachineDigitalTwinScene: React.FC = () => {
   const stabilizerExtension = useSimulationStore((s) => s.kinematics.stabilizerExtension);
 
   // Dynamic chassis inclination angles based on slope and heading
-  const levelFactor = Math.max(0.15, 1.0 - stabilizerExtension * 0.65);
-  const machinePitchRad =
-    selectedScenario === 'hilly_sloped'
-      ? (feasibility.chassisPitchDeg * (Math.PI / 180.0)) * levelFactor
-      : 0;
-  const machineRollRad =
-    selectedScenario === 'hilly_sloped'
-      ? (feasibility.chassisRollDeg * (Math.PI / 180.0)) * levelFactor
-      : 0;
+  const levelFactor = Math.max(0.12, 1.0 - stabilizerExtension * 0.70);
+  const machinePitchRad = (feasibility.chassisPitchDeg * (Math.PI / 180.0)) * levelFactor;
+  const machineRollRad = (feasibility.chassisRollDeg * (Math.PI / 180.0)) * levelFactor;
+
+  // Machine vertical elevation placement factoring slope and mud sinkage
+  const mudDropY = -Math.min(0.08, feasibility.mudSinkageM || 0);
+  const slopeElevationY = terrainParams.slopeDeg > 0 ? 0.08 * (terrainParams.slopeDeg / 14.0) : 0;
+  const machineElevationY = slopeElevationY + mudDropY;
 
   return (
     <group position={[0, 0, 0]}>
@@ -42,10 +41,10 @@ export const MachineDigitalTwinScene: React.FC = () => {
 
       {/* 2. Mechanized Desludging Mobile Unit (Chassis + Pump + Tank + Reel + Boom) */}
       <group
-        position={[0, selectedScenario === 'hilly_sloped' ? 0.08 : 0, 0]}
+        position={[0, machineElevationY, 0]}
         rotation={[machinePitchRad, 0, machineRollRad]}
       >
-        {/* Chassis, Wheels & Outrigger Stabilizers */}
+        {/* Chassis, Wheels / Crawler Tracks & Outrigger Stabilizers */}
         <MobileChassis />
 
         {/* Vacuum Pump & Hydraulic Drive Assembly */}
@@ -60,8 +59,8 @@ export const MachineDigitalTwinScene: React.FC = () => {
         {/* Dual-Joint Articulated Crane Arm */}
         <ArticulatedBoom />
 
-        {/* 3D Chassis Inclinometer Bubble Widget (Hovering above chassis) */}
-        {selectedScenario === 'hilly_sloped' && (
+        {/* 3D Chassis Inclinometer Bubble Widget (Hovering above chassis on non-zero slope) */}
+        {terrainParams.slopeDeg > 2.0 && (
           <Html position={[0, 2.5, 0]} center style={{ pointerEvents: 'none' }}>
             <div className={`px-2.5 py-1 rounded-lg border text-[10px] font-mono shadow-2xl backdrop-blur flex items-center gap-1.5 whitespace-nowrap ${
               feasibility.stabilityStatus === 'critical_unstable'
@@ -78,8 +77,8 @@ export const MachineDigitalTwinScene: React.FC = () => {
           </Html>
         )}
 
-        {/* Lateral Clearance Warning Planes (When in narrow restricted access) */}
-        {selectedScenario === 'narrow_restricted' && feasibility.clearanceConflictDetected && (
+        {/* Lateral Clearance Warning Planes (When path width margin violates threshold) */}
+        {feasibility.clearanceConflictDetected && (
           <group position={[0, 0.45, 0]}>
             {/* Left red collision proximity indicator */}
             <mesh position={[0, 0, 0.85]}>
@@ -92,6 +91,14 @@ export const MachineDigitalTwinScene: React.FC = () => {
               <meshBasicMaterial color="#e11d48" opacity={0.35} transparent wireframe />
             </mesh>
           </group>
+        )}
+
+        {/* Underbody Ground Clearance Strike Warning Plane (When belly clearance compromised) */}
+        {feasibility.groundClearanceRisk && (
+          <mesh position={[0, 0.22, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[2.6, 1.2]} />
+            <meshBasicMaterial color="#f59e0b" opacity={0.45} transparent />
+          </mesh>
         )}
       </group>
 

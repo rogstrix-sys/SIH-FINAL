@@ -7,9 +7,18 @@
  * - Clearances: Metres (m)
  * - Pressures: Kilopascals (kPa)
  * - Roughness: Dimensionless scalar (0.0 to 1.0)
+ * - Rainfall: Millimetres per hour (mm/h)
+ * - Temperature: Degrees Celsius (°C)
+ * - Altitude: Metres above mean sea level (m MSL)
  */
 
-export type TerrainScenarioId = 'level_paved' | 'hilly_sloped' | 'narrow_restricted';
+export type TerrainScenarioId =
+  | 'level_paved'
+  | 'hilly_sloped'
+  | 'uneven_muddy'
+  | 'narrow_restricted'
+  | 'heavy_rain'
+  | 'cold_high_altitude';
 
 export interface TerrainScenarioConfig {
   id: TerrainScenarioId;
@@ -21,8 +30,17 @@ export interface TerrainScenarioConfig {
   defaultPathWidthM: number;
   defaultSetbackM: number;
   defaultHeadingDeg: number;
+  defaultRainfallIntensityMmH: number;
+  defaultAmbientTempC: number;
+  defaultAltitudeM: number;
   groundClearanceNominalM: number;
-  environmentType: 'urban_paved' | 'unpaved_mountain' | 'restricted_alley';
+  environmentType:
+    | 'urban_paved'
+    | 'unpaved_mountain'
+    | 'restricted_alley'
+    | 'wet_muddy'
+    | 'heavy_precipitation'
+    | 'alpine_snow';
 }
 
 export interface TerrainParameters {
@@ -32,7 +50,11 @@ export interface TerrainParameters {
   machineSetbackM: number;         // Staging distance from machine chassis to vault (3m - 30m)
   machineHeadingDeg: number;       // Machine angle relative to fall line: 0° nose up-slope, 90° cross-slope
   groundClearanceNominalM: number; // Machine chassis baseline ground clearance (0.32m)
-  soilFrictionCoeff: number;       // Soil-tire adhesion coefficient (0.30 - 0.95)
+  soilFrictionCoeff: number;       // Baseline dry soil-tire/track adhesion coefficient (0.30 - 0.95)
+  rainfallIntensityMmH: number;    // Precipitation intensity (0 - 100 mm/h)
+  ambientTempC: number;            // Site ambient air temperature (-20°C to +45°C)
+  altitudeM: number;               // Ground elevation above mean sea level (0 - 4500m)
+  configuredHoseLengthM: number;   // Total available extraction hose on machine drum (10 - 60m)
 }
 
 export interface StabilityThresholds {
@@ -73,8 +95,18 @@ export interface EngineeringFeasibilityEstimate {
   machineWidthM: number;               // 1.35m chassis (or 1.85m with stabilizers deployed)
   lateralClearanceMarginM: number;     // (pathWidth - machineWidth) / 2
   clearanceConflictDetected: boolean;
-  effectiveGroundClearanceM: number;   // nominal clearance minus roughness obstacle amplitude
+  effectiveGroundClearanceM: number;   // nominal clearance minus roughness obstacle amplitude and mud sinkage
   groundClearanceRisk: boolean;
+
+  // Environmental & Climate Adjustments
+  atmosphericPressureKpa: number;      // Barometric pressure at altitude: 101.325 * (1 - 2.25577e-5 * h)^5.25588
+  maxAchievableSuctionLiftM: number;   // Theoretical barometric lift ceiling minus friction loss
+  effectiveSlurryViscosityCp: number;  // Dynamic viscosity adjusted for temperature: mu0 * exp(0.035 * (20 - T))
+  soilTractionCoeff: number;          // Soil-tire friction adjusted for wetness/rain
+  mudSinkageM: number;                // Ground penetration depth under load in saturated soil
+  isAltitudeDerated: boolean;         // True if elevation difference approaches atmospheric barometric limit
+  isTemperatureCritical: boolean;     // True if sub-zero freezing or extreme viscosity surge detected
+  isTractionSlipRisk: boolean;        // True if tan(slope) > soilTractionCoeff
 
   // Overall Stability
   stabilityStatus: StabilityStatus;
@@ -92,6 +124,9 @@ export interface ScenarioComparisonItem {
   requiredHoseM: number;
   totalRoutingLossKpa: number;
   clearanceMarginM: number;
+  atmosphericPressureKpa: number;
+  maxAchievableSuctionLiftM: number;
+  effectiveSlurryViscosityCp: number;
   stabilityStatus: StabilityStatus;
   feasibilityRating: 'FEASIBLE' | 'CONDITIONAL' | 'HIGH_RISK';
   keyConstraint: string;

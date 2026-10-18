@@ -10,7 +10,8 @@ import {
   Gauge,
   Compass,
   Layers,
-  Sparkles
+  Thermometer,
+  CloudRain
 } from 'lucide-react';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { TerrainScenarioId } from '../types/terrainScenarios';
@@ -27,13 +28,11 @@ export const TerrainComparisonPanel: React.FC<TerrainComparisonPanelProps> = ({ 
   const setTerrainScenario = useSimulationStore((s) => s.setTerrainScenario);
   const stabilizerExtension = useSimulationStore((s) => s.kinematics.stabilizerExtension);
   const hoseLengthM = useSimulationStore((s) => s.parameters.hoseLengthM);
-  const stabilityThresholds = useSimulationStore((s) => s.stabilityThresholds);
 
-  // Evaluate comparison matrix
+  // Evaluate comparison matrix across all 6 scenarios
   const comparisonItems = evaluateAllScenariosComparison(
     stabilizerExtension,
-    hoseLengthM,
-    stabilityThresholds
+    hoseLengthM
   );
 
   return (
@@ -47,11 +46,11 @@ export const TerrainComparisonPanel: React.FC<TerrainComparisonPanelProps> = ({ 
               Operating Environment Comparison & Engineering Feasibility
             </h3>
             <Badge variant="cyan" size="sm">
-              3 SCENARIOS
+              6 SCENARIOS
             </Badge>
           </div>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Comparative kinematic feasibility, hydrostatic head penalty, lateral clearance, and simplified stability assessment.
+            Comparative kinematic feasibility, barometric vacuum lift limits, temperature deratings, and stability limits.
           </p>
         </div>
 
@@ -66,12 +65,12 @@ export const TerrainComparisonPanel: React.FC<TerrainComparisonPanelProps> = ({ 
       <div className="bg-graphite-950 p-2.5 rounded-lg border border-amber-800/40 text-[10px] font-mono text-amber-300/90 flex items-start gap-2">
         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
         <p className="leading-relaxed">
-          <strong className="text-amber-300 uppercase">Preliminary Engineering Estimate:</strong> This feasibility model provides simplified hydrostatic and kinematic calculations for planning. It is not a certified tip-over, structural, hydraulic, or field-safety geotechnical analysis. All limits are preliminary estimates.
+          <strong className="text-amber-300 uppercase">Preliminary Engineering Estimate:</strong> This feasibility model provides simplified hydrostatic, barometric, and kinematic calculations for planning. It is not a certified tip-over, structural, hydraulic, or field-safety geotechnical analysis. All limits are preliminary estimates.
         </p>
       </div>
 
-      {/* 3 Scenarios Side-By-Side Comparison Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* 6 Scenarios Side-By-Side Comparison Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {comparisonItems.map((item) => {
           const isCurrent = selectedScenario === item.id;
           const config = TERRAIN_SCENARIOS[item.id];
@@ -145,9 +144,17 @@ export const TerrainComparisonPanel: React.FC<TerrainComparisonPanelProps> = ({ 
                   <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-400 flex items-center gap-1">
                       <Gauge className="w-3 h-3 text-rose-400" />
-                      Routing Loss:
+                      Patm / Lift Limit:
                     </span>
-                    <span className="font-semibold">{item.totalRoutingLossKpa} kPa</span>
+                    <span className="font-semibold">{item.atmosphericPressureKpa} kPa ({item.maxAchievableSuctionLiftM}m)</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <Thermometer className="w-3 h-3 text-cyan-400" />
+                      Viscosity:
+                    </span>
+                    <span className="font-semibold">{item.effectiveSlurryViscosityCp.toFixed(0)} cP</span>
                   </div>
 
                   <div className="flex justify-between items-center text-slate-300">
@@ -156,7 +163,7 @@ export const TerrainComparisonPanel: React.FC<TerrainComparisonPanelProps> = ({ 
                       Side Clearance:
                     </span>
                     <span className={`font-semibold ${item.clearanceMarginM < 0.2 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {item.clearanceMarginM} m/side
+                      {item.clearanceMarginM.toFixed(2)} m/side
                     </span>
                   </div>
                 </div>

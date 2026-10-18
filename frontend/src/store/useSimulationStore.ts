@@ -53,7 +53,8 @@ import {
   TERRAIN_SCENARIOS,
   DEFAULT_TERRAIN_PARAMS,
   DEFAULT_STABILITY_THRESHOLDS,
-  calculateTerrainFeasibility
+  calculateTerrainFeasibility,
+  getScenarioDefaultParams
 } from '../simulation/terrainFeasibilityModel';
 
 export const DEFAULT_PARAMETERS: SimulationParameters = {
@@ -284,6 +285,7 @@ export interface SimulationStore {
   feasibility: EngineeringFeasibilityEstimate;
   setTerrainScenario: (id: TerrainScenarioId) => void;
   updateTerrainParams: (partial: Partial<TerrainParameters>) => void;
+  resetTerrainToDefault: () => void;
   updateStabilityThresholds: (partial: Partial<StabilityThresholds>) => void;
 
   // Guided Demonstration Tour
@@ -907,15 +909,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       const scenarioConfig = TERRAIN_SCENARIOS[scenarioId];
       if (!scenarioConfig) return;
       set((state) => {
-        const nextTerrain: TerrainParameters = {
-          ...state.terrainParams,
-          slopeDeg: scenarioConfig.defaultSlopeDeg,
-          surfaceRoughness: scenarioConfig.defaultRoughness,
-          pathWidthM: scenarioConfig.defaultPathWidthM,
-          machineSetbackM: scenarioConfig.defaultSetbackM,
-          machineHeadingDeg: scenarioConfig.defaultHeadingDeg,
-          groundClearanceNominalM: scenarioConfig.groundClearanceNominalM
-        };
+        const nextTerrain = getScenarioDefaultParams(scenarioId);
+        // Preserve user-configured hose length if set
+        nextTerrain.configuredHoseLengthM = state.parameters.hoseLengthM;
         const nextFeasibility = calculateTerrainFeasibility(
           nextTerrain,
           state.kinematics.stabilizerExtension,
@@ -934,7 +930,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       get().addEvent(
         'info',
         'SCENARIO_SWITCH',
-        `Operating environment switched to ${TERRAIN_SCENARIOS[scenarioId].name}: Slope ${TERRAIN_SCENARIOS[scenarioId].defaultSlopeDeg}°, Width ${TERRAIN_SCENARIOS[scenarioId].defaultPathWidthM}m.`
+        `Operating environment switched to ${TERRAIN_SCENARIOS[scenarioId].name}: Slope ${TERRAIN_SCENARIOS[scenarioId].defaultSlopeDeg}°, Width ${TERRAIN_SCENARIOS[scenarioId].defaultPathWidthM}m, Rain ${TERRAIN_SCENARIOS[scenarioId].defaultRainfallIntensityMmH}mm/h, Temp ${TERRAIN_SCENARIOS[scenarioId].defaultAmbientTempC}°C, Alt ${TERRAIN_SCENARIOS[scenarioId].defaultAltitudeM}m.`
       );
     },
 
@@ -955,6 +951,32 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           feasibility: nextFeasibility
         };
       });
+    },
+
+    resetTerrainToDefault: () => {
+      const currentId = get().selectedScenario;
+      const defaultParams = getScenarioDefaultParams(currentId);
+      set((state) => {
+        defaultParams.configuredHoseLengthM = state.parameters.hoseLengthM;
+        const nextFeasibility = calculateTerrainFeasibility(
+          defaultParams,
+          state.kinematics.stabilizerExtension,
+          state.parameters.hoseLengthM,
+          state.parameters.slurryDensityKgM3,
+          state.parameters.slurryViscosityCp,
+          state.parameters.hoseDiameterMm,
+          state.stabilityThresholds
+        );
+        return {
+          terrainParams: defaultParams,
+          feasibility: nextFeasibility
+        };
+      });
+      get().addEvent(
+        'info',
+        'TERRAIN_RESET',
+        `Reset terrain parameters to default calibration for ${TERRAIN_SCENARIOS[currentId].name}.`
+      );
     },
 
     updateStabilityThresholds: (partial: Partial<StabilityThresholds>) => {

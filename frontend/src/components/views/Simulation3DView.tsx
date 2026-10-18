@@ -85,9 +85,12 @@ export const Simulation3DView: React.FC = () => {
             <Mountain className="w-3.5 h-3.5 text-safety-500 ml-1" />
             {(
               [
-                { id: 'level_paved', label: 'Level' },
+                { id: 'level_paved', label: 'Paved' },
                 { id: 'hilly_sloped', label: 'Hilly (14°)' },
-                { id: 'narrow_restricted', label: 'Alley (1.6m)' }
+                { id: 'uneven_muddy', label: 'Muddy' },
+                { id: 'narrow_restricted', label: 'Alley (1.6m)' },
+                { id: 'heavy_rain', label: 'Rain (75mm/h)' },
+                { id: 'cold_high_altitude', label: 'Alpine (-8°C)' }
               ] as const
             ).map((env) => (
               <button
