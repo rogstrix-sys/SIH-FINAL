@@ -71,8 +71,8 @@ export const GuidedDemoTour: React.FC = () => {
           </div>
         </div>
 
-        {/* Stepper Dots Bar */}
-        <div className="px-4 py-2 bg-graphite-900/60 border-b border-slate-800/80 grid grid-cols-6 gap-1.5">
+        {/* Stepper Dots Bar for 12 Stages */}
+        <div className="px-3 py-1.5 bg-graphite-900/60 border-b border-slate-800/80 grid grid-cols-6 sm:grid-cols-12 gap-1 overflow-x-auto">
           {DEMO_STAGES.map((stg, idx) => {
             const isCompleted = idx < guidedDemo.currentStageIndex;
             const isCurrent = idx === guidedDemo.currentStageIndex;
@@ -80,32 +80,45 @@ export const GuidedDemoTour: React.FC = () => {
               <button
                 key={stg.id}
                 onClick={() => setDemoStage(idx)}
-                className={`flex flex-col text-left px-2 py-1.5 rounded-lg transition-all ${
+                className={`flex flex-col text-left px-1.5 py-1 rounded transition-all ${
                   isCurrent
                     ? 'bg-safety-500/15 border border-safety-500/50 text-white'
                     : isCompleted
                     ? 'bg-slate-800/40 hover:bg-slate-800 border border-slate-700/40 text-slate-400'
                     : 'bg-transparent hover:bg-slate-800/30 text-slate-500 border border-transparent'
                 }`}
+                title={stg.title}
               >
-                <div className="flex items-center justify-between text-[10px] font-mono mb-0.5">
+                <div className="flex items-center justify-between text-[9px] font-mono mb-0.5">
                   <span className={isCurrent ? 'text-safety-400 font-bold' : ''}>
-                    0{idx + 1}
+                    {(idx + 1).toString().padStart(2, '0')}
                   </span>
-                  {isCompleted && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                  {isCompleted && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />}
                 </div>
-                <span className="text-[11px] font-medium truncate hidden sm:inline">
-                  {stg.id === 'idle_staging'
-                    ? 'Staging'
-                    : stg.id === 'deploy_stabilizers'
-                    ? 'Deploy'
-                    : stg.id === 'prime_pump'
-                    ? 'Prime'
-                    : stg.id === 'extract_sludge'
-                    ? 'Extract'
-                    : stg.id === 'discharge_transfer'
-                    ? 'Discharge'
-                    : 'Complete'}
+                <span className="text-[9px] font-medium truncate hidden md:inline">
+                  {stg.id === 'project_objective'
+                    ? '1. Objective'
+                    : stg.id === 'component_inspection'
+                    ? '2. Inspect'
+                    : stg.id === 'scenario_selection'
+                    ? '3. Scenario'
+                    : stg.id === 'feasibility_assessment'
+                    ? '4. Feasibility'
+                    : stg.id === 'deployment_positioning'
+                    ? '5. Deploy'
+                    : stg.id === 'priming_extraction'
+                    ? '6. Extract'
+                    : stg.id === 'live_dashboard'
+                    ? '7. Dashboard'
+                    : stg.id === 'alarm_estop_demo'
+                    ? '8. E-Stop'
+                    : stg.id === 'discharge_mass_balance'
+                    ? '9. Discharge'
+                    : stg.id === 'scenario_comparison'
+                    ? '10. Compare'
+                    : stg.id === 'hardware_bom_test_plan'
+                    ? '11. BOM/Tests'
+                    : '12. Report'}
                 </span>
               </button>
             );

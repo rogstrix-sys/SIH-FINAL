@@ -290,6 +290,125 @@ export const ReportsView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* 4. System Verification, Assumptions & Engineering Limitations Dossier */}
+        <div className="mt-8 border-t border-slate-800 print:border-gray-300 pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200 print:text-black flex items-center gap-2">
+              <Layers className="w-4 h-4 text-safety-500" />
+              <span>4. System Verification, Assumptions & Engineering Limitations Dossier</span>
+            </h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 print:text-amber-700 font-semibold">
+              TRUTH-IN-ENGINEERING AUDIT
+            </span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-800/40 text-amber-300/90 print:bg-amber-50 print:border-amber-300 print:text-amber-800 text-[11px] font-mono mb-5 leading-relaxed">
+            <strong className="text-amber-400 print:text-amber-900">DISCLAIMER & INTEGRITY NOTICE:</strong> This digital twin models fluid hydrodynamics, kinematics, and mass conservation numerically using standard engineering formulations. Zero field trials, regulatory approvals, or physical test certifications are fabricated or claimed as completed. Physical commissioning gates must be performed on physical test rigs prior to actual sanitization deployment.
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+            {/* Subsection 4.1: Implemented Software Features */}
+            <div className="p-4 bg-graphite-950 print:bg-gray-50 rounded-lg border border-slate-800 print:border-gray-200 space-y-2">
+              <div className="flex items-center gap-2 text-emerald-400 print:text-emerald-700 font-bold uppercase text-[11px]">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>4.1 Implemented Software Features</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 print:text-gray-700 text-[11px]">
+                <li>Deterministic 8-state machine (IDLE, DEPLOYMENT, PRIMING, EXTRACTION, DISCHARGE, COMPLETE, PAUSED, FAULT).</li>
+                <li>Latched emergency-stop and interlock enforcement (tank capacity, priming threshold, ground stability).</li>
+                <li>PBR 3D machine model with dual-axis stabilizer jacks, articulating boom, rotating reel, and dynamic sludge volume layers.</li>
+                <li>6 Procedural terrain and environmental scenarios with slope, roughness, temperature, rainfall, and altitude parameters.</li>
+                <li>Closed-loop mass balance tracking invariant conserving matter within ±0.001 L.</li>
+                <li>Hardware Prototype Planning module with parametric Bill of Materials and editable INR costing.</li>
+                <li>12-Stage sequential guided demonstration tour covering end-to-end operation.</li>
+              </ul>
+            </div>
+
+            {/* Subsection 4.2: Calculated Engineering Estimates */}
+            <div className="p-4 bg-graphite-950 print:bg-gray-50 rounded-lg border border-slate-800 print:border-gray-200 space-y-2">
+              <div className="flex items-center gap-2 text-cyan-400 print:text-cyan-700 font-bold uppercase text-[11px]">
+                <Activity className="w-3.5 h-3.5" />
+                <span>4.2 Calculated Engineering Estimates</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 print:text-gray-700 text-[11px]">
+                <li><strong>Darcy-Weisbach head loss (hf):</strong> Swamee-Jain explicit equation with commercial pipe roughness (e = 0.045 mm).</li>
+                <li><strong>Reynolds number regime:</strong> Dynamic transition tracking (laminar Re &lt; 2000, transitional, turbulent Re &gt; 4000).</li>
+                <li><strong>Temperature-viscosity decay:</strong> Andrade empirical formulation for temperature-dependent fluid shearing.</li>
+                <li><strong>Barometric suction ceiling:</strong> Altitude-derated atmospheric pressure according to the barometric formula.</li>
+                <li><strong>Chassis tilt & stability:</strong> Vector slope projection with simplified 15° operational rollover warning limit.</li>
+                <li><strong>Motor power demand:</strong> Hydraulic power divided by total electromechanical efficiency (η_pump · η_motor).</li>
+              </ul>
+            </div>
+
+            {/* Subsection 4.3: Conceptual Design Assumptions */}
+            <div className="p-4 bg-graphite-950 print:bg-gray-50 rounded-lg border border-slate-800 print:border-gray-200 space-y-2">
+              <div className="flex items-center gap-2 text-amber-400 print:text-amber-700 font-bold uppercase text-[11px]">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>4.3 Conceptual Design Assumptions</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 print:text-gray-700 text-[11px]">
+                <li>Quasi-homogeneous non-Newtonian slurry assumption; particle settling, compaction, and grit packing are not simulated.</li>
+                <li>Stabilizer footings assume rigid soil contact with sufficient bearing capacity; ground shear failure is unmodeled.</li>
+                <li>Vacuum pump efficiency is modeled as a linear derating curve down to fluid vapor pressure.</li>
+                <li>Hose routing assumes a catenary slack multiplier (1.25×) over straight-line Pythagorean Euclidean distance.</li>
+                <li>Atmospheric gas emissions (H2S, CH4) are simulated as steady-state concentrations without anaerobic microbial kinetics.</li>
+              </ul>
+            </div>
+
+            {/* Subsection 4.4: Features Requiring Engineering Validation */}
+            <div className="p-4 bg-graphite-950 print:bg-gray-50 rounded-lg border border-slate-800 print:border-gray-200 space-y-2">
+              <div className="flex items-center gap-2 text-rose-400 print:text-rose-700 font-bold uppercase text-[11px]">
+                <Zap className="w-3.5 h-3.5" />
+                <span>4.4 Features Requiring Engineering Validation</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 print:text-gray-700 text-[11px]">
+                <li>Bingham plastic yield stress (τ₀) and Herschel-Bulkley parameters for total suspended solids (TSS) &gt; 8%.</li>
+                <li>Liquid slosh dynamics (free-surface momentum transfer) affecting chassis center-of-gravity during grade climbs.</li>
+                <li>Two-phase air-sludge ingestion behavior and suction valve wear under grit abrasiveness.</li>
+                <li>Hose collapse resistance under sustained -75 kPa vacuum suction through sharp 90° bends.</li>
+                <li>Thermal dissipation and motor overheat protection during prolonged continuous stall torque.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Subsection 4.5: Physical Tests Not Yet Conducted (Pre-Commissioning Gates) */}
+          <div className="mt-4 p-4 bg-graphite-950 print:bg-gray-50 rounded-lg border border-slate-800 print:border-gray-200">
+            <div className="flex items-center gap-2 text-yellow-400 print:text-yellow-700 font-bold uppercase text-[11px] mb-2">
+              <Scale className="w-3.5 h-3.5" />
+              <span>4.5 Physical Tests Not Yet Conducted (Pre-Commissioning Verification Gates)</span>
+            </div>
+            <p className="text-[11px] text-slate-400 print:text-gray-600 mb-3">
+              The following experimental tests must be completed on a fabricated hardware prototype before field deployment:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-[11px] font-mono">
+              <div className="p-2.5 rounded bg-slate-900 print:bg-white border border-slate-800 print:border-gray-200">
+                <span className="text-safety-400 font-bold block mb-1">Gate 1: Shaker Table Resonance</span>
+                <span className="text-slate-300 print:text-gray-700">ISO 10816-3 harmonic vibration scan to identify structural frame resonance frequencies.</span>
+              </div>
+              <div className="p-2.5 rounded bg-slate-900 print:bg-white border border-slate-800 print:border-gray-200">
+                <span className="text-safety-400 font-bold block mb-1">Gate 2: Bentonite Slurry Flow Loop</span>
+                <span className="text-slate-300 print:text-gray-700">Bench-scale flow validation across 100 cP to 1200 cP to verify head loss and cavitation limits.</span>
+              </div>
+              <div className="p-2.5 rounded bg-slate-900 print:bg-white border border-slate-800 print:border-gray-200">
+                <span className="text-safety-400 font-bold block mb-1">Gate 3: Vacuum Vessel Hydrotest</span>
+                <span className="text-slate-300 print:text-gray-700">Hydrostatic and negative pressure vessel qualification per ASME Section VIII Division 1.</span>
+              </div>
+              <div className="p-2.5 rounded bg-slate-900 print:bg-white border border-slate-800 print:border-gray-200">
+                <span className="text-safety-400 font-bold block mb-1">Gate 4: 25° Tilt Table Static Stability</span>
+                <span className="text-slate-300 print:text-gray-700">Physical tilt table measurement of rollover angle with 100% full payload to confirm CG calculations.</span>
+              </div>
+              <div className="p-2.5 rounded bg-slate-900 print:bg-white border border-slate-800 print:border-gray-200">
+                <span className="text-safety-400 font-bold block mb-1">Gate 5: ATEX / IECEx Explosion Proof</span>
+                <span className="text-slate-300 print:text-gray-700">Confined space extraction nozzle electrical bonding and Zone 0 non-sparking certification.</span>
+              </div>
+              <div className="p-2.5 rounded bg-slate-900 print:bg-white border border-slate-800 print:border-gray-200">
+                <span className="text-safety-400 font-bold block mb-1">Gate 6: Cold Weather Suction Lift</span>
+                <span className="text-slate-300 print:text-gray-700">Verification of dry priming time and suction lift capacity at -5°C and 2500 m altitude.</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

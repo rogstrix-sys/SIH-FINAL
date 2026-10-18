@@ -568,6 +568,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       set({
         engine: nextEngine,
         operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
         status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
       });
       if (nextEngine.operatingState === 'FAULT') {
@@ -583,6 +584,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       set({
         engine: nextEngine,
         operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
         status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
       });
       if (nextEngine.operatingState === 'FAULT') {
@@ -598,6 +600,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       set({
         engine: nextEngine,
         operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
         status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
       });
       if (nextEngine.operatingState === 'FAULT') {
@@ -613,6 +616,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       set({
         engine: nextEngine,
         operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
         status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
       });
       if (nextEngine.operatingState === 'FAULT') {
@@ -1039,27 +1043,72 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       const {
         setCameraPreset,
         setSelectedComponent,
+        setTerrainScenario,
         triggerDeploy,
         triggerPrime,
         triggerExtract,
         triggerDischarge,
+        triggerEmergencyStop,
+        triggerResolveFault,
         resetSimulation,
+        setActiveView,
         addEvent
       } = get();
 
       setCameraPreset(stage.cameraPreset);
       setSelectedComponent(stage.selectedComponent);
 
-      if (targetIdx === 0) {
-        resetSimulation();
-      } else if (targetIdx === 1) {
-        triggerDeploy();
-      } else if (targetIdx === 2) {
-        triggerPrime();
-      } else if (targetIdx === 3) {
-        triggerExtract();
-      } else if (targetIdx === 4) {
-        triggerDischarge();
+      if (stage.activeViewTarget) {
+        setActiveView(stage.activeViewTarget);
+      }
+
+      if (stage.scenarioTarget) {
+        setTerrainScenario(stage.scenarioTarget as any);
+      }
+
+      // State machine sequencing according to stage without bypassing interlocks
+      switch (stage.id) {
+        case 'project_objective':
+          resetSimulation();
+          break;
+        case 'component_inspection':
+          break;
+        case 'scenario_selection':
+        case 'feasibility_assessment':
+          setTerrainScenario('hilly_sloped');
+          break;
+        case 'deployment_positioning':
+          if (get().operatingState === 'FAULT') triggerResolveFault();
+          triggerDeploy();
+          break;
+        case 'priming_extraction':
+          if (get().operatingState === 'FAULT') triggerResolveFault();
+          if (!get().interlocks.isDeployed) {
+            triggerDeploy();
+          }
+          triggerPrime();
+          setTimeout(() => {
+            get().triggerExtract();
+          }, 350);
+          break;
+        case 'live_dashboard':
+          if (get().operatingState !== 'EXTRACT' && get().interlocks.isPrimed) {
+            triggerExtract();
+          }
+          break;
+        case 'alarm_estop_demo':
+          triggerEmergencyStop();
+          break;
+        case 'discharge_mass_balance':
+          if (get().operatingState === 'FAULT') {
+            triggerResolveFault();
+          }
+          triggerDischarge();
+          break;
+        case 'scenario_comparison':
+        case 'hardware_bom_test_plan':
+        case 'report_export':
+          break;
       }
 
       set((s) => ({

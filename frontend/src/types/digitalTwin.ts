@@ -107,12 +107,18 @@ export interface ComponentInspectionData {
 }
 
 export type DemoStageId =
-  | 'idle_staging'
-  | 'deploy_stabilizers'
-  | 'prime_pump'
-  | 'extract_sludge'
-  | 'discharge_transfer'
-  | 'complete_summary';
+  | 'project_objective'
+  | 'component_inspection'
+  | 'scenario_selection'
+  | 'feasibility_assessment'
+  | 'deployment_positioning'
+  | 'priming_extraction'
+  | 'live_dashboard'
+  | 'alarm_estop_demo'
+  | 'discharge_mass_balance'
+  | 'scenario_comparison'
+  | 'hardware_bom_test_plan'
+  | 'report_export';
 
 export interface DemoStageInfo {
   id: DemoStageId;
@@ -120,6 +126,8 @@ export interface DemoStageInfo {
   title: string;
   subtitle: string;
   operatingStateTarget: string;
+  activeViewTarget?: NavView;
+  scenarioTarget?: string;
   cameraPreset: CameraPreset;
   selectedComponent: string | null;
   durationSec: number;
