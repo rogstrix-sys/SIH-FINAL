@@ -58,6 +58,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: Compass,
     badge: 'TRL 4',
     description: 'Hardware BOM, modular assembly & TRL roadmap'
+  },
+  {
+    id: 'reports',
+    label: 'Engineering Audit',
+    icon: FileText,
+    badge: 'AUDIT',
+    description: 'Limitations dossier, pre-commissioning gates & certificate'
   }
 ];
 

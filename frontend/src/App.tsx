@@ -173,8 +173,10 @@ export const App: React.FC = () => {
             {activeView === 'overview' && <OverviewDashboard />}
             {activeView === 'simulation3d' && <Simulation3DView />}
             {activeView === 'terrain' && <TerrainScenariosView />}
-            {(activeView === 'operations' || activeView === 'sensors') && <LiveOperationsView />}
-            {(activeView === 'analysis' || activeView === 'reports') && <EngineeringAnalysisView />}
+            {activeView === 'operations' && <LiveOperationsView />}
+            {activeView === 'sensors' && <SensorsView />}
+            {activeView === 'analysis' && <EngineeringAnalysisView />}
+            {activeView === 'reports' && <ReportsView />}
             {activeView === 'prototype' && <PrototypePlanningView />}
             {activeView === 'parameters' && <ParametersView />}
           </main>

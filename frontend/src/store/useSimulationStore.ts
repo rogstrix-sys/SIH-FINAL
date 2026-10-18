@@ -296,6 +296,10 @@ export interface SimulationStore {
   prevDemoStage: () => void;
   setDemoStage: (stageIndex: number) => void;
   toggleDemoAutoAdvance: () => void;
+
+  // Engineering Test Scenarios (Deliverable 2)
+  runCompleteCycleScenario: () => void;
+  triggerTankFullScenario: () => void;
 }
 
 function syncEngineParamsFromDigitalTwin(
@@ -1145,6 +1149,75 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           isAutoAdvancing: !s.guidedDemo.isAutoAdvancing
         }
       }));
+    },
+
+    runCompleteCycleScenario: () => {
+      const { resetSimulation, setSimSpeed, triggerDeploy, addEvent } = get();
+      resetSimulation();
+      setSimSpeed(2.5);
+      triggerDeploy();
+      addEvent(
+        'info',
+        'TEST_SCENARIO',
+        'TEST SCENARIO 1: Automated full desludging cycle initiated (IDLE → DEPLOY → PRIME → EXTRACT → DISCHARGE → COMPLETE).'
+      );
+    },
+
+    triggerTankFullScenario: () => {
+      const { resetSimulation, setSimSpeed, triggerExtract, addEvent } = get();
+      resetSimulation();
+      setSimSpeed(2.0);
+
+      // Pre-fill collection tank to 99.6% (2,390 L out of 2,400 L) while strictly conserving mass!
+      set((state) => {
+        const capacity = state.engine.parameters.collectionTankCapacityL; // 2400
+        const prefillL = capacity - 5; // 2395 L (99.8% capacity)
+        const initialTotal = state.materialBalance.totalInitialVolumeL; // 3800
+        const newSourceL = Math.max(0, initialTotal - prefillL); // 1405 L
+
+        const nextMat = {
+          ...state.materialBalance,
+          collectionVolumeL: prefillL,
+          collectionFillPct: (prefillL / capacity) * 100,
+          sourceVolumeL: newSourceL,
+          receiverVolumeL: 0,
+          totalInitialVolumeL: initialTotal,
+          massBalanceDiscrepancyL: prefillL + newSourceL - initialTotal,
+          cycleExtractedL: 0.0
+        };
+
+        const nextEngine = {
+          ...state.engine,
+          materialBalance: nextMat,
+          interlocks: {
+            ...state.engine.interlocks,
+            isDeployed: true,
+            isPrimed: true,
+            preventExtractNotDeployed: false,
+            preventExtractNotPrimed: false
+          },
+          kinematics: {
+            ...state.engine.kinematics,
+            deployProgress: 1.0,
+            stabilizerExtension: 1.0
+          }
+        };
+
+        return {
+          engine: nextEngine,
+          materialBalance: nextMat,
+          interlocks: nextEngine.interlocks,
+          kinematics: nextEngine.kinematics
+        };
+      });
+
+      // Initiate extraction — in subsequent simulation step, will immediately hit capacity and trip tank-full interlock!
+      triggerExtract();
+      addEvent(
+        'warning',
+        'TEST_SCENARIO',
+        'TEST SCENARIO 2: Overfill protection interlock activated. Collection vessel pre-filled to 99.6% capacity.'
+      );
     }
   };
 });

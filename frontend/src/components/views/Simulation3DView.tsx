@@ -13,6 +13,7 @@ import {
   Compass,
   TableProperties,
   AlertTriangle,
+  CheckCircle2,
   Truck
 } from 'lucide-react';
 import { useSimulationStore, INSPECTABLE_COMPONENTS } from '../../store/useSimulationStore';
@@ -40,7 +41,12 @@ export const Simulation3DView: React.FC = () => {
   const selectedScenario = useSimulationStore((s) => s.selectedScenario);
   const setTerrainScenario = useSimulationStore((s) => s.setTerrainScenario);
   const terrainParams = useSimulationStore((s) => s.terrainParams);
+  const updateTerrainParams = useSimulationStore((s) => s.updateTerrainParams);
+  const updateParameter = useSimulationStore((s) => s.updateParameter);
   const feasibility = useSimulationStore((s) => s.feasibility);
+  const operatingState = useSimulationStore((s) => s.operatingState);
+  const runCompleteCycleScenario = useSimulationStore((s) => s.runCompleteCycleScenario);
+  const triggerTankFullScenario = useSimulationStore((s) => s.triggerTankFullScenario);
 
   const [showComparison, setShowComparison] = useState(false);
 
@@ -237,68 +243,327 @@ export const Simulation3DView: React.FC = () => {
         </div>
       )}
 
-      {/* Right Details / Component Inspector Panel */}
-      <aside className="w-full md:w-80 bg-graphite-900 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto shrink-0">
+      {/* Right Details / Component Inspector & Configuration Panel */}
+      <aside className="w-full md:w-96 bg-graphite-900 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto shrink-0 select-none">
+        {/* Header */}
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-white font-mono flex items-center gap-2">
-            <Info className="w-4 h-4 text-safety-500" />
-            <span>Digital Twin Inspector</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Click any 3D asset in the viewport to inspect mechanical specifications and live transducer readings.
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-white font-mono flex items-center gap-2">
+              <Info className="w-4 h-4 text-safety-500" />
+              <span>Component Inspector & Config</span>
+            </h2>
+            <Badge variant="cyan" size="sm">
+              STATE: {operatingState}
+            </Badge>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1 font-sans">
+            Click 3D components in the viewport to inspect geometry, tweak configurable parameters, or trigger test scenarios.
           </p>
         </div>
 
-        {selectedData ? (
-          <Card
-            title={selectedData.name}
-            subtitle={selectedData.type}
-            icon={<Box className="w-4 h-4 text-safety-500" />}
-            headerAction={
-              <Badge variant="safety" size="sm">
-                SELECTED
-              </Badge>
-            }
-          >
-            <div className="space-y-3 font-mono text-xs">
-              <p className="text-slate-300 text-xs leading-relaxed font-sans">
-                {selectedData.description}
+        {/* Demonstration Test Scenarios Card */}
+        <div className="p-3 rounded-xl bg-graphite-950 border border-slate-800 space-y-2.5 font-mono text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-safety-500" />
+              <span>Demonstration Test Scenarios</span>
+            </span>
+            <Badge variant="safety" size="sm">VERIFICATION</Badge>
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              onClick={runCompleteCycleScenario}
+              className="w-full text-left p-2 rounded-lg bg-emerald-950/30 border border-emerald-800/40 hover:bg-emerald-900/40 text-emerald-300 transition text-[11px]"
+            >
+              <div className="font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Scenario 1: Complete Operating Cycle</span>
+              </div>
+              <p className="text-[10px] text-emerald-400/80 font-sans mt-0.5">
+                Runs IDLE → DEPLOY → PRIME → EXTRACT → DISCHARGE → COMPLETE with mass conservation check.
               </p>
+            </button>
 
-              <div className="grid grid-cols-3 gap-2 bg-graphite-950 p-2.5 rounded-lg border border-slate-800 text-center">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">TEMP</span>
-                  <span className="text-slate-200 font-bold">{selectedData.temperatureC}°C</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">PRESS</span>
-                  <span className="text-slate-200 font-bold">{selectedData.pressureBar} bar</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">VIBE</span>
-                  <span className="text-slate-200 font-bold">{selectedData.vibrationMmS} mm/s</span>
-                </div>
+            <button
+              onClick={triggerTankFullScenario}
+              className="w-full text-left p-2 rounded-lg bg-amber-950/30 border border-amber-800/40 hover:bg-amber-900/40 text-amber-300 transition text-[11px]"
+            >
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <span>Scenario 2: Overfill Protection Interlock</span>
               </div>
+              <p className="text-[10px] text-amber-400/80 font-sans mt-0.5">
+                Pre-fills tank to 99.6% and attempts extraction; verifies automated cutoff and alarm trip.
+              </p>
+            </button>
+          </div>
+        </div>
 
-              <div className="space-y-1.5 bg-graphite-950 p-2.5 rounded-lg border border-slate-800 text-[11px]">
-                <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block mb-1">
-                  Technical Specifications
-                </span>
-                {Object.entries(selectedData.specifications).map(([key, val]) => (
-                  <div key={key} className="flex justify-between items-baseline gap-2">
-                    <span className="text-slate-400">{key}:</span>
-                    <span className="text-slate-200 font-semibold text-right">{val}</span>
+        {/* Selected Component Inspection & Configuration */}
+        {selectedData ? (
+          <div className="space-y-4">
+            <Card
+              title={selectedData.name}
+              subtitle={selectedData.type}
+              icon={<Box className="w-4 h-4 text-safety-500" />}
+              headerAction={
+                <Badge variant="safety" size="sm">
+                  SELECTED
+                </Badge>
+              }
+            >
+              <div className="space-y-3 font-mono text-xs">
+                {/* Truth-in-engineering assumption disclaimer tag */}
+                <div className="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] leading-snug">
+                  <strong>CONCEPTUAL DESIGN ASSUMPTION:</strong> Dimensions, mass, and specifications represent preliminary engineering baselines pending physical fabrication.
+                </div>
+
+                <p className="text-slate-300 text-xs leading-relaxed font-sans">
+                  {selectedData.description}
+                </p>
+
+                {/* Transducer Readout */}
+                <div className="grid grid-cols-3 gap-2 bg-graphite-950 p-2.5 rounded-lg border border-slate-800 text-center">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">TEMP</span>
+                    <span className="text-slate-200 font-bold">{selectedData.temperatureC}°C</span>
                   </div>
-                ))}
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">PRESS</span>
+                    <span className="text-slate-200 font-bold">{selectedData.pressureBar} bar</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">VIBE</span>
+                    <span className="text-slate-200 font-bold">{selectedData.vibrationMmS} mm/s</span>
+                  </div>
+                </div>
+
+                {/* Technical Specifications */}
+                <div className="space-y-1.5 bg-graphite-950 p-2.5 rounded-lg border border-slate-800 text-[11px]">
+                  <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block mb-1">
+                    Technical Specifications
+                  </span>
+                  {Object.entries(selectedData.specifications).map(([key, val]) => (
+                    <div key={key} className="flex justify-between items-baseline gap-2">
+                      <span className="text-slate-400">{key}:</span>
+                      <span className="text-slate-200 font-semibold text-right">{val}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+
+            {/* Interactive Component Configuration Panel */}
+            <Card
+              title="Component Configuration"
+              subtitle="Modify physical & operating parameters"
+              icon={<Sliders className="w-4 h-4 text-cyan-400" />}
+            >
+              <div className="space-y-3 font-mono text-xs">
+                {/* Chassis Configuration */}
+                {selectedComponentId === 'chassis' && (
+                  <>
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Mobility Running Gear:</span>
+                        <span className="text-safety-400 font-bold uppercase">{displayOptions.mobilityMode || 'wheels'}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setMobilityMode('wheels')}
+                          className={`p-2 rounded text-xs font-bold border transition ${
+                            displayOptions.mobilityMode !== 'tracks'
+                              ? 'bg-safety-500 text-white border-safety-400'
+                              : 'bg-graphite-950 text-slate-400 border-slate-800 hover:text-white'
+                          }`}
+                        >
+                          4WD Lug Wheels
+                        </button>
+                        <button
+                          onClick={() => setMobilityMode('tracks')}
+                          className={`p-2 rounded text-xs font-bold border transition ${
+                            displayOptions.mobilityMode === 'tracks'
+                              ? 'bg-safety-500 text-white border-safety-400'
+                              : 'bg-graphite-950 text-slate-400 border-slate-800 hover:text-white'
+                          }`}
+                        >
+                          Rubber Crawler Tracks
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Ground Clearance:</span>
+                        <span className="text-white font-bold">{Math.round(terrainParams.groundClearanceNominalM * 1000)} mm</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.20"
+                        max="0.45"
+                        step="0.01"
+                        value={terrainParams.groundClearanceNominalM}
+                        onChange={(e) => updateTerrainParams({ groundClearanceNominalM: Number(e.target.value) })}
+                        className="w-full accent-safety-500"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Pump Configuration */}
+                {selectedComponentId === 'pump' && (
+                  <>
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Pump Speed:</span>
+                        <span className="text-white font-bold">{parameters.pumpRpm} RPM</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="600"
+                        max="3000"
+                        step="50"
+                        value={parameters.pumpRpm}
+                        onChange={(e) => updateParameter('pumpRpm', Number(e.target.value))}
+                        className="w-full accent-safety-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded bg-graphite-950 border border-slate-800">
+                      <span className="text-slate-300">Water-Jetting Ring Assist:</span>
+                      <button
+                        onClick={() => updateParameter('waterJetEnabled', !parameters.waterJetEnabled)}
+                        className={`px-2.5 py-1 rounded text-xs font-bold transition ${
+                          parameters.waterJetEnabled
+                            ? 'bg-cyan-500 text-white'
+                            : 'bg-graphite-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {parameters.waterJetEnabled ? 'ENABLED (180 bar)' : 'OFF'}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Tank Configuration */}
+                {selectedComponentId === 'tank' && (
+                  <>
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Target Vacuum Rating:</span>
+                        <span className="text-white font-bold">{parameters.targetVacuumKpa} kPa</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="-85"
+                        max="-40"
+                        step="5"
+                        value={parameters.targetVacuumKpa}
+                        onChange={(e) => updateParameter('targetVacuumKpa', Number(e.target.value))}
+                        className="w-full accent-safety-500"
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-500 italic">
+                      Geometric tank shell capacity: 2,400 L (SA 516 Gr 70 boiler plate).
+                    </div>
+                  </>
+                )}
+
+                {/* Hose & Reel Configuration */}
+                {(selectedComponentId === 'hosereel' || selectedComponentId === 'hose') && (
+                  <>
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Hose Diameter:</span>
+                        <span className="text-white font-bold">Ø{parameters.hoseDiameterMm} mm</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[50, 75, 100, 150].map((dia) => (
+                          <button
+                            key={dia}
+                            onClick={() => updateParameter('hoseDiameterMm', dia)}
+                            className={`p-1.5 rounded text-xs font-bold border transition ${
+                              parameters.hoseDiameterMm === dia
+                                ? 'bg-safety-500 text-white border-safety-400'
+                                : 'bg-graphite-950 text-slate-400 border-slate-800 hover:text-white'
+                            }`}
+                          >
+                            Ø{dia}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Deployed Hose Length:</span>
+                        <span className="text-white font-bold">{parameters.hoseLengthM} m</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="60"
+                        step="5"
+                        value={parameters.hoseLengthM}
+                        onChange={(e) => updateParameter('hoseLengthM', Number(e.target.value))}
+                        className="w-full accent-safety-500"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Septic Vault Configuration */}
+                {selectedComponentId === 'septictank' && (
+                  <>
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Sludge Viscosity:</span>
+                        <span className="text-white font-bold">{parameters.slurryViscosityCp} cP</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="100"
+                        max="2500"
+                        step="50"
+                        value={parameters.slurryViscosityCp}
+                        onChange={(e) => updateParameter('slurryViscosityCp', Number(e.target.value))}
+                        className="w-full accent-safety-500"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-400">Initial Sludge Depth:</span>
+                        <span className="text-white font-bold">{parameters.initialSludgeDepthM} m</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="3.0"
+                        step="0.1"
+                        value={parameters.initialSludgeDepthM}
+                        onChange={(e) => updateParameter('initialSludgeDepthM', Number(e.target.value))}
+                        className="w-full accent-safety-500"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Receiver Tank */}
+                {selectedComponentId === 'receiver' && (
+                  <div className="text-[11px] text-slate-400 p-2 rounded bg-graphite-950 border border-slate-800">
+                    Municipal disposal tanker: 10,000 L rated transfer capacity. Quick-acting DN100 Camlock coupler with double-ear clamp.
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-6 border border-dashed border-slate-800 rounded-xl text-center">
             <Box className="w-8 h-8 text-slate-600 mb-2" />
-            <span className="text-xs font-mono text-slate-400">No Component Selected</span>
-            <span className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
-              Click machine chassis, pump, tank, boom, nozzle, or septic vault in 3D scene.
+            <span className="text-xs font-mono text-slate-400 font-bold">No Component Selected</span>
+            <span className="text-[11px] text-slate-500 mt-1 max-w-[220px] font-sans">
+              Click machine chassis, pump, tank, boom, nozzle, or septic vault in 3D scene to inspect and tune parameters.
             </span>
           </div>
         )}
