@@ -40,6 +40,10 @@ const PRESET_CONFIGS: Record<CameraPreset, CameraTargetDef> = {
   cutaway: {
     position: new THREE.Vector3(2.9, -0.4, 3.2),
     target: new THREE.Vector3(2.9, -0.6, -1.6)
+  },
+  tank: {
+    position: new THREE.Vector3(-0.45, 1.8, 2.4),
+    target: new THREE.Vector3(-0.45, 1.0, 0)
   }
 };
 

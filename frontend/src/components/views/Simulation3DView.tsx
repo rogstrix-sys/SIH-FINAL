@@ -60,6 +60,7 @@ export const Simulation3DView: React.FC = () => {
     { id: 'iso', label: 'Isometric', desc: '45° engineering axonometric angle' },
     { id: 'top', label: 'Top', desc: 'Orthographic plant layout view' },
     { id: 'side', label: 'Side', desc: 'Direct elevation profile view' },
+    { id: 'tank', label: 'Tank', desc: 'Close-up on collection vessel, compaction platen, and hydraulic cylinder' },
     { id: 'boom', label: 'Boom', desc: 'Close-up on crane arm and hose reel' },
     { id: 'nozzle', label: 'Nozzle', desc: 'Focused on submerged nozzle and slurry fluid' },
     { id: 'cutaway', label: 'Cutaway', desc: 'Front elevation view into septic vault interior' }

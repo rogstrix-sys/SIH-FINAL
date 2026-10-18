@@ -30,7 +30,19 @@ import {
   TableProperties,
   Sparkles,
   BatteryCharging,
-  Info
+  Info,
+  Filter,
+  Lock,
+  Unlock,
+  Anchor,
+  ChevronRight,
+  Check,
+  X,
+  ShieldCheck,
+  Radio,
+  ArrowDownToLine,
+  ArrowUpToLine,
+  Square
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -54,6 +66,7 @@ import { Badge } from '../ui/Badge';
 import { Tooltip } from '../ui/Tooltip';
 import { CameraPreset } from '../../types/digitalTwin';
 import { TerrainScenarioId } from '../../types/terrainScenarios';
+import { WORKFLOW_STAGES } from '../../types/simulationEngine';
 import { TERRAIN_SCENARIOS, PRELIMINARY_ESTIMATE_DISCLAIMER } from '../../simulation/terrainFeasibilityModel';
 import { HYDRAULIC_MODEL_LIMITATIONS } from '../../simulation/deterministicEngine';
 import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
@@ -102,6 +115,25 @@ export const OverviewDashboard: React.FC = () => {
   const setActiveView = useSimulationStore((s) => s.setActiveView);
   const startGuidedDemo = useSimulationStore((s) => s.startGuidedDemo);
 
+  // Mobility & Compaction state & actions
+  const mobilityTelemetry = useSimulationStore((s) => s.mobilityTelemetry);
+  const mobilityInputs = useSimulationStore((s) => s.mobilityInputs);
+  const compactionTelemetry = useSimulationStore((s) => s.compactionTelemetry);
+  const compactionParams = useSimulationStore((s) => s.compactionParams);
+  const alarmsActive = useSimulationStore((s) => s.alarmsActive);
+
+  const triggerTravel = useSimulationStore((s) => s.triggerTravel);
+  const triggerPosition = useSimulationStore((s) => s.triggerPosition);
+  const triggerStabilize = useSimulationStore((s) => s.triggerStabilize);
+  const triggerDeployHose = useSimulationStore((s) => s.triggerDeployHose);
+  const triggerSettle = useSimulationStore((s) => s.triggerSettle);
+  const triggerCompact = useSimulationStore((s) => s.triggerCompact);
+  const triggerSecure = useSimulationStore((s) => s.triggerSecure);
+  const triggerTransportReady = useSimulationStore((s) => s.triggerTransportReady);
+  const retractCompactionPiston = useSimulationStore((s) => s.retractCompactionPiston);
+  const stopVehicle = useSimulationStore((s) => s.stopVehicle);
+  const setWorkflowStage = useSimulationStore((s) => s.setWorkflowStage);
+
   // Viewport / Inspection
   const cameraPreset = useSimulationStore((s) => s.cameraPreset);
   const setCameraPreset = useSimulationStore((s) => s.setCameraPreset);
@@ -125,6 +157,7 @@ export const OverviewDashboard: React.FC = () => {
     { id: 'iso', label: 'ISO' },
     { id: 'top', label: 'Top' },
     { id: 'side', label: 'Side' },
+    { id: 'tank', label: 'Tank' },
     { id: 'boom', label: 'Boom' },
     { id: 'nozzle', label: 'Nozzle' },
     { id: 'cutaway', label: 'Cutaway' }
@@ -166,35 +199,60 @@ export const OverviewDashboard: React.FC = () => {
     ? 'Simulation is not currently paused.'
     : 'Resume simulation clock and active actuators.';
 
-  const deployDisabled = isFault || operatingState !== 'IDLE';
+  // 1. Travel
+  const travelDisabled =
+    isFault ||
+    (!compactionTelemetry.isTransportLocked && compactionTelemetry.strokeMm > 5) ||
+    kinematics.deployProgress > 0.05;
+  const travelReason = isFault
+    ? 'Fault active: Clear fault first.'
+    : !compactionTelemetry.isTransportLocked && compactionTelemetry.strokeMm > 5
+    ? 'Interlock blocked: Compaction platen must be in locked transport position (0 mm) before travel.'
+    : kinematics.deployProgress > 0.05
+    ? 'Interlock blocked: Outriggers and boom crane must be stowed (<0.05) before travel.'
+    : 'Drive tracked vehicle across terrain to worksite.';
+
+  // 2. Stop
+  const stopDisabled = !mobilityTelemetry.isMoving && status !== 'running';
+  const stopReason = !mobilityTelemetry.isMoving && status !== 'running'
+    ? 'Vehicle and simulation are already stopped.'
+    : 'Halt crawler track motion, lock brakes, and pause transit.';
+
+  // 3. Deploy
+  const deployDisabled = isFault || (interlocks.isDeployed && kinematics.deployProgress >= 0.95);
   const deployReason = isFault
     ? 'Fault active: Clear fault first.'
-    : operatingState !== 'IDLE'
-    ? `Machine is currently in ${operatingState} phase.`
-    : 'Extend 4 hydraulic outriggers and articulate extraction boom into vault opening.';
+    : interlocks.isDeployed && kinematics.deployProgress >= 0.95
+    ? 'Machine stabilizers and boom are already fully deployed.'
+    : 'Extend 4 hydraulic outriggers and articulate suction boom over septic vault.';
 
+  // 4. Prime
   const primeDisabled =
     isFault ||
     (!interlocks.isDeployed && kinematics.deployProgress < 0.95) ||
     operatingState === 'PRIME' ||
+    operatingState === 'PRIMING' ||
     operatingState === 'EXTRACT' ||
+    operatingState === 'EXTRACTION' ||
     operatingState === 'DISCHARGE';
   const primeReason = isFault
     ? 'Fault active: Clear fault first.'
     : !interlocks.isDeployed && kinematics.deployProgress < 0.95
-    ? 'Interlock blocked: Machine stabilizers and boom must be fully deployed first.'
-    : operatingState === 'PRIME'
-    ? 'Priming sequence is currently running.'
-    : operatingState === 'EXTRACT' || operatingState === 'DISCHARGE'
+    ? 'Interlock blocked: Stabilizers and hose must be deployed first.'
+    : operatingState === 'PRIME' || operatingState === 'PRIMING'
+    ? 'Priming sequence currently running.'
+    : operatingState === 'EXTRACT' || operatingState === 'EXTRACTION' || operatingState === 'DISCHARGE'
     ? `Machine already past priming (${operatingState}).`
     : 'Prime positive displacement vacuum chamber and flood suction lines.';
 
+  // 5. Extract
   const extractDisabled =
     isFault ||
     !interlocks.isPrimed ||
     materialBalance.collectionFillPct >= 100 ||
     materialBalance.sourceVolumeL <= 10 ||
-    operatingState === 'EXTRACT';
+    operatingState === 'EXTRACT' ||
+    operatingState === 'EXTRACTION';
   const extractReason = isFault
     ? 'Fault active: Clear fault first.'
     : !interlocks.isPrimed
@@ -203,10 +261,61 @@ export const OverviewDashboard: React.FC = () => {
     ? 'Collection tank is full (100% capacity reached).'
     : materialBalance.sourceVolumeL <= 10
     ? 'Source septic vault is evacuated (empty).'
-    : operatingState === 'EXTRACT'
+    : operatingState === 'EXTRACT' || operatingState === 'EXTRACTION'
     ? 'Extraction is currently active.'
     : 'Engage vacuum pump and draw sludge through suction umbilical.';
 
+  // 6. Settle
+  const settleDisabled =
+    isFault ||
+    operatingState === 'SETTLE' ||
+    (operatingState !== 'EXTRACT' && operatingState !== 'EXTRACTION' && materialBalance.collectionVolumeL < 10);
+  const settleReason = isFault
+    ? 'Fault active: Clear fault first.'
+    : operatingState === 'SETTLE'
+    ? 'Settling phase currently active.'
+    : 'Halt vacuum pump; allow slurry phase separation and degassing.';
+
+  // 7. Compact
+  const compactDisabled =
+    isFault ||
+    mobilityTelemetry.isMoving ||
+    !interlocks.isStabilized ||
+    operatingState === 'COMPACT' ||
+    materialBalance.collectionVolumeL < 10;
+  const compactReason = isFault
+    ? 'Fault active: Clear fault first.'
+    : mobilityTelemetry.isMoving
+    ? 'Interlock blocked: Vehicle must be stationary.'
+    : !interlocks.isStabilized
+    ? 'Interlock blocked: Hydraulic outriggers must be deployed.'
+    : operatingState === 'COMPACT'
+    ? 'Compaction stroke currently active.'
+    : materialBalance.collectionVolumeL < 10
+    ? 'No sludge in collection tank to dewater.'
+    : 'Lower hydraulic cylinder; press porous platen into sludge bed up to 180 bar.';
+
+  // 8. Retract
+  const retractDisabled =
+    isFault || compactionTelemetry.strokeMm <= 1 || compactionTelemetry.pistonState === 'RETRACTING';
+  const retractReason = isFault
+    ? 'Fault active: Clear fault first.'
+    : compactionTelemetry.strokeMm <= 1
+    ? 'Piston is already fully retracted at top home (0 mm).'
+    : compactionTelemetry.pistonState === 'RETRACTING'
+    ? 'Piston is currently retracting.'
+    : 'Retract compaction platen to top home position (0 mm).';
+
+  // 9. Secure
+  const secureDisabled =
+    isFault || (compactionTelemetry.isTransportLocked && compactionTelemetry.strokeMm <= 5);
+  const secureReason = isFault
+    ? 'Fault active: Clear fault first.'
+    : compactionTelemetry.isTransportLocked && compactionTelemetry.strokeMm <= 5
+    ? 'Piston is already secured with retention pins engaged.'
+    : 'Retract platen to 0 mm and engage dual mechanical retention pins for safe transport.';
+
+  // 10. Discharge
   const dischargeDisabled =
     isFault || materialBalance.collectionVolumeL <= 0.5 || operatingState === 'DISCHARGE';
   const dischargeReason = isFault
@@ -217,6 +326,11 @@ export const OverviewDashboard: React.FC = () => {
     ? 'Discharge transfer is currently active.'
     : 'Evacuate on-board collection tank to external waste disposal tanker.';
 
+  // 11. Reset
+  const resetDisabled = false;
+  const resetReason = 'Reset simulation state, mass balance, kinematics, charts, and telemetry to initial baseline.';
+
+  // 12. E-Stop
   const eStopDisabled = interlocks.emergencyStopLatched;
   const eStopReason = interlocks.emergencyStopLatched
     ? 'E-STOP already latched. Acknowledge and resolve fault to restore IDLE state.'
@@ -225,11 +339,23 @@ export const OverviewDashboard: React.FC = () => {
   // State badge variant
   const stateVariant: Record<string, 'slate' | 'safety' | 'warning' | 'danger' | 'success' | 'cyan'> = {
     IDLE: 'slate',
+    TRAVEL: 'warning',
+    POSITION: 'slate',
+    STABILIZE: 'warning',
     DEPLOY: 'warning',
+    DEPLOYMENT: 'warning',
+    DEPLOY_HOSE: 'warning',
     PRIME: 'safety',
+    PRIMING: 'safety',
     EXTRACT: 'success',
+    EXTRACTION: 'success',
+    SETTLE: 'cyan',
+    COMPACT: 'safety',
+    SECURE: 'slate',
+    TRANSPORT_READY: 'success',
     DISCHARGE: 'cyan',
     COMPLETE: 'success',
+    PAUSED: 'warning',
     FAULT: 'danger'
   };
 
@@ -339,31 +465,41 @@ export const OverviewDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-            {[
-              { id: 'IDLE', label: '1. IDLE' },
-              { id: 'DEPLOY', label: '2. DEPLOY' },
-              { id: 'PRIME', label: '3. PRIME' },
-              { id: 'EXTRACT', label: '4. EXTRACT' },
-              { id: 'DISCHARGE', label: '5. DISCHG' },
-              { id: 'COMPLETE', label: '6. DONE' }
-            ].map((step, idx) => {
-              const isActive = operatingState === step.id;
-              const stepOrder = ['IDLE', 'DEPLOY', 'PRIME', 'EXTRACT', 'DISCHARGE', 'COMPLETE'];
-              const isPassed = stepOrder.indexOf(operatingState) > idx;
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5">
+            {WORKFLOW_STAGES.map((step, idx) => {
+              const isActive =
+                operatingState === step.id ||
+                (step.id === 'DEPLOY_HOSE' && (operatingState === 'DEPLOY' || operatingState === 'DEPLOYMENT')) ||
+                (step.id === 'PRIME' && operatingState === 'PRIMING') ||
+                (step.id === 'EXTRACT' && operatingState === 'EXTRACTION');
+
+              const stageOrder = WORKFLOW_STAGES.map((s) => s.id);
+              const currentIdx = stageOrder.indexOf(
+                operatingState === 'DEPLOY' || operatingState === 'DEPLOYMENT'
+                  ? 'DEPLOY_HOSE'
+                  : operatingState === 'PRIMING'
+                  ? 'PRIME'
+                  : operatingState === 'EXTRACTION'
+                  ? 'EXTRACT'
+                  : (operatingState as any)
+              );
+              const isPassed = currentIdx > idx;
+
               return (
                 <div
                   key={step.id}
-                  className={`px-2 py-1.5 rounded-lg border text-center font-mono text-[11px] transition-all ${
+                  onClick={() => setWorkflowStage(step.id)}
+                  title={`${step.name}: ${step.description}\nRequired Conditions: ${step.requiredConditions.join(', ')}`}
+                  className={`px-1.5 py-1.5 rounded-lg border text-center font-mono text-[10px] cursor-pointer transition-all ${
                     isActive
-                      ? 'border-safety-500 bg-safety-500/15 text-safety-400 font-bold shadow-md shadow-safety-500/20 animate-pulse'
+                      ? 'border-safety-500 bg-safety-500/20 text-safety-400 font-bold shadow-md shadow-safety-500/20 ring-1 ring-safety-500/50'
                       : isPassed
                       ? 'border-emerald-600/50 bg-emerald-950/30 text-emerald-400'
-                      : 'border-slate-800 bg-graphite-950/60 text-slate-400'
+                      : 'border-slate-800 bg-graphite-950/60 text-slate-400 hover:border-slate-700'
                   }`}
                 >
-                  <div className="truncate">{step.label}</div>
-                  <div className="text-[9px] uppercase tracking-tighter opacity-80">
+                  <div className="truncate font-semibold">{step.label}</div>
+                  <div className="text-[8px] uppercase tracking-tighter opacity-80 mt-0.5">
                     {isActive ? 'ACTIVE' : isPassed ? 'PASSED' : 'STANDBY'}
                   </div>
                 </div>
@@ -604,8 +740,8 @@ export const OverviewDashboard: React.FC = () => {
         </div>
 
         {/* Operating Control Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Start / Pause / Resume */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* Automated Cycle Controls */}
           <Tooltip content={startReason}>
             <Button
               variant="primary"
@@ -645,77 +781,166 @@ export const OverviewDashboard: React.FC = () => {
             </Button>
           </Tooltip>
 
-          <div className="h-5 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <div className="h-5 w-px bg-slate-800 mx-0.5 hidden sm:block" />
 
-          {/* Discrete Sequence Steps */}
+          {/* Dedicated Engineering Operation Buttons */}
+          {/* 1. Travel */}
+          <Tooltip content={travelReason}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={travelDisabled}
+              onClick={triggerTravel}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Truck className="w-3.5 h-3.5 text-amber-400" />
+              Travel
+            </Button>
+          </Tooltip>
+
+          {/* 2. Stop */}
+          <Tooltip content={stopReason}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={stopDisabled}
+              onClick={stopVehicle}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Square className="w-3.5 h-3.5 text-rose-400" />
+              Stop
+            </Button>
+          </Tooltip>
+
+          {/* 3. Deploy */}
           <Tooltip content={deployReason}>
             <Button
               variant="secondary"
               size="sm"
               disabled={deployDisabled}
               onClick={triggerDeploy}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-1 text-xs"
             >
-              <Truck className="w-3.5 h-3.5 text-amber-400" />
+              <Anchor className="w-3.5 h-3.5 text-amber-400" />
               Deploy
             </Button>
           </Tooltip>
 
+          {/* 4. Prime */}
           <Tooltip content={primeReason}>
             <Button
               variant="secondary"
               size="sm"
               disabled={primeDisabled}
               onClick={triggerPrime}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-1 text-xs"
             >
               <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
               Prime
             </Button>
           </Tooltip>
 
+          {/* 5. Extract */}
           <Tooltip content={extractReason}>
             <Button
               variant="secondary"
               size="sm"
               disabled={extractDisabled}
               onClick={triggerExtract}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-1 text-xs"
             >
               <Activity className="w-3.5 h-3.5 text-safety-400" />
               Extract
             </Button>
           </Tooltip>
 
+          {/* 6. Settle */}
+          <Tooltip content={settleReason}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={settleDisabled}
+              onClick={triggerSettle}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Clock className="w-3.5 h-3.5 text-purple-400" />
+              Settle
+            </Button>
+          </Tooltip>
+
+          {/* 7. Compact */}
+          <Tooltip content={compactReason}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={compactDisabled}
+              onClick={triggerCompact}
+              className="flex items-center gap-1 text-xs"
+            >
+              <ArrowDownToLine className="w-3.5 h-3.5 text-safety-400" />
+              Compact
+            </Button>
+          </Tooltip>
+
+          {/* 8. Retract */}
+          <Tooltip content={retractReason}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={retractDisabled}
+              onClick={retractCompactionPiston}
+              className="flex items-center gap-1 text-xs"
+            >
+              <ArrowUpToLine className="w-3.5 h-3.5 text-cyan-400" />
+              Retract
+            </Button>
+          </Tooltip>
+
+          {/* 9. Secure */}
+          <Tooltip content={secureReason}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={secureDisabled}
+              onClick={triggerSecure}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+              Secure
+            </Button>
+          </Tooltip>
+
+          {/* 10. Discharge */}
           <Tooltip content={dischargeReason}>
             <Button
               variant="secondary"
               size="sm"
               disabled={dischargeDisabled}
               onClick={triggerDischarge}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-1 text-xs"
             >
               <ArrowRightCircle className="w-3.5 h-3.5 text-emerald-400" />
               Discharge
             </Button>
           </Tooltip>
 
-          <div className="h-5 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <div className="h-5 w-px bg-slate-800 mx-0.5 hidden sm:block" />
 
-          {/* Reset */}
-          <Tooltip content="Reset simulation state, mass balance, kinematics, charts, and telemetry to initial IDLE baseline.">
+          {/* 11. Reset */}
+          <Tooltip content={resetReason}>
             <Button
               variant="ghost"
               size="sm"
+              disabled={resetDisabled}
               onClick={resetSimulation}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white"
+              className="flex items-center gap-1 text-xs text-slate-400 hover:text-white"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Reset Machine
+              Reset
             </Button>
           </Tooltip>
 
-          {/* E-Stop */}
+          {/* 12. E-Stop */}
           <Tooltip content={eStopReason}>
             <Button
               variant="danger"
@@ -750,24 +975,296 @@ export const OverviewDashboard: React.FC = () => {
             <span>
               {isFault
                 ? 'CRITICAL FAULT: Emergency stop latched. Clear fault before operating.'
+                : operatingState === 'TRAVEL'
+                ? 'Machine in TRAVEL: Tracked crawler mobility active across terrain.'
+                : operatingState === 'POSITION'
+                ? 'Machine in POSITION: Vehicle stationary at worksite, parking brake locked.'
+                : operatingState === 'STABILIZE'
+                ? 'Machine in STABILIZE: Deploying 4 telescoping hydraulic outriggers.'
+                : operatingState === 'DEPLOY' || operatingState === 'DEPLOYMENT' || operatingState === 'DEPLOY_HOSE'
+                ? 'Machine in DEPLOY: Articulating crane boom and positioning suction nozzle.'
+                : operatingState === 'PRIME' || operatingState === 'PRIMING'
+                ? 'Machine in PRIME: Flooding positive displacement vacuum chamber.'
+                : operatingState === 'EXTRACT' || operatingState === 'EXTRACTION'
+                ? 'Machine in EXTRACT: Continuous vacuum mass transfer into collection vessel.'
+                : operatingState === 'SETTLE'
+                ? 'Machine in SETTLE: Slurry phase separation and tank gas venting.'
+                : operatingState === 'COMPACT'
+                ? 'Machine in COMPACT: Guided vertical hydraulic platen pressing sludge bed.'
+                : operatingState === 'SECURE'
+                ? 'Machine in SECURE: Platen retracted to 0 mm, retention pins engaged.'
+                : operatingState === 'TRANSPORT_READY'
+                ? 'Machine in TRANSPORT READY: Travel envelope clearance verified safe.'
+                : operatingState === 'DISCHARGE'
+                ? 'Machine in DISCHARGE: Evacuating collection tank to external disposal tanker.'
+                : operatingState === 'COMPLETE'
+                ? 'Cycle COMPLETE: Batch target accomplished and mass balance verified.'
                 : !interlocks.isDeployed
                 ? 'Machine in IDLE: Stabilizers and hose boom stowed.'
                 : !interlocks.isPrimed
                 ? 'Machine deployed: Vacuum chamber requires priming before extraction.'
                 : materialBalance.collectionFillPct >= 100
-                ? 'Collection tank full (100% capacity): Ready for DISCHARGE.'
+                ? 'Collection tank full (100% capacity): Ready for dewatering or DISCHARGE.'
                 : materialBalance.sourceVolumeL <= 10
                 ? 'Vault evacuated: Complete or initiate final DISCHARGE.'
-                : operatingState === 'EXTRACT'
-                ? 'Extraction active: Continuous mass transfer into on-board vessel.'
-                : operatingState === 'DISCHARGE'
-                ? 'Discharge active: Evacuating collection tank to external disposal tanker.'
                 : 'All safety interlocks clear. Ready for command.'}
             </span>
           </div>
           <span className="text-slate-400 hidden md:inline">
             {isRunning ? 'RUNNING' : isPaused ? 'PAUSED' : 'STANDBY'}
           </span>
+        </div>
+      </div>
+
+      {/* 4. Tracked Engineering Vehicle & Hydraulic Dewatering Transducer Matrix */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        {/* Domain 1: Tracked Mobility & Chassis Dynamics */}
+        <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3 shadow-md flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-slate-800 mb-2">
+            <span className="font-bold text-white uppercase flex items-center gap-1.5 text-[11px]">
+              <Truck className="w-3.5 h-3.5 text-amber-400" />
+              1. Tracked Mobility & Chassis
+            </span>
+            <Badge variant={mobilityTelemetry.isMoving ? 'safety' : 'slate'} size="sm">
+              {mobilityTelemetry.isMoving ? 'TRANSIT' : 'STATIONARY'}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Travel Speed</span>
+              <span className="text-sm font-bold text-amber-300">
+                {mobilityTelemetry.speedKmh.toFixed(1)}{' '}
+                <span className="text-[10px] font-normal text-slate-400">km/h</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                ({mobilityTelemetry.speedMs.toFixed(2)} m/s)
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Chassis Tilt</span>
+              <span className="text-sm font-bold text-cyan-300">
+                {mobilityTelemetry.effectiveTiltDeg.toFixed(1)}°
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                P: {mobilityTelemetry.pitchDeg.toFixed(1)}° | R: {mobilityTelemetry.rollDeg.toFixed(1)}°
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Crawler Tracks (L/R)</span>
+              <span className="text-xs font-semibold text-slate-200">
+                {mobilityTelemetry.leftTrackSpeedMs.toFixed(2)} / {mobilityTelemetry.rightTrackSpeedMs.toFixed(2)}{' '}
+                <span className="text-[9px] text-slate-400">m/s</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Yaw: {(mobilityTelemetry.steerRateRadS * (180 / Math.PI)).toFixed(1)}°/s
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Ground Contact</span>
+              <span className="text-xs font-semibold text-emerald-300">
+                {mobilityTelemetry.groundPressureKpa.toFixed(1)}{' '}
+                <span className="text-[9px] text-slate-400">kPa</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Max Grade: {mobilityTelemetry.gradeabilityMaxDeg.toFixed(1)}°
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Domain 2: Sludge Extraction Core */}
+        <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3 shadow-md flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-slate-800 mb-2">
+            <span className="font-bold text-white uppercase flex items-center gap-1.5 text-[11px]">
+              <Activity className="w-3.5 h-3.5 text-safety-400" />
+              2. Sludge Extraction Core
+            </span>
+            <Badge
+              variant={engine.telemetry.flowRateLpm > 0 ? 'success' : 'slate'}
+              size="sm"
+            >
+              {engine.telemetry.flowRateLpm > 0 ? 'PUMP ACTIVE' : 'IDLE'}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Suction Flow</span>
+              <span className="text-sm font-bold text-safety-400">
+                {engine.telemetry.flowRateLpm.toFixed(1)}{' '}
+                <span className="text-[10px] font-normal text-slate-400">L/min</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                ({engine.telemetry.flowRateM3H.toFixed(2)} m³/h)
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Vessel Fill</span>
+              <span className="text-sm font-bold text-cyan-300">
+                {materialBalance.collectionFillPct.toFixed(1)}%
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                {Math.round(materialBalance.collectionVolumeL)} / {engineParams.collectionTankCapacityL} L
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Suction Vacuum</span>
+              <span className="text-xs font-semibold text-emerald-300">
+                {Math.abs(engine.telemetry.suctionPressureKpa).toFixed(1)}{' '}
+                <span className="text-[9px] text-slate-400">kPa</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Cavitation: {(engine.telemetry.cavitationIndex * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Dynamic Losses</span>
+              <span className="text-xs font-semibold text-slate-200">
+                {(engine.telemetry.staticLiftKpa + engine.telemetry.frictionHeadKpa).toFixed(1)}{' '}
+                <span className="text-[9px] text-slate-400">kPa</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Lift: {engine.telemetry.staticLiftKpa.toFixed(1)} | Fric: {engine.telemetry.frictionHeadKpa.toFixed(1)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Domain 3: Hydraulic Dewatering Piston */}
+        <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3 shadow-md flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-slate-800 mb-2">
+            <span className="font-bold text-white uppercase flex items-center gap-1.5 text-[11px]">
+              <Filter className="w-3.5 h-3.5 text-cyan-400" />
+              3. Hydraulic Dewatering Piston
+            </span>
+            <Badge
+              variant={
+                compactionTelemetry.pistonState === 'EXTENDING' || compactionTelemetry.pistonState === 'RETRACTING'
+                  ? 'safety'
+                  : compactionTelemetry.pistonState === 'LOCKED'
+                  ? 'success'
+                  : 'slate'
+              }
+              size="sm"
+            >
+              {compactionTelemetry.pistonState}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Piston Travel</span>
+              <span className="text-sm font-bold text-cyan-300">
+                {compactionTelemetry.strokeMm.toFixed(0)}{' '}
+                <span className="text-[10px] font-normal text-slate-400">/ {compactionParams.strokeMaxMm} mm</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Stroke: {compactionTelemetry.strokePct.toFixed(0)}%
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Hydraulic Thrust</span>
+              <span className="text-sm font-bold text-amber-300">
+                {compactionTelemetry.compactionForceKn.toFixed(1)}{' '}
+                <span className="text-[10px] font-normal text-slate-400">kN</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Press: {compactionTelemetry.appliedPressureBar.toFixed(1)} bar
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Sludge Cake / Liquid</span>
+              <span className="text-xs font-semibold text-slate-200">
+                {Math.round(compactionTelemetry.cakeVolumeL)} L / {Math.round(compactionTelemetry.filtrateVolumeL)} L
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Init: {Math.round(compactionTelemetry.initialSludgeVolumeL)} L
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Compaction Ratio</span>
+              <span className="text-xs font-semibold text-emerald-300">
+                {compactionTelemetry.compactionRatio.toFixed(2)}x
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                ΔVol: -{compactionTelemetry.volumeReductionPct.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Domain 4: Hydraulics, Interlocks & Transport Readiness */}
+        <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3 shadow-md flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-slate-800 mb-2">
+            <span className="font-bold text-white uppercase flex items-center gap-1.5 text-[11px]">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              4. Hydraulics & Transport Safety
+            </span>
+            <Badge
+              variant={interlocks.isTransportReady ? 'success' : 'warning'}
+              size="sm"
+            >
+              {interlocks.isTransportReady ? 'ROAD READY' : 'INTERLOCKED'}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Relief Valve (180b)</span>
+              <span
+                className={`text-xs font-semibold ${
+                  compactionTelemetry.reliefValveOpen ? 'text-amber-400 animate-pulse' : 'text-emerald-300'
+                }`}
+              >
+                {compactionTelemetry.reliefValveOpen ? 'RELIEF OPEN' : 'ARMED'}
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Trip: {compactionTelemetry.overpressureTrip ? 'TRIPPED' : 'NORMAL'}
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Transport Lock</span>
+              <span
+                className={`text-xs font-semibold flex items-center gap-1 ${
+                  compactionTelemetry.isTransportLocked ? 'text-emerald-300' : 'text-rose-400'
+                }`}
+              >
+                {compactionTelemetry.isTransportLocked ? (
+                  <>
+                    <Lock className="w-3 h-3 text-emerald-400" />
+                    LATCHED
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-3 h-3 text-rose-400" />
+                    UNLOCKED
+                  </>
+                )}
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Pin at 0 mm home
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">Stabilizer Outriggers</span>
+              <span className="text-xs font-semibold text-slate-200">
+                {interlocks.isStabilized ? 'GROUNDED (1.0)' : kinematics.stabilizerExtension > 0 ? `${(kinematics.stabilizerExtension * 100).toFixed(0)}% DEPLOYED` : 'STOWED'}
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Boom: {interlocks.isHoseDeployed ? 'DEPLOYED' : 'STOWED'}
+              </span>
+            </div>
+            <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 block uppercase">System Alarms</span>
+              <span
+                className={`text-xs font-semibold ${
+                  hasActiveAlarms ? 'text-rose-400 font-bold animate-pulse' : 'text-emerald-300'
+                }`}
+              >
+                {hasActiveAlarms ? `${alarmsActive || 1} ACTIVE` : 'ALL NOMINAL'}
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                Interlocks: {interlocks.emergencyStopLatched ? 'E-STOP' : 'ACTIVE'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

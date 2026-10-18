@@ -115,19 +115,20 @@ export const DEMO_STAGES: DemoStageInfo[] = [
   {
     id: 'deployment_positioning',
     stepNumber: 5,
-    title: 'Stage 5: Machine Deployment & Hose Positioning',
-    subtitle: 'Articulated stabilizer leveling and boom placement over vault access opening',
+    title: 'Stage 5: Machine Positioning, Outrigger Stabilization & Hose Deployment',
+    subtitle: 'Stationary halting, 4x outrigger leveling, and dual-joint crane boom placement over vault opening',
     operatingStateTarget: 'DEPLOY',
     activeViewTarget: 'overview',
     cameraPreset: 'boom',
     selectedComponent: 'boom',
     durationSec: 9,
     overview:
-      'The operator issues the DEPLOY command. Four hydraulic outriggers extend to firm ground contact, leveling the vehicle. The articulated dual-joint boom crane swings the suction umbilical directly over the manhole.',
+      'The vehicle halts at the staging coordinates and applies track brakes. Four telescoping hydraulic outriggers extend to firm ground contact, leveling the chassis. The articulated boom crane slews over the vault and drops the suction nozzle into the sludge bed.',
     engineeringContext:
-      'Interlock Enforcement: Machine cannot engage vacuum suction while stabilizers are stowed or boom is transit-locked. Physical ground contact sensors verify level footing.',
+      'Interlock Enforcement: Machine cannot engage vacuum suction while stabilizers are stowed or boom is transit-locked. Ground contact switches verify level footing before granting pump clearance.',
     keyMetrics: [
-      'Operating State: DEPLOY (Active Kinematics)',
+      'Operating State: DEPLOY (Stabilize & Position)',
+      'Vehicle Speed: 0.00 m/s (Hydraulic Parking Brakes Locked)',
       'Stabilizer Extension: 100% Ground Contact Locked',
       'Boom Crane Slew: 38.0° Over Vault Centerline',
       'Interlock State: DEPLOYED (Priming Permitted)'
@@ -169,26 +170,27 @@ export const DEMO_STAGES: DemoStageInfo[] = [
   {
     id: 'live_dashboard',
     stepNumber: 7,
-    title: 'Stage 7: Live Industrial Dashboard & Sensor Monitoring',
-    subtitle: 'Real-time telemetry tracking flow rate, vacuum, motor load, and energy consumption',
+    title: 'Stage 7: Live Dashboard, Settling & Hydraulic Platen Dewatering',
+    subtitle: 'Real-time telemetry tracking extraction flow, motor power, and in-tank mechanical compression',
     operatingStateTarget: 'EXTRACT',
     activeViewTarget: 'overview',
-    cameraPreset: 'iso',
-    selectedComponent: 'tank',
-    durationSec: 10,
+    cameraPreset: 'tank',
+    selectedComponent: 'compactor',
+    durationSec: 11,
     overview:
-      'The industrial dashboard monitors 10 live KPI cards and 4 trend charts. Every metric is computed dynamically by the deterministic simulation engine with zero random noise.',
+      'The industrial dashboard monitors extraction flow, vacuum, and motor load. As the collection vessel fills, the system initiates the settling and compaction sequence: the guided vertical hydraulic cylinder lowers the porous platen into the sludge bed, expressing liquid filtrate.',
     engineeringContext:
-      'Real-time plots display Flow Rate vs Time, Tank Volume Mass Balance, Motor Power & Cumulative Energy (kWh), and the chronological event audit trail.',
+      'The 120mm bore hydraulic cylinder presses up to 140 bar against the sludge bed. The perforated sieve platen allows separated filtrate to accumulate above while compressing the cake below, achieving a 1.45x volume reduction with strict mass conservation.',
     keyMetrics: [
       'Total Extracted Volume: Accumulating live (L)',
-      'Vault Remaining Level: Depleting dynamically',
-      'Cumulative Energy: Integrated ∫ P dt (kWh)',
-      'Data Fidelity: SIMULATED DIGITAL TWIN'
+      'Piston Stroke: Guided 0 to 600 mm Travel',
+      'Hydraulic Compaction Force: ~158 kN (140 bar)',
+      'Filtrate Separation: Separated from compressed cake',
+      'Compaction Ratio: ~1.45x (~31% Volume Reduction)'
     ],
     sensors: [
-      'Current CT Sensor: 18.2 A (Balanced 3-Phase)',
-      'H2S & CH4 Atmospheric Monitoring: NOMINAL'
+      'Piston Position Linear Transducer: Tracking Stroke',
+      'Hydraulic Cylinder Pressure Sensor: 140 bar'
     ]
   },
 
@@ -250,26 +252,27 @@ export const DEMO_STAGES: DemoStageInfo[] = [
   {
     id: 'scenario_comparison',
     stepNumber: 10,
-    title: 'Stage 10: Baseline vs Alternative Terrain Scenario Comparison',
-    subtitle: 'Objective comparison of identical 2,400 L task across Level Paved vs Alpine / Muddy terrain',
+    title: 'Stage 10: Safe Piston Retention, Transport Readiness & Scenario Analytics',
+    subtitle: 'Mechanical lock pin latching, stabilizer retraction, and baseline vs alpine terrain performance comparison',
     operatingStateTarget: 'COMPLETE',
     activeViewTarget: 'analysis',
     cameraPreset: 'iso',
     selectedComponent: 'chassis',
     durationSec: 10,
     overview:
-      'The comparison engine evaluates the standardized 2,400 L desludging task under identical pump RPM, hose bore, and initial vault septage, isolating pure physics-driven performance variances.',
+      'Following dewatering, the platen retracts to 0 mm top home position and engages dual mechanical retention pins. Stabilizers and crane boom stow. Transport readiness invariants are verified before departure.',
     engineeringContext:
-      'In cold alpine terrain (-8°C), Andrade thermal viscosity increases slurry viscosity from 450 cP to 670 cP, extending task duration by +42% and increasing specific energy consumption from 0.42 to 0.65 kWh/m³.',
+      'The comparison engine evaluates the standardized 2,400 L task across terrains. In cold alpine terrain (-8°C), Andrade thermal viscosity increases septage viscosity, extending task duration by +42% and increasing specific energy consumption from 0.42 to 0.65 kWh/m³.',
     keyMetrics: [
-      'Standardized Task Volume: 2,400 L (Common Datum)',
+      'Transport Readiness: VERIFIED ROADWORTHY',
+      'Piston Retention Pins: LATCHED (0 mm Home)',
+      'Stabilizers & Boom: Fully Stowed (<0.05)',
       'Baseline (Level Paved): 5m 03s, 1.01 kWh',
-      'Comparison (Alpine -8°C): 7m 10s, 1.48 kWh (+46.5%)',
-      'Documented Assumptions: Darcy-Weisbach & Isothermal Limits'
+      'Comparison (Alpine -8°C): 7m 10s, 1.48 kWh (+46.5%)'
     ],
     sensors: [
-      'Scenario Comparator: Delta Variance Quantified',
-      'Feasibility Matrix: 6 Terrains Benchmarked'
+      'Transport Lock Transducer: LATCHED',
+      'Roadworthiness Gate: 100% INVARIANTS SATISFIED'
     ]
   },
 

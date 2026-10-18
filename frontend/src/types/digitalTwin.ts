@@ -11,7 +11,7 @@ export type NavView =
   | 'parameters'
   | 'reports';
 
-export type CameraPreset = 'reset' | 'iso' | 'top' | 'side' | 'boom' | 'nozzle' | 'cutaway';
+export type CameraPreset = 'reset' | 'iso' | 'top' | 'side' | 'boom' | 'nozzle' | 'cutaway' | 'tank';
 
 export interface SimulationParameters {
   pumpRpm: number;                 // 0 - 3600 RPM

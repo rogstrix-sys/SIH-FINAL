@@ -1399,6 +1399,10 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         triggerDeploy,
         triggerPrime,
         triggerExtract,
+        triggerSettle,
+        triggerCompact,
+        triggerSecure,
+        triggerTransportReady,
         triggerDischarge,
         triggerEmergencyStop,
         triggerResolveFault,
@@ -1422,18 +1426,26 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       switch (stage.id) {
         case 'project_objective':
           resetSimulation();
+          set((s) => ({ mobilityInputs: { ...s.mobilityInputs, forward: true } }));
+          setTimeout(() => {
+            get().setMobilityInput('forward', false);
+          }, 1500);
           break;
         case 'component_inspection':
+          get().stopVehicle();
           break;
         case 'scenario_selection':
         case 'feasibility_assessment':
+          get().stopVehicle();
           setTerrainScenario('hilly_sloped');
           break;
         case 'deployment_positioning':
+          get().stopVehicle();
           if (get().operatingState === 'FAULT') triggerResolveFault();
           triggerDeploy();
           break;
         case 'priming_extraction':
+          get().stopVehicle();
           if (get().operatingState === 'FAULT') triggerResolveFault();
           if (!get().interlocks.isDeployed) {
             triggerDeploy();
@@ -1444,8 +1456,13 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           }, 350);
           break;
         case 'live_dashboard':
-          if (get().operatingState !== 'EXTRACT' && get().interlocks.isPrimed) {
-            triggerExtract();
+          if (get().operatingState === 'EXTRACT' || get().operatingState === 'EXTRACTION') {
+            triggerSettle();
+            setTimeout(() => {
+              get().triggerCompact();
+            }, 300);
+          } else if (get().operatingState !== 'COMPACT') {
+            get().triggerExtract();
           }
           break;
         case 'alarm_estop_demo':
@@ -1458,6 +1475,14 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           triggerDischarge();
           break;
         case 'scenario_comparison':
+          if (get().operatingState === 'FAULT') {
+            triggerResolveFault();
+          }
+          triggerSecure();
+          setTimeout(() => {
+            get().triggerTransportReady();
+          }, 300);
+          break;
         case 'hardware_bom_test_plan':
         case 'report_export':
           break;
