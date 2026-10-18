@@ -191,28 +191,28 @@ export const SubsurfaceVaultSim3D: React.FC<SubsurfaceVaultSim3DProps> = ({
 
     switch (preset) {
       case 'isometric':
-        cam.position.set(-3.8, 3.2, 4.6);
-        ctrl.target.set(-0.4, -1.2, 0);
+        cam.position.set(-3.4, 2.6, 4.2);
+        ctrl.target.set(0.0, -1.2, 0);
         break;
       case 'manhole_top':
-        cam.position.set(-0.8, 4.2, 0.05);
+        cam.position.set(-0.8, 3.8, 0.05);
         ctrl.target.set(-0.8, -1.8, 0);
         break;
       case 'cutaway_side':
-        cam.position.set(0.0, -1.2, 5.2);
+        cam.position.set(0.0, -1.2, 4.4);
         ctrl.target.set(0.0, -1.2, 0);
         break;
       case 'robot_close':
-        cam.position.set(-0.2, -1.5, 1.4);
+        cam.position.set(-0.35, -1.45, 1.4);
         ctrl.target.set(-0.6, -1.8, 0);
         break;
       case 'gas_plume':
-        cam.position.set(2.2, 1.4, 3.2);
+        cam.position.set(1.8, 1.2, 3.5);
         ctrl.target.set(0.2, -0.6, 0);
         break;
       case 'operator':
-        cam.position.set(-2.6, 1.2, 1.8);
-        ctrl.target.set(-0.8, 1.6, 0);
+        cam.position.set(-2.8, 1.4, 2.2);
+        ctrl.target.set(-0.8, 0.4, 0);
         break;
     }
     ctrl.update();
@@ -272,28 +272,50 @@ export const SubsurfaceVaultSim3D: React.FC<SubsurfaceVaultSim3DProps> = ({
     controls.target.set(-0.4, -1.2, 0);
     controlsRef.current = controls;
 
-    // Lighting setup
-    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 0.55);
+    // Architectural Lighting Setup
+    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x0f172a, 0.75);
     hemiLight.position.set(0, 20, 0);
     scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.4);
-    sunLight.position.set(6, 12, 8);
+    // Warm Golden Sun angling down into the open manhole throat
+    const sunLight = new THREE.DirectionalLight(0xffedd5, 2.2);
+    sunLight.position.set(-1.8, 14, 5.0);
+    sunLight.target.position.set(-0.8, -1.8, 0);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 1024;
     sunLight.shadow.mapSize.height = 1024;
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 30;
-    sunLight.shadow.camera.left = -6;
-    sunLight.shadow.camera.right = 6;
-    sunLight.shadow.camera.top = 6;
-    sunLight.shadow.camera.bottom = -6;
+    sunLight.shadow.camera.far = 28;
+    sunLight.shadow.camera.left = -5;
+    sunLight.shadow.camera.right = 5;
+    sunLight.shadow.camera.top = 5;
+    sunLight.shadow.camera.bottom = -5;
     scene.add(sunLight);
+    scene.add(sunLight.target);
 
-    // Subterranean Inspection Worklight (ambient blue-white for subterranean vault interior)
-    const vaultWorkLight = new THREE.PointLight(0x38bdf8, 1.8, 8, 1.5);
-    vaultWorkLight.position.set(-0.8, -0.6, 0);
+    // Subterranean Inspection Cyan Worklight inside Chamber 1
+    const vaultWorkLight = new THREE.PointLight(0x38bdf8, 2.4, 7.5, 1.2);
+    vaultWorkLight.position.set(-0.8, -0.6, 0.2);
     scene.add(vaultWorkLight);
+
+    // Chamber 2 Warm Ambient Illumination
+    const chamber2Light = new THREE.PointLight(0xf59e0b, 1.8, 6.0, 1.4);
+    chamber2Light.position.set(1.5, -0.8, 0);
+    scene.add(chamber2Light);
+
+    // Volumetric Sunlight Shaft down through the Manhole
+    const godRayGeo = new THREE.CylinderGeometry(0.38, 0.85, 2.2, 24, 1, true);
+    const godRayMat = new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const godRayMesh = new THREE.Mesh(godRayGeo, godRayMat);
+    godRayMesh.position.set(-0.8, -1.0, 0);
+    scene.add(godRayMesh);
 
     // Build Vault Environment & Meshes
     const vaultMeshes = buildVaultEnvironment();
@@ -357,7 +379,16 @@ export const SubsurfaceVaultSim3D: React.FC<SubsurfaceVaultSim3DProps> = ({
           vaultMeshes.robotArmGroup.rotation.z = Math.sin(time * 0.7) * 0.08;
         }
 
-        // 4. Sludge Level & Liquefaction Progression
+        // 4. LiDAR Turret Continuous Spin & Guide Laser Pulse
+        if (vaultMeshes.lidarTurretMesh) {
+          vaultMeshes.lidarTurretMesh.rotation.y += delta * 6.0;
+        }
+        if (vaultMeshes.laserBeamMesh) {
+          const pulse = 0.45 + Math.sin(clock.getElapsedTime() * 7.5) * 0.25;
+          (vaultMeshes.laserBeamMesh.material as THREE.MeshBasicMaterial).opacity = pulse;
+        }
+
+        // 5. Sludge Level & Liquefaction Progression
         if (isSuctionActiveRef.current && vaultLiquidVolRef.current > 100) {
           // Flow: m^3/h to Liters/s
           const flowLps = (suctionFlowM3hRef.current * 1000) / 3600;
@@ -498,20 +529,19 @@ export const SubsurfaceVaultSim3D: React.FC<SubsurfaceVaultSim3DProps> = ({
     };
   }, []);
 
-  // Update cutaway transparency when slider changes
+  // Toggle X-Ray Wireframe across concrete vault meshes
   useEffect(() => {
     if (!meshesRef.current) return;
-    const cutawayMat = meshesRef.current.concreteVaultGroup.children.find(
-      (c) => (c as THREE.Mesh).material && ((c as THREE.Mesh).material as THREE.MeshStandardMaterial).transparent
-    ) as THREE.Mesh | undefined;
-
-    if (cutawayMat && cutawayMat.material) {
-      const mat = cutawayMat.material as THREE.MeshStandardMaterial;
-      mat.opacity = cutawayOpacity;
-      mat.wireframe = isXRayMode;
-      mat.needsUpdate = true;
-    }
-  }, [cutawayOpacity, isXRayMode]);
+    meshesRef.current.concreteVaultGroup.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        if (mat) {
+          mat.wireframe = isXRayMode;
+          mat.needsUpdate = true;
+        }
+      }
+    });
+  }, [isXRayMode]);
 
   return (
     <div className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col font-sans select-none">
