@@ -16,6 +16,8 @@ export interface CanyonVehicleMeshes {
 
 /**
  * Builds the High-Fidelity 6x6 Heavy All-Terrain Expedition Desludger Carrier
+ * Standard Coordinate System:
+ * Front = +Z, Rear = -Z, Left = -X, Right = +X, Up = +Y
  */
 export function buildCanyonVehicle(): CanyonVehicleMeshes {
   const rootGroup = new THREE.Group();
@@ -66,33 +68,33 @@ export function buildCanyonVehicle(): CanyonVehicleMeshes {
   const chassisBody = new THREE.Group();
   chassisBody.position.y = 0.65; // Ground clearance
 
-  // Ladder Frame Steel Rails
-  const frameGeo = new THREE.BoxGeometry(4.8, 0.22, 1.2);
+  // Ladder Frame Steel Rails (Length 4.8 along Z, Width 1.2 along X)
+  const frameGeo = new THREE.BoxGeometry(1.2, 0.22, 4.8);
   const frame = new THREE.Mesh(frameGeo, darkMetalMat);
   frame.castShadow = true;
   chassisBody.add(frame);
   geometriesToDispose.push(frameGeo);
 
-  // Heavy 6x6 Forward-Control Cab (Front: x = 1.2 to 2.4)
-  const cabGeo = new THREE.BoxGeometry(1.4, 1.45, 1.6);
+  // Heavy 6x6 Forward-Control Cab (Front: z = 1.2 to 2.4, Width 1.6 along X)
+  const cabGeo = new THREE.BoxGeometry(1.6, 1.45, 1.4);
   const cab = new THREE.Mesh(cabGeo, cabPaintMat);
-  cab.position.set(1.5, 0.75, 0);
+  cab.position.set(0, 0.75, 1.5);
   cab.castShadow = true;
   chassisBody.add(cab);
   geometriesToDispose.push(cabGeo);
 
-  // Tinted Windshield
-  const windshieldGeo = new THREE.BoxGeometry(0.08, 0.65, 1.4);
+  // Tinted Windshield (Facing forward +Z)
+  const windshieldGeo = new THREE.BoxGeometry(1.4, 0.65, 0.08);
   const windshield = new THREE.Mesh(windshieldGeo, glassMat);
-  windshield.position.set(2.21, 0.95, 0);
+  windshield.position.set(0, 0.95, 2.21);
   chassisBody.add(windshield);
   geometriesToDispose.push(windshieldGeo);
 
-  // Rooftop LED Light Bar
-  const lightBarGeo = new THREE.BoxGeometry(0.12, 0.12, 1.3);
+  // Rooftop LED Light Bar (Spans X across cab top)
+  const lightBarGeo = new THREE.BoxGeometry(1.3, 0.12, 0.12);
   const lightBarMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2.0 });
   const lightBar = new THREE.Mesh(lightBarGeo, lightBarMat);
-  lightBar.position.set(1.6, 1.55, 0);
+  lightBar.position.set(0, 1.55, 1.6);
   chassisBody.add(lightBar);
   materialsToDispose.push(lightBarMat);
   geometriesToDispose.push(lightBarGeo);
@@ -100,60 +102,59 @@ export function buildCanyonVehicle(): CanyonVehicleMeshes {
   // Rotating Rooftop Radar / LiDAR Turret
   const radarMastGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.35, 12);
   const radarMast = new THREE.Mesh(radarMastGeo, chromeMat);
-  radarMast.position.set(1.1, 1.65, 0);
+  radarMast.position.set(0, 1.65, 1.1);
   chassisBody.add(radarMast);
   geometriesToDispose.push(radarMastGeo);
 
   const radarDishGeo = new THREE.CylinderGeometry(0.35, 0.18, 0.1, 16);
-  radarDishGeo.rotateX(Math.PI / 2);
+  radarDishGeo.rotateZ(Math.PI / 2);
   const radarDishMesh = new THREE.Mesh(radarDishGeo, darkMetalMat);
-  radarDishMesh.position.set(1.1, 1.85, 0);
+  radarDishMesh.position.set(0, 1.85, 1.1);
   chassisBody.add(radarDishMesh);
   geometriesToDispose.push(radarDishGeo);
 
-  // Rear Heavy Vacuum Septage Tank (Cylindrical with domed ends)
+  // Rear Heavy Vacuum Septage Tank (Cylindrical along Z axis, length 2.6)
   const tankGeo = new THREE.CylinderGeometry(0.72, 0.72, 2.6, 24);
-  tankGeo.rotateZ(Math.PI / 2);
+  tankGeo.rotateX(Math.PI / 2);
   const tankMesh = new THREE.Mesh(tankGeo, tankMat);
-  tankMesh.position.set(-0.85, 0.85, 0);
+  tankMesh.position.set(0, 0.85, -0.85);
   tankMesh.castShadow = true;
   chassisBody.add(tankMesh);
   geometriesToDispose.push(tankGeo);
 
   // Tank Reinforcing Structural Bands
-  [-1.6, -0.85, -0.1].forEach((bandX) => {
+  [-1.6, -0.85, -0.1].forEach((bandZ) => {
     const bandGeo = new THREE.CylinderGeometry(0.74, 0.74, 0.12, 24);
-    bandGeo.rotateZ(Math.PI / 2);
+    bandGeo.rotateX(Math.PI / 2);
     const band = new THREE.Mesh(bandGeo, darkMetalMat);
-    band.position.set(bandX, 0.85, 0);
+    band.position.set(0, 0.85, bandZ);
     chassisBody.add(band);
     geometriesToDispose.push(bandGeo);
   });
 
   // Articulated 3-Stage Hydraulic Suction Crane Boom Arm on Tank
   const craneBoomGroup = new THREE.Group();
-  craneBoomGroup.position.set(-2.1, 1.25, 0);
+  craneBoomGroup.position.set(0, 1.25, -2.1);
 
-  const boom1Geo = new THREE.BoxGeometry(0.16, 0.16, 0.9);
-  boom1Geo.rotateX(Math.PI / 2);
+  const boom1Geo = new THREE.BoxGeometry(0.16, 0.9, 0.16);
   const boom1 = new THREE.Mesh(boom1Geo, darkMetalMat);
   boom1.position.set(0, 0.45, 0);
   craneBoomGroup.add(boom1);
   geometriesToDispose.push(boom1Geo);
 
-  const boom2Geo = new THREE.BoxGeometry(1.2, 0.14, 0.14);
+  const boom2Geo = new THREE.BoxGeometry(0.14, 0.14, 1.2);
   const boom2 = new THREE.Mesh(boom2Geo, cabPaintMat);
-  boom2.position.set(0.6, 0.9, 0);
+  boom2.position.set(0, 0.9, -0.6);
   craneBoomGroup.add(boom2);
   geometriesToDispose.push(boom2Geo);
 
   chassisBody.add(craneBoomGroup);
 
   // Twin Vertical High-Mounted Exhaust Stacks
-  [-0.68, 0.68].forEach((stackZ) => {
+  [-0.68, 0.68].forEach((stackX) => {
     const pipeGeo = new THREE.CylinderGeometry(0.065, 0.065, 1.8, 12);
     const pipe = new THREE.Mesh(pipeGeo, chromeMat);
-    pipe.position.set(0.75, 1.25, stackZ);
+    pipe.position.set(stackX, 1.25, 0.75);
     pipe.castShadow = true;
     chassisBody.add(pipe);
     geometriesToDispose.push(pipeGeo);
@@ -161,10 +162,10 @@ export function buildCanyonVehicle(): CanyonVehicleMeshes {
 
   // Dual High-Beam LED Projector Headlights
   const headlights: THREE.SpotLight[] = [];
-  [-0.55, 0.55].forEach((lightZ) => {
+  [-0.55, 0.55].forEach((lightX) => {
     const spot = new THREE.SpotLight(0xfffbeb, 5.0, 38, Math.PI / 5, 0.25, 1.2);
-    spot.position.set(2.25, 0.55, lightZ);
-    spot.target.position.set(14.0, -1.0, lightZ);
+    spot.position.set(lightX, 0.55, 2.25);
+    spot.target.position.set(lightX, -1.0, 14.0);
     spot.castShadow = true;
     spot.shadow.mapSize.width = 512;
     spot.shadow.mapSize.height = 512;
@@ -174,30 +175,30 @@ export function buildCanyonVehicle(): CanyonVehicleMeshes {
   });
 
   // Rear LED Taillights / Brake Lights
-  [-0.55, 0.55].forEach((tailZ) => {
-    const tailGeo = new THREE.BoxGeometry(0.06, 0.14, 0.22);
+  [-0.55, 0.55].forEach((tailX) => {
+    const tailGeo = new THREE.BoxGeometry(0.22, 0.14, 0.06);
     const tail = new THREE.Mesh(tailGeo, taillightsMat);
-    tail.position.set(-2.41, 0.55, tailZ);
+    tail.position.set(tailX, 0.55, -2.41);
     chassisBody.add(tail);
     geometriesToDispose.push(tailGeo);
   });
 
   rootGroup.add(chassisBody);
 
-  // 6 Independent Wheel Suspensions (Front Axle: x = 1.4, Middle: x = -0.4, Rear: x = -1.6)
+  // 6 Independent Wheel Suspensions (Front Axle: z = 1.4, Middle: z = -0.4, Rear: z = -1.6)
   const wheelGroups: THREE.Group[] = [];
   const frontSteerGroups: THREE.Group[] = [];
 
   const axlePositions = [
-    { x: 1.4, isSteer: true },   // Front steer axle
-    { x: -0.4, isSteer: false }, // Middle drive axle
-    { x: -1.6, isSteer: false }  // Rear tandem drive axle
+    { z: 1.4, isSteer: true },   // Front steer axle
+    { z: -0.4, isSteer: false }, // Middle drive axle
+    { z: -1.6, isSteer: false }  // Rear tandem drive axle
   ];
 
   axlePositions.forEach((axle) => {
-    [-0.92, 0.92].forEach((wheelZ) => {
+    [-0.92, 0.92].forEach((wheelX) => {
       const wheelMountGroup = new THREE.Group();
-      wheelMountGroup.position.set(axle.x, 0.45, wheelZ);
+      wheelMountGroup.position.set(wheelX, 0.45, axle.z);
 
       // Steering pivot sub-group for front wheels
       const steerPivot = new THREE.Group();
@@ -211,9 +212,9 @@ export function buildCanyonVehicle(): CanyonVehicleMeshes {
       const wheelSpinGroup = new THREE.Group();
       steerPivot.add(wheelSpinGroup);
 
-      // Heavy Off-Road Tire
+      // Heavy Off-Road Tire (Axle along X axis, rotates around X to roll along Z)
       const tireGeo = new THREE.CylinderGeometry(0.48, 0.48, 0.38, 20);
-      tireGeo.rotateX(Math.PI / 2);
+      tireGeo.rotateZ(Math.PI / 2);
       const tireMesh = new THREE.Mesh(tireGeo, rubberMat);
       tireMesh.castShadow = true;
       wheelSpinGroup.add(tireMesh);
@@ -221,7 +222,7 @@ export function buildCanyonVehicle(): CanyonVehicleMeshes {
 
       // Beadlock Steel Rim Hub
       const rimGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.39, 16);
-      rimGeo.rotateX(Math.PI / 2);
+      rimGeo.rotateZ(Math.PI / 2);
       const rimMesh = new THREE.Mesh(rimGeo, chromeMat);
       wheelSpinGroup.add(rimMesh);
       geometriesToDispose.push(rimGeo);
@@ -247,7 +248,7 @@ export function buildCanyonVehicle(): CanyonVehicleMeshes {
     craneBoomGroup,
     headlights,
     taillightsMat,
-    exhaustStackWorld: new THREE.Vector3(0.75, 2.15, -0.68),
+    exhaustStackWorld: new THREE.Vector3(-0.68, 2.15, 0.75),
     materialsToDispose,
     geometriesToDispose
   };
