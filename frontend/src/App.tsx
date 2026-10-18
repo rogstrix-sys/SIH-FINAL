@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import { SiteAssessmentForm } from './components/SiteAssessmentForm';
 import { TerrainSimulationSVG } from './components/TerrainSimulationSVG';
 import { Simulation3D } from './components/Simulation3D';
+import { SubsurfaceVaultSim3D } from './components/vaultSimulation/SubsurfaceVaultSim3D';
 import { RouteAccessPlanner } from './components/RouteAccessPlanner';
 import { EquipmentComparison } from './components/EquipmentComparison';
 import { SafetyPanel } from './components/SafetyPanel';
@@ -206,6 +207,16 @@ export const App: React.FC = () => {
                 site={site}
                 setSite={setSite}
                 topChoice={topChoice}
+                onSwitchToVaultSim={() => setActiveTab('vault3d')}
+              />
+            )}
+
+            {activeTab === 'vault3d' && (
+              <SubsurfaceVaultSim3D
+                site={site}
+                setSite={setSite}
+                topChoice={topChoice}
+                onSwitchToMountainSim={() => setActiveTab('simulation3d')}
               />
             )}
 

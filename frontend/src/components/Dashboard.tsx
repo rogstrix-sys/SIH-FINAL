@@ -18,7 +18,8 @@ import {
   Check,
   ShieldAlert,
   Sliders,
-  ChevronRight
+  ChevronRight,
+  Box
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { EquipmentRecommendation, SiteConditions, SafetyAssessmentResult, AiNarrative, ScenarioItem } from '../types';
@@ -110,7 +111,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
               className="inline-flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-lg shadow-emerald-900/30 transition transform hover:-translate-y-0.5"
             >
               <Rotate3d className="w-4 h-4" />
-              <span>Launch Interactive 3D Simulation</span>
+              <span>Mountain 3D Sim</span>
+            </button>
+
+            <button
+              onClick={() => onNavigateTab('vault3d')}
+              className="inline-flex items-center space-x-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-lg shadow-amber-900/30 transition transform hover:-translate-y-0.5"
+            >
+              <Box className="w-4 h-4" />
+              <span>Subsurface Vault 3D Sim</span>
             </button>
 
             <button

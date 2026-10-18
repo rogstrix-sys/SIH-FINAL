@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mountain, ShieldAlert, FileText, MapPin, Sliders, BarChart3, Activity, Save, Rotate3d } from 'lucide-react';
+import { Mountain, ShieldAlert, FileText, MapPin, Sliders, BarChart3, Activity, Save, Rotate3d, Box } from 'lucide-react';
 import { ScenarioItem } from '../types';
 
 interface NavbarProps {
@@ -27,7 +27,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'assessment', label: 'Site Assessment', icon: Sliders },
     { id: 'simulation', label: 'Terrain Simulation', icon: Mountain },
-    { id: 'simulation3d', label: '3D Simulation', icon: Rotate3d },
+    { id: 'simulation3d', label: 'Mountain 3D', icon: Rotate3d },
+    { id: 'vault3d', label: 'Vault 3D Sim', icon: Box },
     { id: 'route', label: 'Route & Access', icon: MapPin },
     { id: 'comparison', label: 'Equipment Matrix', icon: Activity },
     { id: 'safety', label: 'Safety & Hazard Control', icon: ShieldAlert },

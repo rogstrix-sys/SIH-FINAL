@@ -11,11 +11,14 @@ Over 3.5 billion people worldwide rely on on-site sanitation (septic tanks, soak
 ### Key Innovations of this Decision Support System:
 1. **Adaptive Rule-Based Recommendation Engine**: Evaluates six specialized equipment configurations (compact motorized units, portable skids, modular trailers, 4x4 mini-tankers, robotic crawlers, and packable systems) and enforces **hard physical feasibility gatekeepers** before ranking alternatives.
 2. **Multi-Physics Hydraulic Calculations**: Implements exact, traceable SI equations for non-Newtonian Bingham-plastic sludge rheology, Darcy-Weisbach / Swamee-Jain pipeline friction head loss, Total Dynamic Head (TDH), brake and hydraulic power, cycle times, and operational costs.
-3. **Interactive 2D Terrain SVG Simulation**: Dynamic cross-section profile illustrating slope angle, pit geometry, fluid layers, hose routing, animated fluid flow, operational stages, and dynamic weather particle overlays (rain downpours, sub-zero snow, arid dust).
-4. **GIS Route & Access Corridor Planner**: Interactive Leaflet OpenStreetMap integration comparing vehicular approach versus portable carry-in deployment.
-5. **Worker Safety & Enforced Zero-Entry Mandate**: Calculates critical static rollover tip angles ($\theta_{\text{tip}}$), quantifies toxic biogas risks ($H_2S, CH_4$), mandates 30mA GFCI electrical protection, specifies standard-certified PPE, and strictly enforces zero human pit entry.
-6. **Persistence & Printable Engineering Reports**: SQLite database storage for simulation scenarios, CSV export streaming, and print-to-PDF engineering report generation.
-7. **100% Local & Offline**: Requires zero paid APIs, zero proprietary cloud services, and zero dedicated AI hardware. Runs entirely on a standard Windows laptop.
+3. **Dual Interactive 3D Multi-Physics Simulation Environments**:
+   - **Environment 1: Mountain Slope & Vehicle Stability Simulator** (`Simulation3D.tsx`): Real-time WebGL simulation of the narrow all-terrain crawler ascending 20°–30° Himalayan switchback slopes (Uttarakhand, Himachal, Ladakh presets), featuring dynamic anti-slosh longitudinal baffles (-88.9% surge suppression), low-CoM battery pack, 3D static rollover safety pyramid, and emergency brake tests.
+   - **Environment 2: Subsurface Vault & Robotic Fluidization Digital Twin** (`SubsurfaceVaultSim3D.tsx`): Complete underground confined-space concrete septic vault (ISO 21876 / OSHA 1910.146 compliant). Simulates submersible Bandicoot-class 6-DOF robotic crawler with tungsten-carbide macerator teeth, dual 70-bar hydro-jet crust liquefaction spray particles, suction vortex slurry currents, real-time Net Positive Suction Head ($NPSHa$ vs $NPSHr$) cavitation diagnostics, differential 4-gas atmospheric dispersion ($H_2S, CH_4, CO, O_2$), and forced-air mechanical ventilation dilution.
+4. **Interactive 2D Terrain SVG Simulation**: Dynamic cross-section profile illustrating slope angle, pit geometry, fluid layers, hose routing, animated fluid flow, operational stages, and dynamic weather particle overlays (rain downpours, sub-zero snow, arid dust).
+5. **GIS Route & Access Corridor Planner**: Interactive Leaflet OpenStreetMap integration comparing vehicular approach versus portable carry-in deployment.
+6. **Worker Safety & Enforced Zero-Entry Mandate**: Calculates critical static rollover tip angles ($\theta_{\text{tip}}$), quantifies toxic biogas risks ($H_2S, CH_4$), mandates 30mA GFCI electrical protection, specifies standard-certified PPE, and strictly enforces zero human pit entry.
+7. **Persistence & Printable Engineering Reports**: SQLite database storage for simulation scenarios, CSV export streaming, and print-to-PDF engineering report generation.
+8. **100% Local & Offline**: Requires zero paid APIs, zero proprietary cloud services, and zero dedicated AI hardware. Runs entirely on a standard Windows laptop.
 
 ---
 
@@ -67,7 +70,14 @@ sih 26258/
 │   │   │   ├── Dashboard.tsx          # Key metrics, KPIs, flow chart
 │   │   │   ├── SiteAssessmentForm.tsx # Input form with physical bounds checks
 │   │   │   ├── TerrainSimulationSVG.tsx# 2D cross-section SVG simulation
-│   │   │   ├── Simulation3D.tsx       # Interactive Three.js WebGL 3D simulation
+│   │   │   ├── Simulation3D.tsx       # 3D Mountain Road & Vehicle Stability Simulator
+│   │   │   ├── vaultSimulation/       # Complete 3D Subsurface Vault & Robotics Simulator
+│   │   │   │   ├── SubsurfaceVaultSim3D.tsx # Primary vault simulation & HUD component
+│   │   │   │   ├── vaultGeometry.ts   # Dual-chamber vault, Bandicoot ROV & gantry meshes
+│   │   │   │   ├── vaultPhysics.ts    # Bingham rheology, cavitation NPSH & OSHA 4-gas
+│   │   │   │   ├── vaultParticles.ts  # GPU hydro-jet, slurry vortex & gas cloud particles
+│   │   │   │   ├── vaultAudio.ts      # Web Audio procedural sound synthesizer
+│   │   │   │   └── vaultTextures.ts   # Procedural PBR cast-iron, rebar & concrete textures
 │   │   │   ├── RouteAccessPlanner.tsx # Leaflet GIS map & access corridor
 │   │   │   ├── EquipmentComparison.tsx# Side-by-side matrix & weight sliders
 │   │   │   ├── SafetyPanel.tsx        # Confined space, gas & tip angle panel

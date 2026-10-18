@@ -35,7 +35,8 @@ import {
   Crosshair,
   AlertTriangle,
   Video,
-  Sparkles
+  Sparkles,
+  Box
 } from 'lucide-react';
 import { SiteConditions, EquipmentRecommendation } from '../types';
 import {
@@ -82,12 +83,14 @@ interface Simulation3DProps {
   site: SiteConditions;
   setSite?: React.Dispatch<React.SetStateAction<SiteConditions>>;
   topChoice?: EquipmentRecommendation;
+  onSwitchToVaultSim?: () => void;
 }
 
 export const Simulation3D: React.FC<Simulation3DProps> = ({
   site,
   setSite,
-  topChoice
+  topChoice,
+  onSwitchToVaultSim
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -185,6 +188,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const roofBeaconRef = useRef<THREE.Mesh | null>(null);
   const levelSightFloatRef = useRef<THREE.Mesh | null>(null);
   const trackBeltMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const trackCleatsRef = useRef<Array<{ mesh: THREE.Group; baseU: number }>>([]);
+  const trackProgressRef = useRef<number>(0);
+  const trackProfileCurveRef = useRef<THREE.CatmullRomCurve3 | null>(null);
   const lidarTurretRef = useRef<THREE.Mesh | null>(null);
   const streetLightBulbsRef = useRef<THREE.PointLight[]>([]);
   const weatherParticlesRef = useRef<THREE.Points | null>(null);
@@ -2327,6 +2333,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     suspensionSpringsRef.current = [];
     damperPistonsRef.current = [];
     trackBeltMatsRef.current = [];
+    trackCleatsRef.current = [];
 
     // Continuous 2D CatmullRom Curve profile defining track belt loop in Y-Z plane
     const trackProfileCurve = new THREE.CatmullRomCurve3([
@@ -2343,6 +2350,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       new THREE.Vector3(0, 0.08, -1.04), // rear tensioner idler apex
       new THREE.Vector3(0, 0.17, -0.88)  // rear upper transition
     ], true, 'catmullrom', 0.12);
+    trackProfileCurveRef.current = trackProfileCurve;
 
     const ribbonSampleCount = 56;
     const trackPoints = trackProfileCurve.getPoints(ribbonSampleCount);
@@ -2351,7 +2359,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     trackOffsetsX.forEach((tx) => {
       const trackModuleGroup = new THREE.Group();
       trackModuleGroup.position.set(tx, -0.06, 0);
-      vehicleGroup.add(trackModuleGroup);
+      chassisGroup.add(trackModuleGroup); // Mechanically locked to armored rover chassis monocoque
 
       // Armored Track Longitudinal Bogie Beam
       const bogieBeam = new THREE.Mesh(
@@ -2601,6 +2609,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         cleatGroup.add(horn);
 
         trackModuleGroup.add(cleatGroup);
+        trackCleatsRef.current.push({ mesh: cleatGroup, baseU: u });
       }
 
       // Armored Track Mud/Rock Deflector Armor Skirt with Hazard Stripes
@@ -2633,13 +2642,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       comGroup.add(ring);
     });
 
-    // Laser line projection down to ground footprint
+    // Laser line projection down to ground footprint (Parented to vehicleGroup for aligned coordinates)
     const linePoints = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -0.7, 0)];
     const vectorLineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
     const vectorLineMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 });
     const comVectorLine = new THREE.Line(vectorLineGeo, vectorLineMat);
     comVectorLineRef.current = comVectorLine;
-    comGroup.add(comVectorLine);
+    vehicleGroup.add(comVectorLine);
 
     // 3D Dynamic Rollover Safety Pyramid connecting Laden CoM to 4 Tire Ground Contact Points
     const pyramidGeo = new THREE.BufferGeometry();
@@ -2672,10 +2681,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
     // Ground footprint perimeter line loop (Track Contact Polygon)
     const footprintPts = [
-      new THREE.Vector3(-0.68, -0.28, 0.80), // FL
-      new THREE.Vector3(0.68, -0.28, 0.80),  // FR
-      new THREE.Vector3(0.68, -0.28, -0.80), // RR
-      new THREE.Vector3(-0.68, -0.28, -0.80) // RL
+      new THREE.Vector3(-0.68, -0.24, 0.80), // FL
+      new THREE.Vector3(0.68, -0.24, 0.80),  // FR
+      new THREE.Vector3(0.68, -0.24, -0.80), // RR
+      new THREE.Vector3(-0.68, -0.24, -0.80) // RL
     ];
     const footprintGeo = new THREE.BufferGeometry().setFromPoints(footprintPts);
     const footprintMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 3 });
@@ -2717,24 +2726,24 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     const widthBadge = createBadgeSprite(widthBadgeTex, 0, 0.68, 1.15);
     cadDimensionsGroup.add(widthBadge);
 
-    // 2. Belly Clearance: 360 mm
-    const gcPts = [new THREE.Vector3(0.82, -0.28, 0.1), new THREE.Vector3(0.82, 0.08, 0.1)];
+    // 2. Belly Clearance: 340 mm
+    const gcPts = [new THREE.Vector3(0.82, -0.24, 0.1), new THREE.Vector3(0.82, 0.10, 0.1)];
     const gcLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(gcPts), dimLineMat);
     cadDimensionsGroup.add(gcLine);
-    [-0.28, 0.08].forEach((ty) => {
+    [-0.24, 0.10].forEach((ty) => {
       const tick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.015), tickMat);
       tick.position.set(0.82, ty, 0.1);
       cadDimensionsGroup.add(tick);
     });
-    const gcBadgeTex = createCadDimensionBadge('Belly Clearance', '360 mm', 'Armored Skid Plate Standard');
-    const gcBadge = createBadgeSprite(gcBadgeTex, 0.94, -0.10, 0.1);
+    const gcBadgeTex = createCadDimensionBadge('Belly Clearance', '340 mm', 'Armored Skid Plate Standard');
+    const gcBadge = createBadgeSprite(gcBadgeTex, 0.94, -0.07, 0.1);
     cadDimensionsGroup.add(gcBadge);
 
     // 3. Laden CoM Height: 0.36 m
-    const comPts = [new THREE.Vector3(-0.82, -0.28, -0.28), new THREE.Vector3(-0.82, 0.36, -0.28)];
+    const comPts = [new THREE.Vector3(-0.82, -0.24, -0.28), new THREE.Vector3(-0.82, 0.36, -0.28)];
     const comLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(comPts), dimLineMat);
     cadDimensionsGroup.add(comLine);
-    [-0.28, 0.36].forEach((ty) => {
+    [-0.24, 0.36].forEach((ty) => {
       const tick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.015), tickMat);
       tick.position.set(-0.82, ty, -0.28);
       cadDimensionsGroup.add(tick);
@@ -2744,16 +2753,16 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     cadDimensionsGroup.add(comBadge);
 
     // 4. Track Contact Length: 1.70 m
-    const trackPts = [new THREE.Vector3(-0.68, -0.22, 0.80), new THREE.Vector3(-0.68, -0.22, -0.80)];
+    const trackPts = [new THREE.Vector3(-0.68, -0.24, 0.80), new THREE.Vector3(-0.68, -0.24, -0.80)];
     const trackLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(trackPts), dimLineMat);
     cadDimensionsGroup.add(trackLine);
     [-0.80, 0.80].forEach((tz) => {
       const tick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.015), tickMat);
-      tick.position.set(-0.68, -0.22, tz);
+      tick.position.set(-0.68, -0.24, tz);
       cadDimensionsGroup.add(tick);
     });
     const trackBadgeTex = createCadDimensionBadge('Ground Contact Length', '1.70 m', '18.4 kPa Low Ground Pressure');
-    const trackBadge = createBadgeSprite(trackBadgeTex, 0, -0.18, 0.96);
+    const trackBadge = createBadgeSprite(trackBadgeTex, 0, -0.16, 0.96);
     cadDimensionsGroup.add(trackBadge);
 
     // Weather Particles (Snow / Rain)
@@ -3056,10 +3065,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         const nextPt = roadCurveRef.current.getPoint(tNext);
         const nextTangent = roadCurveRef.current.getTangent(tNext).normalize();
 
-        vehicleGroupRef.current.position.set(pt.x, pt.y + 0.28, pt.z);
+        // VEHICLE POSITION: road sits at pt.y + 0.38m; track lowest plane is -0.24m below vehicleGroup
+        // Placing vehicleGroup at pt.y + 0.62m rests track contact bottom flush upon road surface
+        const vehiclePos = new THREE.Vector3(pt.x, pt.y + 0.62, pt.z);
+        vehicleGroupRef.current.position.copy(vehiclePos);
 
-        // FORWARD ORIENTATION: (pt + tangent) ensures vehicle drives cab-first forward
-        const lookTarget = pt.clone().add(tangent.clone().multiplyScalar(4));
+        // FORWARD ORIENTATION: lookTarget at vehiclePos.y ensures parallel slope without pitch distortion
+        const lookTarget = vehiclePos.clone().add(tangent.clone().multiplyScalar(4));
         vehicleGroupRef.current.lookAt(lookTarget);
 
         // Grade & Elevation telemetry
@@ -3102,15 +3114,35 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
         // Rotate all drive sprockets, idlers, and bogie rollers forward about their axle with ground velocity
         if (driveMode !== 'parked' && driveMode !== 'desludge' && activeStressTest !== 'hill_brake') {
+          // Track movement delta U per frame (L_track = 4.8m; at 14 km/h v = 3.88 m/s -> 0.81 rev/sec)
+          const cleatDeltaU = delta * (vehicleSpeedKmh / 14) * 0.82;
+          trackProgressRef.current = (trackProgressRef.current + cleatDeltaU) % 1.0;
+
+          // Sprockets and bogie wheels rotate in exact mechanical ratio (26.7 rad per track revolution)
           wheelsRef.current.forEach((w) => {
-            w.rotation.x -= delta * (vehicleSpeedKmh / 14) * 8.0;
+            w.rotation.x -= cleatDeltaU * 26.7;
           });
 
-          // Continuous caterpillar track belt texture scrolling with terrain speed
+          // Continuous caterpillar track belt texture scrolling in 1:1 sync with track cleats (v repeats 4 times)
           trackBeltMatsRef.current.forEach((mat) => {
-            if (mat.map) mat.map.offset.y -= delta * (vehicleSpeedKmh / 14) * 2.2;
-            if (mat.bumpMap) mat.bumpMap.offset.y -= delta * (vehicleSpeedKmh / 14) * 2.2;
+            if (mat.map) mat.map.offset.y -= cleatDeltaU * 4.0;
+            if (mat.bumpMap) mat.bumpMap.offset.y -= cleatDeltaU * 4.0;
           });
+
+          // Dynamically animate all 3D Chevron Grouser Cleats along continuous track curve
+          if (trackProfileCurveRef.current) {
+            const curve = trackProfileCurveRef.current;
+            const xUnit = new THREE.Vector3(1, 0, 0);
+            trackCleatsRef.current.forEach((item) => {
+              const currentU = (item.baseU + trackProgressRef.current) % 1.0;
+              const cp = curve.getPointAt(currentU);
+              const cTan = curve.getTangentAt(currentU).normalize();
+              const cNorm = xUnit.clone().cross(cTan).normalize();
+              item.mesh.position.copy(cp);
+              const rotMat = new THREE.Matrix4().makeBasis(xUnit, cNorm, cTan);
+              item.mesh.quaternion.setFromRotationMatrix(rotMat);
+            });
+          }
         }
 
         // Autonomous 360-degree spinning LiDAR puck turret
@@ -3745,8 +3777,19 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </p>
           </div>
 
-          {/* Quick Actions: Audio, X-Ray, Fullscreen */}
+          {/* Quick Actions: Switch to Vault Sim, Audio, X-Ray, Fullscreen */}
           <div className="flex items-center space-x-2 shrink-0">
+            {onSwitchToVaultSim && (
+              <button
+                onClick={onSwitchToVaultSim}
+                className="px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center space-x-1.5 transition bg-amber-950/80 border-amber-500/70 text-amber-300 hover:bg-amber-900 shadow-sm"
+                title="Switch to Subsurface Vault & Robotics Digital Twin Simulation"
+              >
+                <Box className="w-4 h-4 text-amber-400" />
+                <span>Switch to Vault Sim</span>
+              </button>
+            )}
+
             <button
               onClick={toggleAudio}
               className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center space-x-1.5 transition ${
