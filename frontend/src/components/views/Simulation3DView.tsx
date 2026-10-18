@@ -25,6 +25,7 @@ import { CameraPreset } from '../../types/digitalTwin';
 import { TerrainScenarioId } from '../../types/terrainScenarios';
 import { TERRAIN_SCENARIOS } from '../../simulation/terrainFeasibilityModel';
 import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
+import { CrawlerMobilityController } from '../CrawlerMobilityController';
 
 export const Simulation3DView: React.FC = () => {
   const cameraPreset = useSimulationStore((s) => s.cameraPreset);
@@ -179,8 +180,13 @@ export const Simulation3DView: React.FC = () => {
         </div>
 
         {/* 3D Canvas */}
-        <div className="flex-1 w-full h-full">
+        <div className="flex-1 w-full h-full relative">
           <DigitalTwinCanvas />
+
+          {/* Floating Crawler Mobility Controller Widget */}
+          <div className="absolute top-20 left-4 z-20 pointer-events-auto">
+            <CrawlerMobilityController />
+          </div>
         </div>
 
         {/* Viewport Bottom Telemetry & Terrain HUD Ribbon */}

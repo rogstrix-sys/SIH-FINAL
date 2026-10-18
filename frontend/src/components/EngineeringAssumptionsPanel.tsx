@@ -41,6 +41,7 @@ export const EngineeringAssumptionsPanel: React.FC = () => {
   const terrainParams = useSimulationStore((s) => s.terrainParams);
   const feasibility = useSimulationStore((s) => s.feasibility);
   const engineParams = useSimulationStore((s) => s.engine.parameters);
+  const mobility = useSimulationStore((s) => s.mobilityTelemetry);
 
   const [classificationFilter, setClassificationFilter] = useState<string>('ALL');
   const [expandedItemId, setExpandedItemId] = useState<string | null>('calc-mass-balance');
@@ -233,6 +234,46 @@ export const EngineeringAssumptionsPanel: React.FC = () => {
       assumedValues: ['Quasi-static fluid centroid assumption with rigid internal baffle damping'],
       sourceJustification: 'Requires transient CFD analysis or physical tilt table verification (Gate 4 Pre-Commissioning)',
       classification: 'UNVALIDATED'
+    },
+    {
+      id: 'calc-crawler-ground-pressure',
+      resultName: 'Continuous Rubber Track Ground Contact Pressure',
+      currentValue: `${mobility.groundPressureKpa.toFixed(1)} kPa (0.39 kg/cm²)`,
+      isAvailable: true,
+      units: 'kPa (kiloPascals)',
+      inputParameters: [
+        `Vehicle Total Mass = ${(2850 + materialBalance.collectionVolumeL * 1.18).toFixed(0)} kg (Chassis + Slurry)`,
+        'Track Contact Length L = 1.85 m',
+        'Dual Rubber Track Width W = 0.28 m × 2'
+      ],
+      calculationMethod: 'Boussinesq contact mechanics for dual continuous track crawlers on semi-infinite elastic half-space',
+      equation: 'P_ground = (M_total · g) / (2 · L_contact · W_track)',
+      assumedValues: [
+        'Uniform ground pressure distribution across 5 articulated bogie road rollers per side',
+        'Neglects dynamic track belt pitch wave harmonics'
+      ],
+      sourceJustification: 'Bekker (1960), Introduction to Terrain-Vehicle Systems; ISO 16754 Earth-moving machinery',
+      classification: 'SIMULATED'
+    },
+    {
+      id: 'calc-crawler-traction-gradeability',
+      resultName: 'Tracked Mobility Traction & Gradeability Equilibrium',
+      currentValue: `Max Grade: ${mobility.gradeabilityMaxDeg.toFixed(1)}° | Delivered Effort: ${mobility.tractiveEffortKn.toFixed(1)} kN (μ = ${mobility.currentTractionCoeff.toFixed(2)})`,
+      isAvailable: true,
+      units: 'degrees (°) / kN',
+      inputParameters: [
+        `Coulomb Soil Friction Coeff μ = ${mobility.currentTractionCoeff.toFixed(2)}`,
+        'Rubber Track Rolling Resistance Crr = 0.08',
+        `Current Incline Pitch = ${mobility.pitchDeg.toFixed(1)}°`
+      ],
+      calculationMethod: 'Coulomb-Mohr shear limit and drawbar pull equilibrium on sloped terrain',
+      equation: 'F_trac = μ · M · g · cos(θ);  θ_max = arctan(μ - Crr)',
+      assumedValues: [
+        'Rigid-body terrain clamping with planar multi-point contact',
+        'Simplified Coulomb track-soil adhesion without continuum elastoplastic soil mesh'
+      ],
+      sourceJustification: 'Wong (2008), Theory of Ground Vehicles; SAE J1309 Crawler Tractor Gradeability Protocol',
+      classification: 'ESTIMATED'
     }
   ];
 

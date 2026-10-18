@@ -24,27 +24,25 @@ export const MachineDigitalTwinScene: React.FC = () => {
   const feasibility = useSimulationStore((s) => s.feasibility);
   const stabilizerExtension = useSimulationStore((s) => s.kinematics.stabilizerExtension);
 
+  const mobility = useSimulationStore((s) => s.mobilityTelemetry);
+
   // Dynamic chassis inclination angles based on slope and heading
   const levelFactor = Math.max(0.12, 1.0 - stabilizerExtension * 0.70);
-  const machinePitchRad = (feasibility.chassisPitchDeg * (Math.PI / 180.0)) * levelFactor;
-  const machineRollRad = (feasibility.chassisRollDeg * (Math.PI / 180.0)) * levelFactor;
-
-  // Machine vertical elevation placement factoring slope and mud sinkage
-  const mudDropY = -Math.min(0.08, feasibility.mudSinkageM || 0);
-  const slopeElevationY = terrainParams.slopeDeg > 0 ? 0.08 * (terrainParams.slopeDeg / 14.0) : 0;
-  const machineElevationY = slopeElevationY + mudDropY;
+  const machinePitchRad = (mobility.pitchDeg * (Math.PI / 180.0)) * levelFactor;
+  const machineRollRad = (mobility.rollDeg * (Math.PI / 180.0)) * levelFactor;
+  const machineHeadingRad = mobility.headingRad;
 
   return (
     <group position={[0, 0, 0]}>
       {/* 1. Surrounding Terrain & Environmental Obstacles */}
       <TerrainEnvironment />
 
-      {/* 2. Mechanized Desludging Mobile Unit (Chassis + Pump + Tank + Reel + Boom) */}
+      {/* 2. Self-Propelled Tracked Engineering Vehicle Group (Chassis + Pump + Tank + Reel + Boom + Hose) */}
       <group
-        position={[0, machineElevationY, 0]}
-        rotation={[machinePitchRad, 0, machineRollRad]}
+        position={[mobility.position[0], mobility.position[1], mobility.position[2]]}
+        rotation={[machinePitchRad, machineHeadingRad, machineRollRad]}
       >
-        {/* Chassis, Wheels / Crawler Tracks & Outrigger Stabilizers */}
+        {/* Continuous Rubber Track Chassis, Drive Sprockets & Outriggers */}
         <MobileChassis />
 
         {/* Vacuum Pump & Hydraulic Drive Assembly */}
@@ -59,8 +57,14 @@ export const MachineDigitalTwinScene: React.FC = () => {
         {/* Dual-Joint Articulated Crane Arm */}
         <ArticulatedBoom />
 
-        {/* 3D Chassis Inclinometer Bubble Widget (Hovering above chassis on non-zero slope) */}
-        {terrainParams.slopeDeg > 2.0 && (
+        {/* Flexible Umbilical Suction Hose Spline */}
+        <ExtractionHose />
+
+        {/* Submerged Hydro-Jetting & Cutter Suction Nozzle */}
+        <HoseNozzle />
+
+        {/* 3D Chassis Inclinometer Bubble Widget (Hovering above chassis) */}
+        {mobility.effectiveTiltDeg > 1.5 && (
           <Html position={[0, 2.5, 0]} center style={{ pointerEvents: 'none' }}>
             <div className={`px-2.5 py-1 rounded-lg border text-[10px] font-mono shadow-2xl backdrop-blur flex items-center gap-1.5 whitespace-nowrap ${
               feasibility.stabilityStatus === 'critical_unstable'
@@ -71,7 +75,7 @@ export const MachineDigitalTwinScene: React.FC = () => {
             }`}>
               <Compass className="w-3.5 h-3.5" />
               <span>
-                CHASSIS TILT: {feasibility.effectiveTiltDeg.toFixed(1)}° (PITCH {feasibility.chassisPitchDeg.toFixed(1)}° | ROLL {feasibility.chassisRollDeg.toFixed(1)}°)
+                CRAWLER TILT: {mobility.effectiveTiltDeg.toFixed(1)}° (PITCH {mobility.pitchDeg.toFixed(1)}° | ROLL {mobility.rollDeg.toFixed(1)}°)
               </span>
             </div>
           </Html>
@@ -80,12 +84,10 @@ export const MachineDigitalTwinScene: React.FC = () => {
         {/* Lateral Clearance Warning Planes (When path width margin violates threshold) */}
         {feasibility.clearanceConflictDetected && (
           <group position={[0, 0.45, 0]}>
-            {/* Left red collision proximity indicator */}
             <mesh position={[0, 0, 0.85]}>
               <boxGeometry args={[3.2, 0.6, 0.04]} />
               <meshBasicMaterial color="#e11d48" opacity={0.35} transparent wireframe />
             </mesh>
-            {/* Right red collision proximity indicator */}
             <mesh position={[0, 0, -0.85]}>
               <boxGeometry args={[3.2, 0.6, 0.04]} />
               <meshBasicMaterial color="#e11d48" opacity={0.35} transparent wireframe />
@@ -93,7 +95,7 @@ export const MachineDigitalTwinScene: React.FC = () => {
           </group>
         )}
 
-        {/* Underbody Ground Clearance Strike Warning Plane (When belly clearance compromised) */}
+        {/* Underbody Ground Clearance Strike Warning Plane */}
         {feasibility.groundClearanceRisk && (
           <mesh position={[0, 0.22, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[2.6, 1.2]} />
@@ -105,13 +107,7 @@ export const MachineDigitalTwinScene: React.FC = () => {
       {/* 3. External Waste Receiving Disposal Tanker */}
       <ReceiverTank />
 
-      {/* 4. Flexible Umbilical Suction Hose Spline */}
-      <ExtractionHose />
-
-      {/* 5. Submerged Hydro-Jetting & Cutter Suction Nozzle */}
-      <HoseNozzle />
-
-      {/* 6. Demonstration Dual-Compartment Septic Vault (Cutaway) */}
+      {/* 4. Demonstration Dual-Compartment Septic Vault (Cutaway) */}
       <DemonstrationSepticTank />
 
       {/* ========================================================== */}

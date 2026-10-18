@@ -56,6 +56,15 @@ import {
   calculateTerrainFeasibility,
   getScenarioDefaultParams
 } from '../simulation/terrainFeasibilityModel';
+import {
+  VehicleMobilityParameters,
+  VehicleMobilityTelemetry,
+  MobilityInputState,
+  DEFAULT_MOBILITY_PARAMS,
+  INITIAL_MOBILITY_TELEMETRY,
+  INITIAL_MOBILITY_INPUTS
+} from '../types/vehicleMobility';
+import { stepVehicleMobility } from '../utils/terrainPhysics';
 
 export const DEFAULT_PARAMETERS: SimulationParameters = {
   pumpRpm: 1850,
@@ -77,20 +86,22 @@ export const DEFAULT_PARAMETERS: SimulationParameters = {
 export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
   chassis: {
     id: 'chassis',
-    name: 'Heavy-Duty 4-Wheel / Crawler Mobile Chassis',
-    type: 'Mobility Platform',
+    name: 'Self-Propelled Tracked Engineering Vehicle Chassis',
+    type: 'Tracked Mobility Platform',
     status: 'nominal',
     temperatureC: 24.5,
     pressureBar: 0,
     vibrationMmS: 0.6,
-    description: 'Narrow-gauge welded box-section steel chassis engineered for restricted-access alleyways and steep mountain slopes. Selectable between high-flotation agricultural lug wheels and articulated rubber continuous tracks.',
+    description: 'Narrow-gauge welded box-section steel chassis engineered for restricted-access alleyways and steep mountain slopes. Powered by dual closed-loop hydrostatic crawler drive (or electric AC induction) with continuous vulcanized rubber tracks, toothed drive sprockets, recoil buffer idlers, and 5 bogie road rollers per side.',
     specifications: {
-      'Track Width': '1.35 m (Conceptual Assumption for Narrow Alleys)',
-      'Wheelbase': '2.10 m (Conceptual Assumption)',
-      'Ground Clearance': '320 mm nominal (Conceptual Model)',
-      'Approximate Payload': '2,800 kg GVW Rating (Conceptual Estimate)',
-      'Mobility Running Gear': 'Selectable 4-Wheel Lug / Articulated Rubber Crawler',
-      'Stabilizers': '4x Telescopic hydraulic outrigger pads'
+      'Mobility System': 'Dual Continuous Rubber Tracks with Embedded High-Tensile Steel Cords',
+      'Drive Concept': 'Dual Closed-Circuit Hydrostatic Travel Motors (Proposed Configuration)',
+      'Ground Contact Pressure': '38.5 kPa (0.39 kg/cm² nominal — high flotation, low sinkage)',
+      'Turning Capability': '360° Spin Turn / Counter-Rotation in Place (Zero Turning Radius)',
+      'Track Gauge Width': '1.64 m centerline (1.92 m outer width)',
+      'Belly Ground Clearance': '280 mm nominal under heavy-duty rock skid plate',
+      'Stabilizers': '4x Telescoping hydraulic outrigger legs with ground reaction pads',
+      'Rigging Points': '4x Heavy-Duty Crane Hoisting Points (SWL 2,500 kg per corner)'
     }
   },
   pump: {
@@ -300,6 +311,15 @@ export interface SimulationStore {
   // Engineering Test Scenarios (Deliverable 2)
   runCompleteCycleScenario: () => void;
   triggerTankFullScenario: () => void;
+
+  // Tracked Engineering Vehicle Mobility & Drive Dynamics
+  mobilityParams: VehicleMobilityParameters;
+  mobilityTelemetry: VehicleMobilityTelemetry;
+  mobilityInputs: MobilityInputState;
+  setMobilityInput: (key: keyof MobilityInputState, value: boolean) => void;
+  stopVehicle: () => void;
+  resetVehiclePosition: () => void;
+  updateMobilityParams: (partial: Partial<VehicleMobilityParameters>) => void;
 }
 
 function syncEngineParamsFromDigitalTwin(
@@ -413,10 +433,14 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       godRays: true,
       soundEnabled: false,
       showGrid: true,
-      mobilityMode: 'wheels',
+      mobilityMode: 'tracks',
       showSensorOverlay: true
     },
     selectedComponentId: null,
+
+    mobilityParams: { ...DEFAULT_MOBILITY_PARAMS },
+    mobilityTelemetry: { ...INITIAL_MOBILITY_TELEMETRY },
+    mobilityInputs: { ...INITIAL_MOBILITY_INPUTS },
 
     selectedScenario: 'level_paved',
     terrainParams: { ...DEFAULT_TERRAIN_PARAMS },
@@ -519,7 +543,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         telemetry: freshTelemetry,
         telemetryHistory: freshHistory,
         alarmsActive: 0,
-        feasibility: freshFeasibility
+        feasibility: freshFeasibility,
+        mobilityTelemetry: { ...INITIAL_MOBILITY_TELEMETRY },
+        mobilityInputs: { ...INITIAL_MOBILITY_INPUTS }
       });
       addEvent('info', 'SYSTEM_RESET', 'Machine kinematics, tanks, and telemetry reset to initial IDLE baseline.');
     },
@@ -714,7 +740,61 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     tickSimulation: (deltaSeconds: number) => {
       const state = get();
       if (state.engine.isPaused) return;
-      if (state.engine.operatingState === 'IDLE' && state.status === 'idle') return;
+
+      // 1. Evaluate Tracked Engineering Vehicle Mobility Step
+      const isMobilityBlocked =
+        state.interlocks.emergencyStopLatched ||
+        state.alarms.emergencyStopActive ||
+        state.interlocks.isDeployed ||
+        state.kinematics.stabilizerExtension > 0.05 ||
+        state.operatingState === 'DEPLOY' ||
+        state.operatingState === 'EXTRACT' ||
+        state.operatingState === 'EXTRACTION' ||
+        state.operatingState === 'DISCHARGE' ||
+        state.operatingState === 'FAULT';
+
+      const mobilityBlockReason =
+        (state.interlocks.emergencyStopLatched || state.alarms.emergencyStopActive)
+          ? 'EMERGENCY STOP (E-STOP) ACTUATED — Track drive inhibited'
+          : (state.interlocks.isDeployed || state.kinematics.stabilizerExtension > 0.05)
+          ? 'STABILIZERS EXTENDED — Retract hydraulic outriggers to travel'
+          : (state.operatingState === 'EXTRACT' || state.operatingState === 'EXTRACTION' || state.operatingState === 'DISCHARGE')
+          ? 'ACTIVE SLURRY TRANSFER — Stop pump and stow umbilical before travel'
+          : state.operatingState === 'FAULT'
+          ? 'MACHINE FAULT ACTIVE — Clear system faults before travel'
+          : null;
+
+      const nextMobility = stepVehicleMobility(
+        state.mobilityTelemetry,
+        state.mobilityInputs,
+        state.mobilityParams,
+        state.selectedScenario,
+        state.terrainParams,
+        isMobilityBlocked,
+        mobilityBlockReason,
+        state.materialBalance.collectionVolumeL,
+        deltaSeconds
+      );
+
+      // If pump engine is idle and not running, only step mobility if moving or inputs pressed
+      if (state.engine.operatingState === 'IDLE' && state.status === 'idle') {
+        if (
+          state.mobilityTelemetry.isMoving ||
+          nextMobility.isMoving ||
+          state.mobilityTelemetry.speedMs !== nextMobility.speedMs ||
+          state.mobilityTelemetry.headingRad !== nextMobility.headingRad ||
+          state.mobilityInputs.forward ||
+          state.mobilityInputs.reverse ||
+          state.mobilityInputs.steerLeft ||
+          state.mobilityInputs.steerRight ||
+          state.mobilityInputs.pivotLeft ||
+          state.mobilityInputs.pivotRight ||
+          state.mobilityInputs.brake
+        ) {
+          set({ mobilityTelemetry: nextMobility });
+        }
+        return;
+      }
 
       const effectiveDt = deltaSeconds * state.simSpeed;
       const nextEngine = stepSimulationEngine(state.engine, effectiveDt);
@@ -841,7 +921,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         telemetryHistory: nextHistory,
         eventLog: nextEvents,
         alarmsActive: alarmCount,
-        feasibility: nextFeasibility
+        feasibility: nextFeasibility,
+        mobilityTelemetry: nextMobility
       });
 
       // Update Guided Demo timer & auto-advance
@@ -1218,6 +1299,70 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         'TEST_SCENARIO',
         'TEST SCENARIO 2: Overfill protection interlock activated. Collection vessel pre-filled to 99.6% capacity.'
       );
+    },
+
+    setMobilityInput: (key: keyof MobilityInputState, value: boolean) => {
+      set((s) => ({
+        mobilityInputs: {
+          ...s.mobilityInputs,
+          [key]: value
+        }
+      }));
+    },
+
+    stopVehicle: () => {
+      set((s) => ({
+        mobilityInputs: {
+          forward: false,
+          reverse: false,
+          steerLeft: false,
+          steerRight: false,
+          pivotLeft: false,
+          pivotRight: false,
+          brake: true
+        },
+        mobilityTelemetry: {
+          ...s.mobilityTelemetry,
+          speedMs: 0,
+          speedKmh: 0,
+          steerRateRadS: 0,
+          leftTrackSpeedMs: 0,
+          rightTrackSpeedMs: 0,
+          isMoving: false
+        }
+      }));
+    },
+
+    resetVehiclePosition: () => {
+      const { selectedScenario, terrainParams, mobilityParams, addEvent } = get();
+      set((s) => ({
+        mobilityInputs: { ...INITIAL_MOBILITY_INPUTS },
+        mobilityTelemetry: {
+          ...s.mobilityTelemetry,
+          position: [0.0, 0.0, 0.0],
+          headingDeg: 0.0,
+          headingRad: 0.0,
+          pitchDeg: 0.0,
+          rollDeg: 0.0,
+          effectiveTiltDeg: 0.0,
+          speedMs: 0.0,
+          speedKmh: 0.0,
+          steerRateRadS: 0.0,
+          leftTrackSpeedMs: 0.0,
+          rightTrackSpeedMs: 0.0,
+          isMoving: false
+        }
+      }));
+      addEvent('info', 'MOBILITY', 'Tracked vehicle repositioned to origin staging coordinates [0, 0, 0].');
+    },
+
+    updateMobilityParams: (partial: Partial<VehicleMobilityParameters>) => {
+      set((s) => ({
+        mobilityParams: {
+          ...s.mobilityParams,
+          ...partial
+        }
+      }));
     }
   };
 });

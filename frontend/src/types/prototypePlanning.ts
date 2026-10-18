@@ -136,30 +136,30 @@ export const DEFAULT_BOM_ITEMS: BomItem[] = [
     verificationStatus: 'PRELIMINARY_ESTIMATE'
   },
 
-  // 2. Mobility
+  // 2. Mobility (Tracked Engineering Vehicle)
   {
     id: 'BOM-03',
-    name: 'High-Flotation Mountain Scree Tires & Hubs',
+    name: 'Continuous Rubber Track Belts & Bogie Assemblies',
     category: 'Mobility',
-    qty: 4,
-    function: 'All-terrain tractive propulsion on 14° mud, rocky scree, and wet stairs',
-    proposedSpec: '26x12.00-12 8-ply agricultural chevron-lug tires on heavy-duty 5-bolt steel rims',
-    unitPriceInr: 8000,
-    subtotalInr: 32000,
-    compatibilityNotes: 'Ensures 1.35m overall machine track width to negotiate 1.6m narrow pedestrian paths',
+    qty: 2,
+    function: 'All-terrain tractive propulsion on 18° mud, rocky scree, and narrow stairways',
+    proposedSpec: '280 mm wide vulcanized rubber continuous crawler track belts with embedded high-tensile steel cord cores, forged steel drive lugs, and 5 bogie road rollers per side',
+    unitPriceInr: 45000,
+    subtotalInr: 90000,
+    compatibilityNotes: 'Ensures 1.64m track gauge / 1.92m overall width with 38.5 kPa ground contact pressure',
     verificationStatus: 'VENDOR_QUOTED'
   },
   {
     id: 'BOM-04',
-    name: 'Hydraulic Planetary Wheel Drive Motors',
+    name: 'Dual Closed-Loop Hydrostatic Track Final Drive Motors',
     category: 'Mobility',
-    qty: 4,
-    function: 'Hydrostatic high-torque 4WD wheel propulsion with dynamic holding brake',
-    proposedSpec: '1200 Nm orbital hydraulic motors with integrated multi-disc fail-safe negative park brake',
-    unitPriceInr: 28750,
+    qty: 2,
+    function: 'High-torque crawler track propulsion with 360° spin-turn in place and fail-safe holding brake',
+    proposedSpec: 'Dual 2-speed variable displacement axial piston hydraulic motors (45 cc/rev) with planetary reduction gearboxes (1:28 ratio) and SAHR park brakes',
+    unitPriceInr: 57500,
     subtotalInr: 115000,
-    compatibilityNotes: 'Driven by 210-bar variable-displacement hydraulic pump on auxiliary engine PTO',
-    verificationStatus: 'PRELIMINARY_ESTIMATE'
+    compatibilityNotes: 'Closed-circuit hydrostatic drive with cross-port relief & counter-balance overcenter valves',
+    verificationStatus: 'VENDOR_QUOTED'
   },
 
   // 3. Pump
