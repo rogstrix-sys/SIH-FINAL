@@ -327,17 +327,16 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
           vMesh.position.copy(currentPoint);
           vMesh.position.y += 0.35; // Tire ground offset
 
-          // Look ahead along curve
-          const lookTarget = currentPoint.clone().add(tangent.clone().multiplyScalar(4.0));
-          vMesh.lookAt(lookTarget);
+          // Align vehicle heading (+Z) with road tangent
+          vMesh.rotation.y = Math.atan2(tangent.x, tangent.z);
+          const pitch = Math.atan2(tangent.y, Math.hypot(tangent.x, tangent.z));
+          vMesh.rotation.x = -pitch;
 
           // Incline and banking computation
-          const pitch = Math.atan2(tangent.y, Math.hypot(tangent.x, tangent.z)) * (180 / Math.PI);
-          chassisPitchRef.current = -pitch * 0.7;
+          chassisPitchRef.current = -(pitch * (180 / Math.PI)) * 0.4;
 
           // Steering angle from curvature
-          const nextPt = roadCurve.getPointAt((pathProgressRef.current + 0.01) % 1.0);
-          const nextTangent = roadCurve.getTangentAt((pathProgressRef.current + 0.01) % 1.0);
+          const nextTangent = roadCurve.getTangentAt((pathProgressRef.current + 0.01) % 1.0).normalize();
           const turnAngle = (nextTangent.x * tangent.z - nextTangent.z * tangent.x) * 12.0;
           steerAngleRef.current = Math.max(-0.55, Math.min(0.55, turnAngle));
           chassisRollRef.current = -turnAngle * 1.8;
@@ -373,7 +372,7 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
             steerAngleRef.current *= Math.pow(0.75, delta * 30); // Self-centering
           }
 
-          // Advance position along heading
+          // Advance position along heading (+Z is forward)
           const speedMps = curSpeed / 3.6;
           vehicleHeadingRef.current += steerAngleRef.current * (speedMps / 3.4) * delta;
 
@@ -384,6 +383,7 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
           );
           vMesh.position.addScaledVector(headingVec, speedMps * delta);
           vMesh.rotation.y = vehicleHeadingRef.current;
+          vMesh.rotation.x = 0;
 
           // Pitch and Roll Inertia
           chassisPitchRef.current = keys.forward ? -2.2 : keys.brake ? 3.8 : 0;
@@ -391,15 +391,15 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
         }
 
         // Apply Chassis Pitch and Roll (Suspension Articulation)
-        chassis.rotation.z = THREE.MathUtils.degToRad(chassisRollRef.current);
         chassis.rotation.x = THREE.MathUtils.degToRad(chassisPitchRef.current);
+        chassis.rotation.z = THREE.MathUtils.degToRad(chassisRollRef.current);
 
         // Turn front wheels according to steerAngle
         vehicle.frontSteerGroups.forEach((pivot) => {
           pivot.rotation.y = steerAngleRef.current;
         });
 
-        // Spin all 6 wheels based on distance travelled
+        // Spin all 6 wheels based on distance travelled around X axle
         const wheelSpin = (curSpeed / 3.6 / 0.48) * delta;
         vehicle.wheelGroups.forEach((w) => {
           w.rotation.x += wheelSpin;
@@ -420,27 +420,27 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
         const vPos = vMesh.position;
 
         if (cameraViewRef.current === 'chase' && cam && ctrl) {
-          // Dynamic chase camera following behind vehicle
-          const offset = new THREE.Vector3(-8.5, 4.2, 0);
+          // Dynamic chase camera following behind vehicle (-Z)
+          const offset = new THREE.Vector3(0, 3.8, -8.5);
           offset.applyEuler(vMesh.rotation);
           const targetCamPos = vPos.clone().add(offset);
           cam.position.lerp(targetCamPos, 0.08);
-          ctrl.target.lerp(vPos.clone().add(new THREE.Vector3(0, 1.4, 0)), 0.12);
+          ctrl.target.lerp(vPos.clone().add(new THREE.Vector3(0, 1.2, 1.0)), 0.12);
         } else if (cameraViewRef.current === 'cockpit' && cam && ctrl) {
-          // FPV inside the cab
-          const eyeOffset = new THREE.Vector3(1.4, 1.2, 0.35);
+          // FPV inside the cab (front +Z)
+          const eyeOffset = new THREE.Vector3(0.35, 1.2, 1.4);
           eyeOffset.applyEuler(vMesh.rotation);
           cam.position.copy(vPos.clone().add(eyeOffset));
 
-          const lookDir = new THREE.Vector3(12.0, 0.4, 0);
+          const lookDir = new THREE.Vector3(0, 0.2, 12.0);
           lookDir.applyEuler(vMesh.rotation);
           ctrl.target.copy(vPos.clone().add(lookDir));
         } else if (cameraViewRef.current === 'wheel_cam' && cam && ctrl) {
           // Low-angle wheel hub camera
-          const wheelOffset = new THREE.Vector3(1.2, 0.4, 1.8);
+          const wheelOffset = new THREE.Vector3(1.6, 0.4, 1.4);
           wheelOffset.applyEuler(vMesh.rotation);
           cam.position.copy(vPos.clone().add(wheelOffset));
-          ctrl.target.copy(vPos);
+          ctrl.target.copy(vPos.clone().add(new THREE.Vector3(0, 0.45, 1.4)));
         }
 
         // ==========================================
@@ -454,7 +454,7 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
         });
 
         const exhaustWorld = new THREE.Vector3();
-        vMesh.localToWorld(vehicle.exhaustStackWorld.clone());
+        vMesh.localToWorld(exhaustWorld.copy(vehicle.exhaustStackWorld));
 
         particles.update(
           delta,
