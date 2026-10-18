@@ -42,6 +42,7 @@ interface CanyonExpedition3DProps {
   setSite?: React.Dispatch<React.SetStateAction<SiteConditions>>;
   topChoice?: EquipmentRecommendation;
   onSwitchToMountainSim?: () => void;
+  onSwitchToVaultSim?: () => void;
 }
 
 export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({

@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
+import { Header } from './components/Header';
+import { LeftNavigation } from './components/LeftNavigation';
+import { OverviewDashboard } from './components/views/OverviewDashboard';
+import { Simulation3DView } from './components/views/Simulation3DView';
+import { SensorsView } from './components/views/SensorsView';
+import { ParametersView } from './components/views/ParametersView';
+import { ReportsView } from './components/views/ReportsView';
+
+// Field / Scenario exploration components
+import { CanyonExpedition3D } from './components/canyonSimulation/CanyonExpedition3D';
+import { Simulation3D } from './components/Simulation3D';
+import { SubsurfaceVaultSim3D } from './components/vaultSimulation/SubsurfaceVaultSim3D';
 import { Dashboard } from './components/Dashboard';
 import { SiteAssessmentForm } from './components/SiteAssessmentForm';
-import { TerrainSimulationSVG } from './components/TerrainSimulationSVG';
-import { Simulation3D } from './components/Simulation3D';
-import { CanyonExpedition3D } from './components/canyonSimulation/CanyonExpedition3D';
-import { SubsurfaceVaultSim3D } from './components/vaultSimulation/SubsurfaceVaultSim3D';
-import { RouteAccessPlanner } from './components/RouteAccessPlanner';
-import { EquipmentComparison } from './components/EquipmentComparison';
-import { SafetyPanel } from './components/SafetyPanel';
-import { EngineeringReport } from './components/EngineeringReport';
-import { ScenarioManager } from './components/ScenarioManager';
+
+import { useSimulationStore } from './store/useSimulationStore';
 import { SiteConditions, EvaluationWeights, FullRecommendationResponse, ScenarioItem } from './types';
 import { api } from './services/api';
+import { ArrowLeft, Box, Mountain, Compass, LayoutDashboard } from 'lucide-react';
 
 const DEFAULT_SITE: SiteConditions = {
   terrain_type: 'mountainous',
@@ -46,248 +51,126 @@ const DEFAULT_WEIGHTS: EvaluationWeights = {
 };
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [backendOnline, setBackendOnline] = useState<boolean>(true);
+  const activeView = useSimulationStore((s) => s.activeView);
+  const setActiveView = useSimulationStore((s) => s.setActiveView);
+
+  // Field scenario view overlay (if user switches to canyon / mountain / legacy tools)
+  const [legacyView, setLegacyView] = useState<string | null>(null);
+
   const [site, setSite] = useState<SiteConditions>(DEFAULT_SITE);
   const [weights, setWeights] = useState<EvaluationWeights>(DEFAULT_WEIGHTS);
-  
   const [recommendationData, setRecommendationData] = useState<FullRecommendationResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   const [presets, setPresets] = useState<ScenarioItem[]>([]);
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('');
-  const [savedScenarios, setSavedScenarios] = useState<ScenarioItem[]>([]);
-  const [isScenarioModalOpen, setIsScenarioModalOpen] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Initial load: health check, presets, scenarios, initial recommendation
   useEffect(() => {
-    const initialize = async () => {
-      try {
-        await api.getHealth();
-        setBackendOnline(true);
-      } catch (err) {
-        console.warn('Backend offline or starting up...');
-        setBackendOnline(false);
-      }
-
+    const init = async () => {
       try {
         const presetData = await api.getScenarioPresets();
         setPresets(presetData);
       } catch (err) {
-        console.warn('Error fetching presets:', err);
+        console.warn('API presets unavailable, using local mock defaults.');
       }
 
       try {
-        const scenarioData = await api.getScenarios();
-        setSavedScenarios(scenarioData);
+        const res = await api.getRecommendations(DEFAULT_SITE, DEFAULT_WEIGHTS);
+        setRecommendationData(res);
       } catch (err) {
-        console.warn('Error fetching scenarios:', err);
+        console.warn('Backend API offline or unreachable, continuing in stand-alone simulation mode.');
       }
-
-      runEvaluation(DEFAULT_SITE, DEFAULT_WEIGHTS);
     };
 
-    initialize();
+    init();
   }, []);
-
-  const runEvaluation = async (targetSite: SiteConditions, targetWeights: EvaluationWeights) => {
-    try {
-      setIsLoading(true);
-      setErrorMsg(null);
-      const res = await api.getRecommendations(targetSite, targetWeights);
-      setRecommendationData(res);
-      setBackendOnline(true);
-    } catch (err: any) {
-      console.error('Recommendation fetch error:', err);
-      setErrorMsg(err.message || 'Failed to calculate recommendations');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Re-run evaluation when site changes
-  const handleSiteChange = (newSite: SiteConditions) => {
-    setSite(newSite);
-    runEvaluation(newSite, weights);
-  };
-
-  const handleSelectPreset = (presetId: string) => {
-    setSelectedPresetId(presetId);
-    const matched = presets.find((p) => p.id === presetId);
-    if (matched) {
-      setSite(matched.site_conditions);
-      runEvaluation(matched.site_conditions, weights);
-    }
-  };
-
-  const handleLoadScenario = (scenario: ScenarioItem) => {
-    setSite(scenario.site_conditions);
-    runEvaluation(scenario.site_conditions, weights);
-    setActiveTab('dashboard');
-  };
-
-  const refreshScenarios = async () => {
-    try {
-      const data = await api.getScenarios();
-      setSavedScenarios(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const topChoice = recommendationData?.recommendations[0];
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
-      {/* Top Navigation */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        backendOnline={backendOnline}
-        presets={presets}
-        selectedPresetId={selectedPresetId}
-        onSelectPreset={handleSelectPreset}
-        onOpenSaveModal={() => setIsScenarioModalOpen(true)}
-        onPrintReport={() => setActiveTab('report')}
-      />
+    <div className="min-h-screen bg-graphite-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden">
+      {/* 1. Global Header */}
+      <Header />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Error notification if any */}
-        {errorMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-950/80 border border-rose-700/60 text-rose-200 text-xs flex justify-between items-center shadow-lg">
-            <div>
-              <span className="font-bold">Error executing calculation: </span>
-              <span>{errorMsg}</span>
-            </div>
-            <button
-              onClick={() => runEvaluation(site, weights)}
-              className="px-2.5 py-1 bg-rose-800 hover:bg-rose-700 rounded text-white font-medium"
-            >
-              Retry
-            </button>
+      {/* Legacy / Field Scenario Overlay banner if active */}
+      {legacyView && (
+        <div className="bg-graphite-900 border-b border-safety-500/40 px-4 py-2 flex items-center justify-between text-xs font-mono z-40">
+          <div className="flex items-center gap-2 text-safety-400">
+            <span className="w-2 h-2 rounded-full bg-safety-500 animate-pulse" />
+            <span className="font-semibold uppercase">Field Scenario View: {legacyView}</span>
           </div>
-        )}
+          <button
+            onClick={() => setLegacyView(null)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded bg-graphite-800 hover:bg-graphite-700 text-white border border-slate-700 transition"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-safety-400" />
+            <span>Return to Digital Twin Control Room</span>
+          </button>
+        </div>
+      )}
 
-        {/* Tab Switcher */}
-        {recommendationData && (
-          <>
-            {activeTab === 'dashboard' && (
+      {/* 2. Main Workspace Layout */}
+      {legacyView ? (
+        <div className="flex-1 overflow-y-auto">
+          {legacyView === 'canyon3d' && (
+            <CanyonExpedition3D
+              site={site}
+              setSite={setSite}
+              topChoice={topChoice}
+              onSwitchToMountainSim={() => setLegacyView('simulation3d')}
+              onSwitchToVaultSim={() => setLegacyView('vault3d')}
+            />
+          )}
+
+          {legacyView === 'simulation3d' && (
+            <Simulation3D
+              site={site}
+              setSite={setSite}
+              topChoice={topChoice}
+              onSwitchToVaultSim={() => setLegacyView('vault3d')}
+              onSwitchToCanyonSim={() => setLegacyView('canyon3d')}
+            />
+          )}
+
+          {legacyView === 'vault3d' && (
+            <SubsurfaceVaultSim3D
+              site={site}
+              setSite={setSite}
+              topChoice={topChoice}
+              onSwitchToMountainSim={() => setLegacyView('simulation3d')}
+              onSwitchToCanyonSim={() => setLegacyView('canyon3d')}
+            />
+          )}
+
+          {legacyView === 'dashboard' && recommendationData && (
+            <div className="max-w-7xl mx-auto p-6">
               <Dashboard
                 topChoice={topChoice}
                 recommendations={recommendationData.recommendations}
                 site={site}
                 safety={recommendationData.safety_assessment}
                 narrative={recommendationData.ai_narrative}
-                recentScenarios={presets.concat(savedScenarios)}
-                onSelectScenario={handleLoadScenario}
-                onNavigateTab={(tab) => setActiveTab(tab)}
+                recentScenarios={presets}
+                onSelectScenario={(sc) => setSite(sc.site_conditions)}
+                onNavigateTab={(tab) => setLegacyView(tab)}
               />
-            )}
-
-            {activeTab === 'assessment' && (
-              <SiteAssessmentForm
-                site={site}
-                setSite={setSite}
-                onRunEvaluation={() => runEvaluation(site, weights)}
-                isLoading={isLoading}
-              />
-            )}
-
-            {activeTab === 'simulation' && (
-              <TerrainSimulationSVG
-                site={site}
-                setSite={setSite}
-                topChoice={topChoice}
-              />
-            )}
-
-            {activeTab === 'simulation3d' && (
-              <Simulation3D
-                site={site}
-                setSite={setSite}
-                topChoice={topChoice}
-                onSwitchToVaultSim={() => setActiveTab('vault3d')}
-                onSwitchToCanyonSim={() => setActiveTab('canyon3d')}
-              />
-            )}
-
-            {activeTab === 'canyon3d' && (
-              <CanyonExpedition3D
-                site={site}
-                setSite={setSite}
-                topChoice={topChoice}
-                onSwitchToMountainSim={() => setActiveTab('simulation3d')}
-              />
-            )}
-
-            {activeTab === 'vault3d' && (
-              <SubsurfaceVaultSim3D
-                site={site}
-                setSite={setSite}
-                topChoice={topChoice}
-                onSwitchToMountainSim={() => setActiveTab('simulation3d')}
-              />
-            )}
-
-            {activeTab === 'route' && (
-              <RouteAccessPlanner
-                site={site}
-                setSite={setSite}
-                recommendations={recommendationData.recommendations}
-              />
-            )}
-
-            {activeTab === 'comparison' && (
-              <EquipmentComparison
-                recommendations={recommendationData.recommendations}
-                weights={weights}
-                setWeights={setWeights}
-                onRecalculateWithWeights={() => runEvaluation(site, weights)}
-              />
-            )}
-
-            {activeTab === 'safety' && (
-              <SafetyPanel
-                safety={recommendationData.safety_assessment}
-                site={site}
-              />
-            )}
-
-            {activeTab === 'report' && (
-              <EngineeringReport
-                site={site}
-                topChoice={topChoice}
-                recommendations={recommendationData.recommendations}
-                safety={recommendationData.safety_assessment}
-                narrative={recommendationData.ai_narrative}
-              />
-            )}
-          </>
-        )}
-      </main>
-
-      {/* Scenario Manager Modal */}
-      <ScenarioManager
-        isOpen={isScenarioModalOpen}
-        onClose={() => setIsScenarioModalOpen(false)}
-        currentSite={site}
-        currentRecommendation={topChoice}
-        savedScenarios={savedScenarios}
-        onRefreshScenarios={refreshScenarios}
-        onLoadScenario={handleLoadScenario}
-      />
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800 bg-slate-950 py-4 text-center text-xs text-slate-500 font-mono no-print">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Innovative Mechanized Desludging Decision Support System v1.0</span>
-          <span>Zero Physical Pit Entry Mandated · ISO 21876 / OSHA 1910.146</span>
+            </div>
+          )}
         </div>
-      </footer>
+      ) : (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Navigation Rail */}
+          <LeftNavigation onOpenLegacyView={(viewId) => setLegacyView(viewId)} />
+
+          {/* Primary View Display */}
+          <main className="flex-1 flex flex-col overflow-hidden bg-graphite-950">
+            {activeView === 'overview' && <OverviewDashboard />}
+            {activeView === 'simulation3d' && <Simulation3DView />}
+            {activeView === 'sensors' && <SensorsView />}
+            {activeView === 'parameters' && <ParametersView />}
+            {activeView === 'reports' && <ReportsView />}
+          </main>
+        </div>
+      )}
     </div>
   );
 };
-
 export default App;

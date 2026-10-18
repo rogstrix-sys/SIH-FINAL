@@ -46,6 +46,7 @@ interface SubsurfaceVaultSim3DProps {
   setSite?: React.Dispatch<React.SetStateAction<SiteConditions>>;
   topChoice?: EquipmentRecommendation;
   onSwitchToMountainSim?: () => void;
+  onSwitchToCanyonSim?: () => void;
 }
 
 export const SubsurfaceVaultSim3D: React.FC<SubsurfaceVaultSim3DProps> = ({
