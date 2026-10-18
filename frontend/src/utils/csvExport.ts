@@ -4,6 +4,7 @@
  */
 
 import { TelemetryPoint, EventLogItem } from '../types/digitalTwin';
+import { BomItem, ProposedSensorItem, PhysicalTestProcedure } from '../types/prototypePlanning';
 
 export function generateTelemetryCsvString(history: TelemetryPoint[]): string {
   const headers = [
@@ -82,4 +83,105 @@ function triggerBrowserDownload(content: string, filename: string, mimeType: str
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+export function generateBomCsvString(items: BomItem[]): string {
+  const headers = [
+    'Item ID',
+    'Category',
+    'Component Name',
+    'Quantity',
+    'Function',
+    'Proposed Specification',
+    'Unit Price (INR)',
+    'Subtotal (INR)',
+    'Compatibility Notes',
+    'Verification Status',
+    'Cost Status'
+  ];
+  const rows = items.map((item) => [
+    `"${item.id}"`,
+    `"${item.category}"`,
+    `"${item.name.replace(/"/g, '""')}"`,
+    item.qty,
+    `"${item.function.replace(/"/g, '""')}"`,
+    `"${item.proposedSpec.replace(/"/g, '""')}"`,
+    item.unitPriceInr,
+    item.subtotalInr,
+    `"${item.compatibilityNotes.replace(/"/g, '""')}"`,
+    `"${item.verificationStatus}"`,
+    '"BUDGETARY_ESTIMATE"'
+  ]);
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+}
+
+export function generateSensorPlanCsvString(sensors: ProposedSensorItem[]): string {
+  const headers = [
+    'Sensor ID',
+    'Measurement',
+    'Candidate Sensor Type',
+    'Measurement Range',
+    'Interface Signal',
+    'Installation Location',
+    'Purpose',
+    'Calibration / Validation Requirement',
+    'Status',
+    'Data Fidelity'
+  ];
+  const rows = sensors.map((s) => [
+    `"${s.id}"`,
+    `"${s.measurement.replace(/"/g, '""')}"`,
+    `"${s.candidateSensorType.replace(/"/g, '""')}"`,
+    `"${s.measurementRange.replace(/"/g, '""')}"`,
+    `"${s.interfaceSignal.replace(/"/g, '""')}"`,
+    `"${s.installationLocation.replace(/"/g, '""')}"`,
+    `"${s.purpose.replace(/"/g, '""')}"`,
+    `"${s.calibrationRequirement.replace(/"/g, '""')}"`,
+    `"${s.status}"`,
+    '"PROPOSED_CANDIDATE_TRANSDUCER"'
+  ]);
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+}
+
+export function generateTestPlanCsvString(tests: PhysicalTestProcedure[]): string {
+  const headers = [
+    'Test ID',
+    'Procedure Name',
+    'Category',
+    'Purpose',
+    'Acceptance Criteria',
+    'Acceptance Limit',
+    'Verification Method',
+    'Status',
+    'Preliminary Notes',
+    'Data Fidelity'
+  ];
+  const rows = tests.map((t) => [
+    `"${t.id}"`,
+    `"${t.name.replace(/"/g, '""')}"`,
+    `"${t.category.replace(/"/g, '""')}"`,
+    `"${t.purpose.replace(/"/g, '""')}"`,
+    `"${t.acceptanceCriteria.replace(/"/g, '""')}"`,
+    `"${t.acceptanceLimit.replace(/"/g, '""')}"`,
+    `"${t.verificationMethod.replace(/"/g, '""')}"`,
+    `"${t.status}"`,
+    `"${t.preliminaryNotes.replace(/"/g, '""')}"`,
+    '"PHYSICAL_TEST_CRITERIA_PENDING_BENCH_EXECUTION"'
+  ]);
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+}
+
+export function downloadBomCsv(items: BomItem[], filename = 'desludge_prototype_bom.csv'): void {
+  const csvContent = generateBomCsvString(items);
+  triggerBrowserDownload(csvContent, filename, 'text/csv;charset=utf-8;');
+}
+
+export function downloadSensorPlanCsv(sensors: ProposedSensorItem[], filename = 'desludge_sensor_plan.csv'): void {
+  const csvContent = generateSensorPlanCsvString(sensors);
+  triggerBrowserDownload(csvContent, filename, 'text/csv;charset=utf-8;');
+}
+
+export function downloadTestPlanCsv(tests: PhysicalTestProcedure[], filename = 'desludge_physical_test_plan.csv'): void {
+  const csvContent = generateTestPlanCsvString(tests);
+  triggerBrowserDownload(csvContent, filename, 'text/csv;charset=utf-8;');
 }
