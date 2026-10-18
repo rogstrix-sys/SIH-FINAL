@@ -51,10 +51,15 @@ export const Slider: React.FC<SliderProps> = ({
               }
             }}
             aria-label={`${label} numeric input`}
-            className={`w-16 px-1.5 py-0.5 rounded border text-right font-mono text-xs bg-graphite-950 transition-colors focus:outline-none focus:ring-1 focus:ring-safety-500 disabled:opacity-40 disabled:cursor-not-allowed ${
+            style={{
+              backgroundColor: isDanger ? '#4c0519' : '#0b0f17',
+              color: isDanger ? '#fda4af' : '#fb923c',
+              borderColor: isDanger ? '#be123c' : '#334155'
+            }}
+            className={`w-16 px-1.5 py-0.5 rounded border text-right font-mono text-xs transition-colors focus:outline-none focus:ring-1 focus:ring-safety-500 disabled:opacity-40 disabled:cursor-not-allowed appearance-none ${
               isDanger
                 ? 'bg-rose-950/80 text-rose-300 border-rose-700/60 font-semibold'
-                : 'text-safety-400 border-slate-700 hover:border-slate-600'
+                : 'bg-graphite-950 text-safety-400 border-slate-700 hover:border-slate-600'
             }`}
           />
           {unit && <span className="text-slate-400 text-[11px] font-mono">{unit}</span>}
