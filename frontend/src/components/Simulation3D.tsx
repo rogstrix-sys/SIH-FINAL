@@ -49,6 +49,7 @@ import {
 import { SiteConditions, EquipmentRecommendation } from '../types';
 import {
   PistonOperatingMode,
+  SludgeCompactionParameters,
   DEFAULT_COMPACTION_PARAMS
 } from '../types/sludgeCompaction';
 import {
@@ -164,6 +165,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const [filtrateVolumeL, setFiltrateVolumeL] = useState<number>(0);
   const [compactionRatio, setCompactionRatio] = useState<number>(1.0);
   const [isTransportLocked, setIsTransportLocked] = useState<boolean>(true);
+  const [sludgeType, setSludgeType] = useState<'septage' | 'raw_sludge' | 'digested_biosolids'>('septage');
+  const [maxStrokeLimitMm, setMaxStrokeLimitMm] = useState<number>(600);
+  const [reliefPressureLimitBar, setReliefPressureLimitBar] = useState<number>(180);
+  const [isReliefValveOpen, setIsReliefValveOpen] = useState<boolean>(false);
 
   // Desludging operation sequence state
   const [desludgeStage, setDesludgeStage] = useState<'idle' | 'deploying' | 'pumping' | 'completed'>('idle');
@@ -281,6 +286,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const pistonStrokeMmRef = useRef<number>(pistonStrokeMm);
   const isTransportLockedRef = useRef<boolean>(isTransportLocked);
   const isEStopActiveRef = useRef<boolean>(isEStopActive);
+  const sludgeTypeRef = useRef(sludgeType);
+  const maxStrokeLimitMmRef = useRef(maxStrokeLimitMm);
+  const reliefPressureLimitBarRef = useRef(reliefPressureLimitBar);
+  const isReliefValveOpenRef = useRef(isReliefValveOpen);
   const interlockWarningTimeoutRef = useRef<any>(null);
 
   cameraModeRef.current = cameraMode;
@@ -299,6 +308,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   pistonStrokeMmRef.current = pistonStrokeMm;
   isTransportLockedRef.current = isTransportLocked;
   isEStopActiveRef.current = isEStopActive;
+  sludgeTypeRef.current = sludgeType;
+  maxStrokeLimitMmRef.current = maxStrokeLimitMm;
+  reliefPressureLimitBarRef.current = reliefPressureLimitBar;
+  isReliefValveOpenRef.current = isReliefValveOpen;
 
   // Vehicle progress tracking
   const pathProgressRef = useRef<number>(0.12);
@@ -3553,30 +3566,72 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         }
 
         // Manual Piston Mode Execution (Outside Auto Mission Sequence)
+        const currentSludge = sludgeTypeRef.current;
+        const dewaterFactor = currentSludge === 'raw_sludge' ? 0.42 : currentSludge === 'digested_biosolids' ? 0.22 : 0.35;
+        const dynamicCompactionParams: SludgeCompactionParameters = {
+          ...DEFAULT_COMPACTION_PARAMS,
+          strokeMaxMm: maxStrokeLimitMmRef.current,
+          reliefPressureBar: reliefPressureLimitBarRef.current,
+          dewaterabilityFactor: dewaterFactor
+        };
+
         if (currentDrive !== 'desludge') {
-          const curPistonMode = pistonModeRef.current;
-          if (curPistonMode === 'EXTENDING') {
-            if (currentDrive !== 'parked') {
-              setInterlockWarning('MOTION INTERLOCK: Compaction piston cannot extend while vehicle is in motion!');
+          if (isEStopActiveRef.current) {
+            if (pistonModeRef.current === 'EXTENDING' || pistonModeRef.current === 'RETRACTING') {
               pistonModeRef.current = 'HOLD';
               setPistonMode('HOLD');
-            } else {
-              isTransportLockedRef.current = false;
-              pistonStrokeMmRef.current = Math.min(600, pistonStrokeMmRef.current + delta * 35);
-              if (pistonStrokeMmRef.current >= 600) {
+            }
+          } else {
+            const curPistonMode = pistonModeRef.current;
+            if (curPistonMode === 'EXTENDING') {
+              if (currentDrive !== 'parked' || vehicleSpeedKmhRef.current > 0.1) {
+                setInterlockWarning('MOTION INTERLOCK: Compaction piston cannot extend while vehicle is in motion!');
                 pistonModeRef.current = 'HOLD';
                 setPistonMode('HOLD');
+              } else {
+                isTransportLockedRef.current = false;
+                const maxStroke = maxStrokeLimitMmRef.current;
+                const nextStroke = Math.min(maxStroke, pistonStrokeMmRef.current + delta * 35);
+                pistonStrokeMmRef.current = nextStroke;
+
+                // Check instantaneous hydraulic pressure against relief limit
+                const curDewater = calculateDewateringState(nextStroke, 0, 400, dynamicCompactionParams);
+                if (curDewater.hydraulicPressureBar >= reliefPressureLimitBarRef.current) {
+                  pistonModeRef.current = 'HOLD';
+                  setPistonMode('HOLD');
+                  isReliefValveOpenRef.current = true;
+                  setIsReliefValveOpen(true);
+                  setInterlockWarning(`PRESSURE RELIEF LIMIT REACHED: Hydraulic pressure reached relief setpoint (${reliefPressureLimitBarRef.current} bar). Compaction held.`);
+                } else if (nextStroke >= maxStroke) {
+                  pistonModeRef.current = 'HOLD';
+                  setPistonMode('HOLD');
+                  setInterlockWarning(`STROKE LIMIT REACHED: Reached maximum configured stroke (${maxStroke} mm). Switching to HOLD.`);
+                }
               }
+            } else if (curPistonMode === 'RETRACTING') {
+              isReliefValveOpenRef.current = false;
+              setIsReliefValveOpen(false);
+              isTransportLockedRef.current = false;
+              pistonStrokeMmRef.current = Math.max(0, pistonStrokeMmRef.current - delta * 60);
+              if (pistonStrokeMmRef.current <= 0) {
+                pistonStrokeMmRef.current = 0;
+                pistonModeRef.current = 'HOME';
+                setPistonMode('HOME');
+              }
+            } else if (curPistonMode === 'LOCKED') {
+              pistonStrokeMmRef.current = 0;
+              isTransportLockedRef.current = true;
             }
-          } else if (curPistonMode === 'RETRACTING') {
-            pistonStrokeMmRef.current = Math.max(0, pistonStrokeMmRef.current - delta * 60);
-            if (pistonStrokeMmRef.current <= 0) {
-              pistonModeRef.current = 'HOME';
-              setPistonMode('HOME');
-            }
-          } else if (curPistonMode === 'LOCKED') {
-            pistonStrokeMmRef.current = 0;
-            isTransportLockedRef.current = true;
+          }
+        }
+
+        // Safety Invariant: Inhibit vehicle travel if platen not seated at 0mm with transport lock pin engaged
+        if (currentDrive === 'auto_climb' || currentDrive === 'manual') {
+          if (pistonStrokeMmRef.current > 5 || !isTransportLockedRef.current) {
+            driveModeRef.current = 'parked';
+            setDriveMode('parked');
+            setVehicleSpeedKmh(0);
+            setInterlockWarning('TRANSPORT INTERLOCK: Platen movement detected while in motion! Motion halted.');
           }
         }
 
@@ -3584,14 +3639,14 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         // COMPACTION KINEMATICS & DEWATERING 3D MESH ARTICULATION
         // =====================================================================
         const strokeMm = pistonStrokeMmRef.current;
-        const strokeRatio = strokeMm / 600;
+        const strokeRatio = strokeMm / (maxStrokeLimitMmRef.current || 600);
 
-        // Dewatering physics calculations via sludgeCompactionModel
+        // Dewatering physics calculations via sludgeCompactionModel with configurable rheology
         const dewateringResult = calculateDewateringState(
           strokeMm,
           0, // Contact occurs at top of loaded sludge bed
-          400, // Initial 400L septage
-          DEFAULT_COMPACTION_PARAMS
+          400, // Initial 400L batch
+          dynamicCompactionParams
         );
 
         // Update Compaction Platen Vertical Position (y: 0.72 -> 0.25)
@@ -3663,12 +3718,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           setPistonStrokeMm(Math.round(strokeMm));
           setAppliedPressureBar(dewateringResult.hydraulicPressureBar);
           setCompactionForceKn(
-            Math.round(calculateCylinderForceKn(dewateringResult.hydraulicPressureBar, DEFAULT_COMPACTION_PARAMS.boreDiameterMm) * 10) / 10
+            Math.round(calculateCylinderForceKn(dewateringResult.hydraulicPressureBar, dynamicCompactionParams.boreDiameterMm) * 10) / 10
           );
           setCakeVolumeL(Math.round(dewateringResult.cakeVolumeL));
           setFiltrateVolumeL(Math.round(dewateringResult.filtrateVolumeL));
           setCompactionRatio(dewateringResult.compactionRatio);
           setIsTransportLocked(isTransportLockedRef.current);
+          setIsReliefValveOpen(dewateringResult.reliefValveOpen || dewateringResult.hydraulicPressureBar >= reliefPressureLimitBarRef.current);
         }
 
         // Retract outriggers and suction arm back to travel position when not in mission
@@ -4468,21 +4524,41 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
   // Manual Piston Handlers with Strict Interlocks
   const handleExtendPiston = () => {
+    if (isEStopActive) {
+      setInterlockWarning('EMERGENCY STOP ACTIVE: Compaction hydraulic circuit isolated. Reset E-Stop first.');
+      return;
+    }
     if (driveMode !== 'parked' || vehicleSpeedKmh > 0.1) {
       setInterlockWarning('MOTION INTERLOCK: Compaction piston operation prohibited while vehicle is in motion!');
       return;
     }
-    if (desludgeStage === 'pumping' || missionStage === 'extracting') {
-      setInterlockWarning('SUCTION INTERLOCK: Cannot compact sludge bed while extraction pump is actively pumping!');
+    if (desludgeStage === 'pumping' || missionStage === 'extracting' || missionStage === 'priming' || missionStage === 'stabilizing') {
+      setInterlockWarning('SUCTION INTERLOCK: Cannot compact sludge bed while extraction pump is operating!');
+      return;
+    }
+    if (pistonStrokeMm >= maxStrokeLimitMm) {
+      setInterlockWarning(`STROKE LIMIT: Platen already at maximum configured travel limit (${maxStrokeLimitMm} mm).`);
+      return;
+    }
+    if (appliedPressureBar >= reliefPressureLimitBar) {
+      setInterlockWarning(`PRESSURE RELIEF LIMIT: Hydraulic pressure at relief setpoint (${reliefPressureLimitBar} bar). Compaction held.`);
       return;
     }
     setInterlockWarning(null);
+    setIsReliefValveOpen(false);
+    isReliefValveOpenRef.current = false;
     setPistonMode('EXTENDING');
     pistonModeRef.current = 'EXTENDING';
   };
 
   const handleRetractPiston = () => {
+    if (isEStopActive) {
+      setInterlockWarning('EMERGENCY STOP ACTIVE: Compaction hydraulic circuit isolated. Reset E-Stop first.');
+      return;
+    }
     setInterlockWarning(null);
+    setIsReliefValveOpen(false);
+    isReliefValveOpenRef.current = false;
     setPistonMode('RETRACTING');
     pistonModeRef.current = 'RETRACTING';
   };
@@ -4502,6 +4578,15 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     pistonModeRef.current = 'LOCKED';
     setIsTransportLocked(true);
     isTransportLockedRef.current = true;
+  };
+
+  const toggleTankCutaway = () => {
+    const isCurrentlyCutaway = cutawayOpacity < 0.85;
+    const nextCutaway = isCurrentlyCutaway ? 1.0 : 0.35;
+    setCutawayOpacity(nextCutaway);
+    if (!isCurrentlyCutaway) {
+      setCameraMode('tank');
+    }
   };
 
   const handleWorksiteSelect = (ws: 'alley' | 'station' | 'summit') => {
@@ -4815,16 +4900,20 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Piston Stroke:</span>
                 <span className="text-white font-bold">
-                  {pistonStrokeMm} mm / 600 mm ({((pistonStrokeMm / 600) * 100).toFixed(0)}%)
+                  {pistonStrokeMm} mm / {maxStrokeLimitMm} mm ({((pistonStrokeMm / maxStrokeLimitMm) * 100).toFixed(0)}%)
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Hydraulic Pressure:</span>
-                <span className="text-cyan-400 font-bold">{appliedPressureBar.toFixed(1)} bar / 180 bar</span>
+                <span className="text-cyan-400 font-bold">{appliedPressureBar.toFixed(1)} bar / {reliefPressureLimitBar} bar</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Compaction Thrust:</span>
                 <span className="text-amber-400 font-bold">{compactionForceKn.toFixed(1)} kN</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Sludge Type:</span>
+                <span className="text-emerald-400 font-bold uppercase">{sludgeType.replace('_', ' ')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Cake / Filtrate Vol:</span>
@@ -4836,6 +4925,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 <span className="text-slate-400">Compaction Ratio:</span>
                 <span className="text-emerald-400 font-bold">
                   {compactionRatio.toFixed(2)}× ({((1 - cakeVolumeL / 400) * 100).toFixed(1)}% red.)
+                </span>
+              </div>
+              <div className="flex justify-between pt-0.5">
+                <span className="text-slate-400">Relief Valve:</span>
+                <span className={`font-bold ${isReliefValveOpen ? 'text-amber-400 animate-pulse' : 'text-emerald-400'}`}>
+                  {isReliefValveOpen ? 'OPEN (RELIEVING)' : 'CLOSED (NORMAL)'}
                 </span>
               </div>
               <div className="flex justify-between pt-0.5">
@@ -5154,23 +5249,35 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             <div className="grid grid-cols-4 gap-1">
               <button
                 onClick={handleExtendPiston}
+                disabled={isEStopActive || driveMode !== 'parked'}
                 className={`py-1 px-1 rounded text-[10px] font-bold transition flex items-center justify-center space-x-0.5 ${
                   pistonMode === 'EXTENDING'
                     ? 'bg-amber-600 text-white shadow-sm'
+                    : isEStopActive || driveMode !== 'parked'
+                    ? 'bg-slate-900 text-slate-600 cursor-not-allowed'
                     : 'bg-slate-800 text-amber-400 hover:bg-slate-700'
                 }`}
-                title="Extend hydraulic compaction cylinder into sludge bed"
+                title={
+                  isEStopActive
+                    ? 'E-Stop active: Compaction isolated'
+                    : driveMode !== 'parked'
+                    ? 'Motion Interlock: Park machine before extending'
+                    : 'Extend hydraulic compaction cylinder into sludge bed'
+                }
               >
                 <span>Extend</span>
               </button>
               <button
                 onClick={handleRetractPiston}
+                disabled={isEStopActive}
                 className={`py-1 px-1 rounded text-[10px] font-bold transition flex items-center justify-center space-x-0.5 ${
                   pistonMode === 'RETRACTING'
                     ? 'bg-purple-600 text-white shadow-sm'
+                    : isEStopActive
+                    ? 'bg-slate-900 text-slate-600 cursor-not-allowed'
                     : 'bg-slate-800 text-purple-400 hover:bg-slate-700'
                 }`}
-                title="Retract piston platen up to Top Home position"
+                title={isEStopActive ? 'E-Stop active' : 'Retract piston platen up to Top Home position'}
               >
                 <span>Retract</span>
               </button>
@@ -5187,12 +5294,19 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               </button>
               <button
                 onClick={handleLockTransportPins}
+                disabled={pistonStrokeMm > 5}
                 className={`py-1 px-1 rounded text-[10px] font-bold transition flex items-center justify-center space-x-0.5 ${
                   isTransportLocked
                     ? 'bg-emerald-600 text-white shadow-sm'
+                    : pistonStrokeMm > 5
+                    ? 'bg-slate-900 text-slate-600 cursor-not-allowed'
                     : 'bg-slate-800 text-emerald-400 hover:bg-slate-700'
                 }`}
-                title="Engage mechanical retention lock pins for transport"
+                title={
+                  pistonStrokeMm > 5
+                    ? 'Lock Interlock: Return platen to 0mm before engaging retention pins'
+                    : 'Engage mechanical retention lock pins for transport'
+                }
               >
                 <Lock className="w-2.5 h-2.5 mr-0.5" />
                 <span>Lock</span>
@@ -5203,20 +5317,27 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             <div>
               <div className="flex justify-between text-[10px] font-mono text-slate-400 mb-0.5">
                 <span>Piston Stroke:</span>
-                <span className="text-white font-bold">{pistonStrokeMm} mm / 600 mm</span>
+                <span className="text-white font-bold">
+                  {pistonStrokeMm} mm / {maxStrokeLimitMm} mm ({((pistonStrokeMm / maxStrokeLimitMm) * 100).toFixed(0)}%)
+                </span>
               </div>
               <input
                 type="range"
                 min="0"
-                max="600"
+                max={maxStrokeLimitMm}
                 step="5"
                 value={pistonStrokeMm}
+                disabled={isEStopActive || driveMode !== 'parked' || desludgeStage === 'pumping' || missionStage === 'extracting'}
                 onChange={(e) => {
+                  if (isEStopActive) {
+                    setInterlockWarning('EMERGENCY STOP ACTIVE: Cannot adjust compaction piston.');
+                    return;
+                  }
                   if (driveMode !== 'parked' || vehicleSpeedKmh > 0.1) {
                     setInterlockWarning('MOTION INTERLOCK: Cannot manually adjust piston while vehicle is moving.');
                     return;
                   }
-                  if (desludgeStage === 'pumping' || missionStage === 'extracting') {
+                  if (desludgeStage === 'pumping' || missionStage === 'extracting' || missionStage === 'priming' || missionStage === 'stabilizing') {
                     setInterlockWarning('SUCTION INTERLOCK: Cannot manually adjust piston while extraction pump is operating.');
                     return;
                   }
@@ -5237,9 +5358,179 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
               />
             </div>
 
-            <div className="flex justify-between text-[10px] font-mono pt-1 border-t border-slate-800">
-              <span className="text-slate-400">Pressure / Force:</span>
-              <span className="text-cyan-400 font-bold">{appliedPressureBar.toFixed(0)} bar · {compactionForceKn.toFixed(0)} kN</span>
+            {/* Configurable Sludge Rheology Profile Selector */}
+            <div className="pt-1.5 border-t border-slate-800 space-y-1">
+              <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                <span>Sludge Rheology:</span>
+                <span className="text-emerald-400 font-bold uppercase">
+                  {sludgeType === 'septage' ? 'Septage (35% dewater)' : sludgeType === 'raw_sludge' ? 'Raw Sewage (42% dewater)' : 'Digested (22% dewater)'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={() => {
+                    setSludgeType('septage');
+                    sludgeTypeRef.current = 'septage';
+                  }}
+                  className={`py-0.5 px-1 rounded text-[9px] font-semibold transition ${
+                    sludgeType === 'septage' ? 'bg-cyan-700 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                  title="Fecal Septage: 4.5% TS, compressible index n=1.4, dewaterability 0.35"
+                >
+                  Septage
+                </button>
+                <button
+                  onClick={() => {
+                    setSludgeType('raw_sludge');
+                    sludgeTypeRef.current = 'raw_sludge';
+                  }}
+                  className={`py-0.5 px-1 rounded text-[9px] font-semibold transition ${
+                    sludgeType === 'raw_sludge' ? 'bg-cyan-700 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                  title="Primary Raw Sludge: 3.0% TS, compressible index n=1.2, dewaterability 0.42"
+                >
+                  Raw Sludge
+                </button>
+                <button
+                  onClick={() => {
+                    setSludgeType('digested_biosolids');
+                    sludgeTypeRef.current = 'digested_biosolids';
+                  }}
+                  className={`py-0.5 px-1 rounded text-[9px] font-semibold transition ${
+                    sludgeType === 'digested_biosolids' ? 'bg-cyan-700 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                  title="Digested Biosolids: 6.5% TS, stiff matrix index n=1.7, dewaterability 0.22"
+                >
+                  Biosolids
+                </button>
+              </div>
+            </div>
+
+            {/* Configurable Stroke & Pressure Relief Limits */}
+            <div className="pt-1.5 border-t border-slate-800 space-y-1">
+              <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                <span>Config Limits:</span>
+                <span className="text-slate-200">
+                  Stroke {maxStrokeLimitMm}mm · Relief {reliefPressureLimitBar} bar
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>
+                  <span className="text-[9px] text-slate-500 block mb-0.5">Stroke Limit</span>
+                  <div className="flex space-x-1">
+                    {[450, 520, 600].map((sVal) => (
+                      <button
+                        key={sVal}
+                        onClick={() => {
+                          setMaxStrokeLimitMm(sVal);
+                          maxStrokeLimitMmRef.current = sVal;
+                        }}
+                        className={`flex-1 py-0.5 text-[9px] rounded font-mono ${
+                          maxStrokeLimitMm === sVal ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        {sVal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-500 block mb-0.5">Relief Valve</span>
+                  <div className="flex space-x-1">
+                    {[160, 180, 200].map((pVal) => (
+                      <button
+                        key={pVal}
+                        onClick={() => {
+                          setReliefPressureLimitBar(pVal);
+                          reliefPressureLimitBarRef.current = pVal;
+                        }}
+                        className={`flex-1 py-0.5 text-[9px] rounded font-mono ${
+                          reliefPressureLimitBar === pVal ? 'bg-rose-700 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        {pVal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Hydraulic Sensor Instrumentation */}
+            <div className="pt-1.5 border-t border-slate-800 space-y-1 text-[10px] font-mono">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Pressure / Force:</span>
+                <span className="text-cyan-400 font-bold">{appliedPressureBar.toFixed(1)} bar · {compactionForceKn.toFixed(1)} kN</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Cake / Filtrate:</span>
+                <span className="text-slate-200">{cakeVolumeL}L cake · {filtrateVolumeL}L filtrate ({compactionRatio.toFixed(2)}×)</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Relief Valve:</span>
+                <span className={`font-bold flex items-center space-x-1 ${isReliefValveOpen ? 'text-amber-400 animate-pulse' : 'text-emerald-400'}`}>
+                  {isReliefValveOpen ? (
+                    <>
+                      <AlertTriangle className="w-3 h-3 text-amber-400" />
+                      <span>RELIEVING ({reliefPressureLimitBar} bar)</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span>NORMAL (CLOSED)</span>
+                    </>
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Transport Lock:</span>
+                <span className={`font-bold ${isTransportLocked ? 'text-emerald-400' : 'text-rose-400 animate-pulse'}`}>
+                  {isTransportLocked ? 'SAFE (RETENTION ENGAGED)' : 'UNLOCKED (DRIVE BLOCKED)'}
+                </span>
+              </div>
+            </div>
+
+            {/* Tank Viewport Quick Inspection Buttons */}
+            <div className="grid grid-cols-2 gap-1 pt-1.5 border-t border-slate-800">
+              <button
+                onClick={toggleTankCutaway}
+                className={`py-1 px-1.5 rounded text-[10px] font-bold transition flex items-center justify-center space-x-1 ${
+                  cutawayOpacity < 0.85
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-cyan-400 hover:bg-slate-700'
+                }`}
+                title="Toggle transparent tank cutaway mode to view piston & sludge layers"
+              >
+                <Eye className="w-3 h-3 mr-0.5" />
+                <span>{cutawayOpacity < 0.85 ? 'Cutaway: ON' : 'Cutaway: OFF'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCameraMode('tank');
+                  if (cutawayOpacity >= 0.85) setCutawayOpacity(0.35);
+                }}
+                className={`py-1 px-1.5 rounded text-[10px] font-bold transition flex items-center justify-center space-x-1 ${
+                  cameraMode === 'tank'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+                title="Position camera for direct close-up inspection of tank internals"
+              >
+                <Camera className="w-3 h-3 mr-0.5" />
+                <span>Inspect Tank</span>
+              </button>
+            </div>
+
+            {/* Explicit Engineering Assumptions & Validation Checklist */}
+            <div className="pt-1.5 border-t border-slate-800 text-[9px] font-mono text-slate-400 space-y-0.5">
+              <span className="text-amber-400 font-bold block flex items-center space-x-1">
+                <Info className="w-3 h-3 text-amber-400" />
+                <span>UNVALIDATED ENGINEERING ASSUMPTIONS:</span>
+              </span>
+              <p>• Rheology: 1D Terzaghi consolidated porous media (non-linear n={sludgeType === 'raw_sludge' ? '1.2' : sludgeType === 'digested_biosolids' ? '1.7' : '1.4'}).</p>
+              <p>• Filtrate rate assumes clean 80-mesh wedge-wire screen; cake fouling neglected.</p>
+              <p>• Wiper seal wall friction and hydraulic cylinder flow inertia neglected.</p>
+              <p className="text-amber-300">• Field deployment requires physical bench testing & structural FEA certification.</p>
             </div>
           </div>
 
@@ -5275,10 +5566,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
               />
               <button
-                onClick={() => setCutawayOpacity(cutawayOpacity > 0.8 ? 0.45 : 1.0)}
+                onClick={toggleTankCutaway}
                 className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-semibold text-slate-300"
               >
-                {cutawayOpacity > 0.8 ? 'Cutaway ON' : 'Opaque'}
+                {cutawayOpacity < 0.85 ? 'Cutaway ON' : 'Opaque'}
               </button>
             </div>
           </div>

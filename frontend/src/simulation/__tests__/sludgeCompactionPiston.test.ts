@@ -242,4 +242,71 @@ describe('Sludge-Compaction Piston & Dewatering Engine', () => {
       expect(useSimulationStore.getState().compactionTelemetry.interlockBlocked).toBe(true);
     });
   });
+
+  describe('Configurable Rheology & Variable Limits', () => {
+    it('produces variable compaction ratios for different sludge rheology types at identical stroke', () => {
+      const septageParams = {
+        ...DEFAULT_COMPACTION_PARAMS,
+        dewaterabilityFactor: 0.35 // Septage
+      };
+      const rawSludgeParams = {
+        ...DEFAULT_COMPACTION_PARAMS,
+        dewaterabilityFactor: 0.42 // Raw sewage
+      };
+      const digestedParams = {
+        ...DEFAULT_COMPACTION_PARAMS,
+        dewaterabilityFactor: 0.22 // Digested biosolids
+      };
+
+      const stroke = 500;
+      const contact = 100;
+      const initVol = 1000;
+
+      const septageState = calculateDewateringState(stroke, contact, initVol, septageParams);
+      const rawState = calculateDewateringState(stroke, contact, initVol, rawSludgeParams);
+      const digestedState = calculateDewateringState(stroke, contact, initVol, digestedParams);
+
+      // Raw sewage should express more filtrate than septage, which expresses more than digested
+      expect(rawState.filtrateVolumeL).toBeGreaterThan(septageState.filtrateVolumeL);
+      expect(septageState.filtrateVolumeL).toBeGreaterThan(digestedState.filtrateVolumeL);
+
+      // Compaction ratio must vary dynamically rather than being hardcoded
+      expect(rawState.compactionRatio).toBeGreaterThan(septageState.compactionRatio);
+      expect(septageState.compactionRatio).toBeGreaterThan(digestedState.compactionRatio);
+    });
+
+    it('clamps travel and pressure at configurable limits (520 mm stroke & 160 bar relief)', () => {
+      const customParams = {
+        ...DEFAULT_COMPACTION_PARAMS,
+        strokeMaxMm: 520,
+        reliefPressureBar: 160.0
+      };
+
+      let tel: SludgeCompactionTelemetry = {
+        ...INITIAL_COMPACTION_TELEMETRY,
+        pistonState: 'EXTENDING',
+        isTransportLocked: false,
+        strokeMm: 500
+      };
+
+      // Step forward by 2.0s at 15mm/s (30mm advance) -> exceeds 520 mm limit
+      tel = stepSludgeCompaction(
+        tel,
+        customParams,
+        1500,
+        2400,
+        false,
+        null,
+        2.0
+      );
+
+      expect(tel.strokeMm).toBe(520);
+      expect(tel.pistonState).toBe('HOLD');
+
+      // State at max travel with 160 bar relief
+      const state = calculateDewateringState(520, 50, 1500, customParams);
+      expect(state.hydraulicPressureBar).toBeLessThanOrEqual(160.0);
+      expect(state.reliefValveOpen).toBe(true);
+    });
+  });
 });
