@@ -8,6 +8,7 @@ export const MobileChassis: React.FC = () => {
   const wireframe = useSimulationStore((s) => s.displayOptions.wireframe);
 
   const isSelected = selectedComponentId === 'chassis';
+  const stabilizerExtension = useSimulationStore((s) => s.kinematics.stabilizerExtension);
 
   // Wheel positions: Front Axle at X = 1.05, Rear Axle at X = -1.05; Z = ±0.82
   const wheels = [
@@ -24,6 +25,11 @@ export const MobileChassis: React.FC = () => {
     { x: -1.35, z: 0.75 },
     { x: -1.35, z: -0.75 }
   ];
+
+  // Jack extension offset: 0.0 is fully retracted up by 0.18m, 1.0 is planted on ground
+  const jackDrop = 0.18 * stabilizerExtension;
+  const rodY = -0.22 - jackDrop * 0.5;
+  const footY = -0.29 - jackDrop;
 
   return (
     <group
@@ -118,18 +124,20 @@ export const MobileChassis: React.FC = () => {
             <meshStandardMaterial color="#f59e0b" metalness={0.7} roughness={0.3} wireframe={wireframe} />
           </mesh>
 
-          {/* Vertical Chrome Hydraulic Cylinder Jack */}
-          <mesh position={[0, -0.22, s.z > 0 ? 0.12 : -0.12]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.44, 16]} />
+          {/* Vertical Hydraulic Cylinder Jack Housing */}
+          <mesh position={[0, -0.16, s.z > 0 ? 0.12 : -0.12]} castShadow>
+            <cylinderGeometry args={[0.04, 0.04, 0.32, 16]} />
             <meshStandardMaterial color="#0284c7" metalness={0.8} roughness={0.2} />
           </mesh>
-          <mesh position={[0, -0.36, s.z > 0 ? 0.12 : -0.12]}>
-            <cylinderGeometry args={[0.025, 0.025, 0.25, 16]} />
+
+          {/* Telescoping Chrome Jack Piston Rod (Animated) */}
+          <mesh position={[0, rodY, s.z > 0 ? 0.12 : -0.12]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.24, 16]} />
             <meshStandardMaterial color="#e2e8f0" metalness={0.95} roughness={0.1} />
           </mesh>
 
-          {/* Swivel Ground Footpad Resting Firmly on Terrain */}
-          <mesh position={[0, -0.47, s.z > 0 ? 0.12 : -0.12]} receiveShadow>
+          {/* Swivel Ground Footpad Resting Firmly on Terrain (Animated) */}
+          <mesh position={[0, footY, s.z > 0 ? 0.12 : -0.12]} receiveShadow>
             <cylinderGeometry args={[0.11, 0.13, 0.03, 16]} />
             <meshStandardMaterial color="#0f172a" metalness={0.8} roughness={0.4} />
           </mesh>

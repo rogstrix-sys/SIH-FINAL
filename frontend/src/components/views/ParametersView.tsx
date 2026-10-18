@@ -105,7 +105,9 @@ const PARAMETER_PRESETS: PresetConfig[] = [
 
 export const ParametersView: React.FC = () => {
   const parameters = useSimulationStore((s) => s.parameters);
+  const engine = useSimulationStore((s) => s.engine);
   const updateParameter = useSimulationStore((s) => s.updateParameter);
+  const updateEngineParameter = useSimulationStore((s) => s.updateEngineParameter);
   const batchUpdateParameters = useSimulationStore((s) => s.batchUpdateParameters);
   const addEvent = useSimulationStore((s) => s.addEvent);
 
@@ -246,6 +248,35 @@ export const ParametersView: React.FC = () => {
           icon={<Droplets className="w-4 h-4 text-cyan-400" />}
         >
           <div className="space-y-4">
+            {/* Sludge Consistency Tier Selector */}
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1.5">Sludge Consistency Classification</label>
+              <div className="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
+                {[
+                  { id: 'liquid', label: 'Liquid', visc: 150, dens: 1050 },
+                  { id: 'slurry', label: 'Slurry', visc: 450, dens: 1180 },
+                  { id: 'viscous', label: 'Viscous', visc: 1200, dens: 1320 },
+                  { id: 'thick_crust', label: 'Crust', visc: 2400, dens: 1480 }
+                ].map((tier) => (
+                  <button
+                    key={tier.id}
+                    onClick={() => {
+                      updateParameter('slurryViscosityCp', tier.visc);
+                      updateParameter('slurryDensityKgM3', tier.dens);
+                      updateEngineParameter('sludgeConsistency', tier.id as any);
+                    }}
+                    className={`py-1.5 px-1 rounded border text-center transition ${
+                      engine.parameters.sludgeConsistency === tier.id
+                        ? 'bg-safety-500/20 border-safety-500 text-safety-400 font-bold'
+                        : 'bg-graphite-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {tier.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Slider
               id="param-viscosity"
               label="Sludge Viscosity (cP)"
@@ -269,6 +300,30 @@ export const ParametersView: React.FC = () => {
               unit="kg/m³"
               onChange={(val) => updateParameter('slurryDensityKgM3', val)}
               description="Determines hydrostatic head pressure and solids concentration."
+            />
+
+            <Slider
+              id="param-collection-cap"
+              label="Collection Tank Capacity"
+              value={engine.parameters.collectionTankCapacityL}
+              min={500}
+              max={5000}
+              step={100}
+              unit="L"
+              onChange={(val) => updateEngineParameter('collectionTankCapacityL', val)}
+              description="Rated working volume of on-board mobile cylindrical vacuum tank."
+            />
+
+            <Slider
+              id="param-target-batch"
+              label="Target Batch Extraction Volume"
+              value={engine.parameters.targetExtractionVolumeL}
+              min={200}
+              max={4000}
+              step={100}
+              unit="L"
+              onChange={(val) => updateEngineParameter('targetExtractionVolumeL', val)}
+              description="Batch limit before automatic transition to DISCHARGE cycle."
             />
 
             <Slider

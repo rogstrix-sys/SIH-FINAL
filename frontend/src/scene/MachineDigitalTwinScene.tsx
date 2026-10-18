@@ -9,13 +9,15 @@ import { ArticulatedBoom } from './ArticulatedBoom';
 import { ExtractionHose } from './ExtractionHose';
 import { HoseNozzle } from './HoseNozzle';
 import { DemonstrationSepticTank } from './DemonstrationSepticTank';
+import { ReceiverTank } from './ReceiverTank';
 import { TerrainEnvironment } from './TerrainEnvironment';
-import { Gauge, Activity, Droplets, Cpu, Box, Radio } from 'lucide-react';
+import { Gauge, Activity, Droplets, Cpu, Box, Radio, Truck } from 'lucide-react';
 
 export const MachineDigitalTwinScene: React.FC = () => {
   const showAnnotations = useSimulationStore((s) => s.displayOptions.showAnnotations);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
   const telemetry = useSimulationStore((s) => s.telemetry);
+  const materialBalance = useSimulationStore((s) => s.materialBalance);
   const params = useSimulationStore((s) => s.parameters);
 
   return (
@@ -32,19 +34,22 @@ export const MachineDigitalTwinScene: React.FC = () => {
       {/* 4. On-Chassis Sludge Collection Vessel with Sight Glass */}
       <CollectionTank />
 
-      {/* 5. Powered Rotating Hydraulic Hose Reel */}
+      {/* 5. External Waste Receiving Tanker */}
+      <ReceiverTank />
+
+      {/* 6. Powered Rotating Hydraulic Hose Reel */}
       <HoseReel />
 
-      {/* 6. Dual-Joint Articulated Support Crane Boom */}
+      {/* 7. Dual-Joint Articulated Support Crane Boom */}
       <ArticulatedBoom />
 
-      {/* 7. Flexible Umbilical Suction Hose Spline */}
+      {/* 8. Flexible Umbilical Suction Hose Spline */}
       <ExtractionHose />
 
-      {/* 8. Submerged Hydro-Jetting & Cutter Suction Nozzle */}
+      {/* 9. Submerged Hydro-Jetting & Cutter Suction Nozzle */}
       <HoseNozzle />
 
-      {/* 9. Demonstration Dual-Compartment Septic Tank (Cutaway) */}
+      {/* 10. Demonstration Dual-Compartment Septic Tank (Cutaway) */}
       <DemonstrationSepticTank />
 
       {/* ========================================================== */}
@@ -119,6 +124,20 @@ export const MachineDigitalTwinScene: React.FC = () => {
             >
               <Activity className="w-2.5 h-2.5 text-emerald-400" />
               <span>FLOW: {telemetry.extractionRateM3H.toFixed(1)} m³/h</span>
+            </div>
+          </Html>
+
+          {/* External Receiver Tanker Tag */}
+          <Html position={[-3.3, 1.4, 0.6]} center style={{ pointerEvents: 'auto' }}>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedComponent('receiver');
+              }}
+              className="bg-graphite-950/90 hover:bg-graphite-900 border border-slate-700 hover:border-sky-500 rounded px-2 py-0.5 shadow-md text-[9px] font-mono backdrop-blur cursor-pointer transition select-none flex items-center gap-1 text-sky-300 whitespace-nowrap"
+            >
+              <Truck className="w-2.5 h-2.5 text-sky-400" />
+              <span>RECEIVER: {Math.round(materialBalance.receiverVolumeL)} L</span>
             </div>
           </Html>
 

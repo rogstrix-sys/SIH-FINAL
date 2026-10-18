@@ -1,6 +1,7 @@
 /**
  * Typed central simulation state management using Zustand.
- * Controls parameters, telemetry stream, event logs, and UI modes.
+ * Integrates deterministic physical mass-balance engine, telemetry streams,
+ * event logs, kinematics, alarms, interlocks, and 3D UI modes.
  */
 
 import { create } from 'zustand';
@@ -15,7 +16,27 @@ import {
   DisplayOptions,
   ComponentInspectionData
 } from '../types/digitalTwin';
-import { createInitialTelemetry, stepPhysicsSimulation } from '../simulation/physicsEngine';
+import {
+  OperatingState,
+  EngineState,
+  MaterialBalanceState,
+  MachineKinematicsState,
+  ActiveAlarms,
+  SafetyInterlocks,
+  EngineParameters
+} from '../types/simulationEngine';
+import {
+  createInitialEngineState,
+  stepSimulationEngine,
+  triggerStart,
+  triggerPause,
+  triggerResume,
+  triggerReset,
+  triggerEmergencyStop,
+  triggerResolveFault,
+  triggerManualDischarge
+} from '../simulation/deterministicEngine';
+import { createInitialTelemetry } from '../simulation/physicsEngine';
 
 export const DEFAULT_PARAMETERS: SimulationParameters = {
   pumpRpm: 1850,
@@ -82,6 +103,22 @@ export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
       'Shell Thickness': '6.0 mm structural carbon steel',
       'Sight Gauge': 'Direct optical borosilicate tube',
       'Inspection Hatch': '450 mm top dome with wing clamps'
+    }
+  },
+  receiver: {
+    id: 'receiver',
+    name: 'External Waste Disposal Receiving Tanker',
+    type: 'Receiving Facility',
+    status: 'nominal',
+    temperatureC: 18.0,
+    pressureBar: 1.01,
+    vibrationMmS: 0.1,
+    description: '10,000L high-capacity transport disposal tanker receiving transferred sludge during discharge cycle.',
+    specifications: {
+      'Gross Capacity': '10,000 Liters',
+      'Inlet Flange': 'DN100 Camlock Coupling',
+      'Vessel Type': 'Triple-axle vacuum road tanker',
+      'Transfer Status': 'Atmospheric gravity & pump discharge'
     }
   },
   hosereel: {
@@ -166,14 +203,22 @@ export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
   }
 };
 
-interface SimulationStore {
+export interface SimulationStore {
   // Core Status
   status: SimulationStatus;
   activeView: NavView;
   simSpeed: number; // 0.5, 1, 2, 5
   connectionState: 'SIMULATED';
+
+  // Deterministic Simulation Engine State
+  engine: EngineState;
+  operatingState: OperatingState;
+  materialBalance: MaterialBalanceState;
+  kinematics: MachineKinematicsState;
+  alarms: ActiveAlarms;
+  interlocks: SafetyInterlocks;
   
-  // State Models
+  // Dashboard Models & Streams
   parameters: SimulationParameters;
   telemetry: TelemetryState;
   telemetryHistory: TelemetryPoint[];
@@ -185,16 +230,20 @@ interface SimulationStore {
   displayOptions: DisplayOptions;
   selectedComponentId: string | null;
 
-  // Actions
+  // Operating Actions
   startSimulation: () => void;
   pauseSimulation: () => void;
   resumeSimulation: () => void;
   resetSimulation: () => void;
   stepSimulation: (stepSeconds?: number) => void;
+  triggerEmergencyStop: () => void;
+  triggerResolveFault: () => void;
+  triggerManualDischarge: () => void;
   setSimSpeed: (speed: number) => void;
   setActiveView: (view: NavView) => void;
   updateParameter: <K extends keyof SimulationParameters>(key: K, value: SimulationParameters[K]) => void;
   batchUpdateParameters: (partial: Partial<SimulationParameters>) => void;
+  updateEngineParameter: <K extends keyof EngineParameters>(key: K, value: EngineParameters[K]) => void;
   tickSimulation: (deltaSeconds: number) => void;
   addEvent: (level: EventLogItem['level'], source: string, message: string) => void;
   clearEvents: () => void;
@@ -203,11 +252,47 @@ interface SimulationStore {
   setSelectedComponent: (id: string | null) => void;
 }
 
+function syncEngineParamsFromDigitalTwin(
+  p: SimulationParameters,
+  existing: EngineParameters
+): Partial<EngineParameters> {
+  return {
+    pumpRpm: p.pumpRpm,
+    hoseDiameterMm: p.hoseDiameterMm,
+    hoseLengthM: p.hoseLengthM,
+    pipeRoughnessMm: p.pipeRoughnessMm,
+    sludgeViscosityCp: p.slurryViscosityCp,
+    sludgeDensityKgM3: p.slurryDensityKgM3,
+    sourceTankCapacityL: p.containmentVolumeLiters,
+    initialSourceVolumeL: p.containmentVolumeLiters * (p.initialSludgeDepthM / 2.0),
+    waterJettingEnabled: p.waterJetEnabled,
+    waterJetPressureBar: p.waterJetPressureBar,
+    cutterHeadEnabled: p.cutterHeadEnabled,
+    cutterHeadSpeedRpm: p.cutterHeadSpeedRpm
+  };
+}
+
 export const useSimulationStore = create<SimulationStore>((set, get) => {
   const initialParams = { ...DEFAULT_PARAMETERS };
   const initialTelemetry = createInitialTelemetry(initialParams);
 
-  // Seed baseline history for smooth chart on first render
+  const initialEngine = createInitialEngineState({
+    pumpRpm: initialParams.pumpRpm,
+    hoseDiameterMm: initialParams.hoseDiameterMm,
+    hoseLengthM: initialParams.hoseLengthM,
+    sludgeViscosityCp: initialParams.slurryViscosityCp,
+    sludgeDensityKgM3: initialParams.slurryDensityKgM3,
+    sourceTankCapacityL: initialParams.containmentVolumeLiters,
+    initialSourceVolumeL: 3800,
+    collectionTankCapacityL: 2400,
+    receiverTankCapacityL: 10000,
+    targetExtractionVolumeL: 2400,
+    waterJettingEnabled: initialParams.waterJetEnabled,
+    waterJetPressureBar: initialParams.waterJetPressureBar,
+    cutterHeadEnabled: initialParams.cutterHeadEnabled,
+    cutterHeadSpeedRpm: initialParams.cutterHeadSpeedRpm
+  });
+
   const initialHistory: TelemetryPoint[] = Array.from({ length: 12 }, (_, i) => {
     const t = i * 2;
     return {
@@ -226,19 +311,19 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
   const initialEvents: EventLogItem[] = [
     {
       id: 'evt-init-1',
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: '00:00',
       timeSec: 0,
       level: 'info',
       source: 'SYSTEM_BOOT',
-      message: 'Desludge Digital Twin telemetry gateway initialized in SIMULATED mode.'
+      message: 'Desludge Digital Twin deterministic physics & kinematics engine initialized.'
     },
     {
       id: 'evt-init-2',
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: '00:00',
       timeSec: 0,
       level: 'info',
-      source: 'ATMOSPHERE_CHK',
-      message: 'Initial vault atmospheric survey: H2S 2.1 ppm, CH4 0.15% (Within Safe Limits).'
+      source: 'INTERLOCK_CHK',
+      message: 'Safety interlocks armed. Stabilizers stowed. Machine in IDLE sequence.'
     }
   ];
 
@@ -247,6 +332,13 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     activeView: 'overview',
     simSpeed: 1,
     connectionState: 'SIMULATED',
+
+    engine: initialEngine,
+    operatingState: initialEngine.operatingState,
+    materialBalance: initialEngine.materialBalance,
+    kinematics: initialEngine.kinematics,
+    alarms: initialEngine.alarms,
+    interlocks: initialEngine.interlocks,
 
     parameters: initialParams,
     telemetry: initialTelemetry,
@@ -267,28 +359,43 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     selectedComponentId: null,
 
     startSimulation: () => {
-      const { status, addEvent } = get();
-      if (status === 'running') return;
-      set({ status: 'running' });
-      addEvent('info', 'OPERATOR_CMD', 'Desludging vacuum cycle initiated.');
+      const { engine, addEvent } = get();
+      if (engine.operatingState === 'FAULT') {
+        addEvent('critical', 'INTERLOCK_TRIP', 'Cannot start machine: Clear active fault / E-STOP first.');
+        return;
+      }
+      const updatedEngine = triggerStart(engine);
+      set({
+        engine: updatedEngine,
+        operatingState: updatedEngine.operatingState,
+        status: 'running'
+      });
+      addEvent('info', 'OPERATOR_CMD', 'Operating sequence initiated: DEPLOY sequence starting.');
     },
 
     pauseSimulation: () => {
-      const { status, addEvent } = get();
-      if (status !== 'running') return;
-      set({ status: 'paused' });
+      const { engine, addEvent } = get();
+      const updatedEngine = triggerPause(engine);
+      set({
+        engine: updatedEngine,
+        status: 'paused'
+      });
       addEvent('warning', 'OPERATOR_CMD', 'Simulation paused by operator.');
     },
 
     resumeSimulation: () => {
-      const { status, addEvent } = get();
-      if (status !== 'paused') return;
-      set({ status: 'running' });
+      const { engine, addEvent } = get();
+      const updatedEngine = triggerResume(engine);
+      set({
+        engine: updatedEngine,
+        status: 'running'
+      });
       addEvent('info', 'OPERATOR_CMD', 'Simulation resumed.');
     },
 
     resetSimulation: () => {
-      const { parameters, addEvent } = get();
+      const { parameters, engine, addEvent } = get();
+      const freshEngine = triggerReset(engine);
       const freshTelemetry = createInitialTelemetry(parameters);
       const freshHistory: TelemetryPoint[] = [
         {
@@ -306,19 +413,66 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
 
       set({
         status: 'idle',
+        engine: freshEngine,
+        operatingState: freshEngine.operatingState,
+        materialBalance: freshEngine.materialBalance,
+        kinematics: freshEngine.kinematics,
+        alarms: freshEngine.alarms,
+        interlocks: freshEngine.interlocks,
         telemetry: freshTelemetry,
         telemetryHistory: freshHistory,
         alarmsActive: 0
       });
-      addEvent('info', 'SYSTEM_RESET', 'Simulation telemetry and counters reset to baseline.');
+      addEvent('info', 'SYSTEM_RESET', 'Machine kinematics, tanks, and telemetry reset to initial IDLE baseline.');
     },
 
     stepSimulation: (stepSeconds = 1.0) => {
       get().tickSimulation(stepSeconds);
     },
 
+    triggerEmergencyStop: () => {
+      const { engine, addEvent } = get();
+      const nextEngine = triggerEmergencyStop(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        status: 'alarm',
+        alarms: nextEngine.alarms,
+        interlocks: nextEngine.interlocks,
+        alarmsActive: get().alarmsActive + 1
+      });
+      addEvent('critical', 'EMERGENCY_STOP', 'EMERGENCY STOP (E-STOP) ACTUATED! Machinery disabled immediately.');
+    },
+
+    triggerResolveFault: () => {
+      const { engine, addEvent } = get();
+      const nextEngine = triggerResolveFault(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        status: 'idle',
+        alarms: nextEngine.alarms,
+        interlocks: nextEngine.interlocks,
+        alarmsActive: 0
+      });
+      addEvent('info', 'FAULT_RESOLVED', 'Operator fault reset acknowledged. Machine returned to safe IDLE mode.');
+    },
+
+    triggerManualDischarge: () => {
+      const { engine, addEvent } = get();
+      const nextEngine = triggerManualDischarge(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState
+      });
+      addEvent('info', 'OPERATOR_CMD', 'Manual discharge to external disposal tanker initiated.');
+    },
+
     setSimSpeed: (speed: number) => {
-      set({ simSpeed: speed });
+      set((state) => ({
+        simSpeed: speed,
+        engine: { ...state.engine, simSpeedMultiplier: speed }
+      }));
     },
 
     setActiveView: (view: NavView) => {
@@ -326,78 +480,159 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     },
 
     updateParameter: (key, value) => {
-      set((state) => ({
-        parameters: {
-          ...state.parameters,
-          [key]: value
-        }
-      }));
+      set((state) => {
+        const nextParams = { ...state.parameters, [key]: value };
+        const enginePartial = syncEngineParamsFromDigitalTwin(nextParams, state.engine.parameters);
+        const nextEngine: EngineState = {
+          ...state.engine,
+          parameters: {
+            ...state.engine.parameters,
+            ...enginePartial
+          }
+        };
+        return {
+          parameters: nextParams,
+          engine: nextEngine
+        };
+      });
     },
 
     batchUpdateParameters: (partial) => {
+      set((state) => {
+        const nextParams = { ...state.parameters, ...partial };
+        const enginePartial = syncEngineParamsFromDigitalTwin(nextParams, state.engine.parameters);
+        const nextEngine: EngineState = {
+          ...state.engine,
+          parameters: {
+            ...state.engine.parameters,
+            ...enginePartial
+          }
+        };
+        return {
+          parameters: nextParams,
+          engine: nextEngine
+        };
+      });
+    },
+
+    updateEngineParameter: (key, value) => {
       set((state) => ({
-        parameters: {
-          ...state.parameters,
-          ...partial
+        engine: {
+          ...state.engine,
+          parameters: {
+            ...state.engine.parameters,
+            [key]: value
+          }
         }
       }));
     },
 
     tickSimulation: (deltaSeconds: number) => {
       const state = get();
-      if (state.status !== 'running') return;
+      if (state.engine.isPaused) return;
+      if (state.engine.operatingState === 'IDLE' && state.status === 'idle') return;
 
       const effectiveDt = deltaSeconds * state.simSpeed;
-      const result = stepPhysicsSimulation(state.parameters, state.telemetry, effectiveDt);
+      const nextEngine = stepSimulationEngine(state.engine, effectiveDt);
 
-      // New point for chart history (sampled ~ every 0.8s)
+      // Collect new events generated by engine
+      const convertedEvents: EventLogItem[] = nextEngine.recentEvents.map((evt) => ({
+        id: evt.id,
+        timestamp: evt.formattedTime,
+        timeSec: evt.simTimeSec,
+        level: evt.level,
+        source: evt.source,
+        message: evt.message,
+        acknowledged: false
+      }));
+
+      const nextEvents = convertedEvents.length > 0
+        ? [...convertedEvents, ...state.eventLog].slice(0, 100)
+        : state.eventLog;
+
+      // Status mapping
+      const nextStatus: SimulationStatus =
+        nextEngine.operatingState === 'FAULT'
+          ? 'alarm'
+          : nextEngine.operatingState === 'COMPLETE'
+          ? 'complete'
+          : nextEngine.operatingState === 'IDLE'
+          ? 'idle'
+          : 'running';
+
+      // Telemetry synchronization
+      const isFlowing = nextEngine.kinematics.isMaterialFlowing;
+      const rpmRatio = nextEngine.parameters.pumpRpm / 3000;
+      const nextTelemetry: TelemetryState = {
+        ...state.telemetry,
+        elapsedTimeSeconds: nextEngine.simulatedTimeSec,
+        volumeExtractedLiters: nextEngine.materialBalance.collectionVolumeL,
+        volumeRemainingLiters: nextEngine.materialBalance.sourceVolumeL,
+        sludgeLevelM: nextEngine.materialBalance.sourceLevelM,
+        extractionRateM3H: nextEngine.telemetry.flowRateM3H,
+        suctionPressureKpa: -nextEngine.telemetry.suctionPressureKpa,
+        dischargePressureBar: nextEngine.telemetry.dischargePressureKpa / 100,
+        cavitationIndex: nextEngine.telemetry.cavitationIndex,
+        motorPowerKw: nextEngine.telemetry.motorPowerKw,
+        motorCurrentAmps: (nextEngine.telemetry.motorPowerKw * 1000) / (400 * 1.732 * 0.88),
+        h2sConcentrationPpm: isFlowing
+          ? Math.min(18.0, 2.0 + (nextEngine.materialBalance.cycleExtractedL / 3800) * 8.5)
+          : 2.0,
+        ch4ConcentrationPct: isFlowing
+          ? Math.min(1.2, 0.15 + (nextEngine.materialBalance.cycleExtractedL / 3800) * 0.45)
+          : 0.15,
+        vibrationRmsMmS: isFlowing
+          ? 1.5 + rpmRatio * 1.4 + (nextEngine.telemetry.cavitationIndex > 0.5 ? 2.0 : 0)
+          : 0.2,
+        estimatedCompletionMinutes: nextEngine.telemetry.estimatedRemainingTimeSec / 60
+      };
+
+      // Chart history sampling
+      const lastPoint = state.telemetryHistory[state.telemetryHistory.length - 1];
       const shouldSample =
-        state.telemetryHistory.length === 0 ||
-        result.nextTelemetry.elapsedTimeSeconds -
-          state.telemetryHistory[state.telemetryHistory.length - 1].timestamp >= 0.75;
+        !lastPoint ||
+        nextTelemetry.elapsedTimeSeconds - lastPoint.timestamp >= 0.75;
 
       let nextHistory = state.telemetryHistory;
       if (shouldSample) {
-        const mm = Math.floor(result.nextTelemetry.elapsedTimeSeconds / 60)
+        const mm = Math.floor(nextTelemetry.elapsedTimeSeconds / 60)
           .toString()
           .padStart(2, '0');
-        const ss = Math.floor(result.nextTelemetry.elapsedTimeSeconds % 60)
+        const ss = Math.floor(nextTelemetry.elapsedTimeSeconds % 60)
           .toString()
           .padStart(2, '0');
 
         const newPoint: TelemetryPoint = {
           time: `${mm}:${ss}`,
-          timestamp: result.nextTelemetry.elapsedTimeSeconds,
-          flowRate: parseFloat(result.nextTelemetry.extractionRateM3H.toFixed(2)),
-          vacuum: Math.abs(parseFloat(result.nextTelemetry.suctionPressureKpa.toFixed(1))),
-          power: parseFloat(result.nextTelemetry.motorPowerKw.toFixed(2)),
-          h2s: parseFloat(result.nextTelemetry.h2sConcentrationPpm.toFixed(1)),
-          ch4: parseFloat(result.nextTelemetry.ch4ConcentrationPct.toFixed(2)),
-          sludgeLevel: parseFloat(result.nextTelemetry.sludgeLevelM.toFixed(2)),
-          vibration: parseFloat(result.nextTelemetry.vibrationRmsMmS.toFixed(2))
+          timestamp: nextTelemetry.elapsedTimeSeconds,
+          flowRate: parseFloat(nextTelemetry.extractionRateM3H.toFixed(2)),
+          vacuum: Math.abs(parseFloat(nextTelemetry.suctionPressureKpa.toFixed(1))),
+          power: parseFloat(nextTelemetry.motorPowerKw.toFixed(2)),
+          h2s: parseFloat(nextTelemetry.h2sConcentrationPpm.toFixed(1)),
+          ch4: parseFloat(nextTelemetry.ch4ConcentrationPct.toFixed(2)),
+          sludgeLevel: parseFloat(nextTelemetry.sludgeLevelM.toFixed(2)),
+          vibration: parseFloat(nextTelemetry.vibrationRmsMmS.toFixed(2))
         };
 
-        // Ring buffer max 45 points for fast chart animations
         nextHistory = [...state.telemetryHistory.slice(-44), newPoint];
       }
 
-      const nextEvents = result.newEvents.length > 0
-        ? [...result.newEvents, ...state.eventLog].slice(0, 100)
-        : state.eventLog;
-
-      const nextStatus: SimulationStatus = result.isCompleted
-        ? 'complete'
-        : result.hasAlarm
-        ? 'alarm'
-        : state.status;
-
-      const alarmCount = nextEvents.filter(
-        (e) => (e.level === 'critical' || e.level === 'warning') && !e.acknowledged
-      ).length;
+      const alarmCount =
+        (nextEngine.alarms.lowSourceLevel ? 1 : 0) +
+        (nextEngine.alarms.collectionTankFull ? 1 : 0) +
+        (nextEngine.alarms.excessiveVacuum ? 1 : 0) +
+        (nextEngine.alarms.motorOverload ? 1 : 0) +
+        (nextEngine.alarms.emergencyStopActive ? 1 : 0);
 
       set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        materialBalance: nextEngine.materialBalance,
+        kinematics: nextEngine.kinematics,
+        alarms: nextEngine.alarms,
+        interlocks: nextEngine.interlocks,
         status: nextStatus,
-        telemetry: result.nextTelemetry,
+        telemetry: nextTelemetry,
         telemetryHistory: nextHistory,
         eventLog: nextEvents,
         alarmsActive: alarmCount
@@ -405,11 +640,13 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     },
 
     addEvent: (level, source, message) => {
-      const now = new Date();
+      const simSec = Math.round(get().engine.simulatedTimeSec);
+      const mm = Math.floor(simSec / 60).toString().padStart(2, '0');
+      const ss = (simSec % 60).toString().padStart(2, '0');
       const newEvt: EventLogItem = {
         id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        timestamp: now.toLocaleTimeString(),
-        timeSec: Math.round(get().telemetry.elapsedTimeSeconds),
+        timestamp: `${mm}:${ss}`,
+        timeSec: simSec,
         level,
         source,
         message,

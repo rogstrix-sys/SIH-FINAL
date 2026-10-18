@@ -7,15 +7,16 @@ export const DemonstrationSepticTank: React.FC = () => {
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
   const cutaway = useSimulationStore((s) => s.displayOptions.cutaway);
   const wireframe = useSimulationStore((s) => s.displayOptions.wireframe);
-  const sludgeLevelM = useSimulationStore((s) => s.telemetry.sludgeLevelM);
-  const initialDepthM = useSimulationStore((s) => s.parameters.initialSludgeDepthM);
+  const sourceLevelM = useSimulationStore((s) => s.materialBalance.sourceLevelM);
+  const sourceVolumeL = useSimulationStore((s) => s.materialBalance.sourceVolumeL);
+  const initialVolumeL = useSimulationStore((s) => s.materialBalance.totalInitialVolumeL);
 
   const isSelected = selectedComponentId === 'septictank';
 
   // Sludge depth in demonstration tank: tank internal floor is at Y = -1.5, ceiling at Y = 0.1 (total depth 1.6m)
-  const sludgeDepthRatio = Math.max(0.04, Math.min(1.0, sludgeLevelM / Math.max(0.1, initialDepthM)));
+  const sludgeDepthRatio = Math.max(0.04, Math.min(1.0, sourceVolumeL / Math.max(1, initialVolumeL)));
   const sludgeHeight = 0.75 * sludgeDepthRatio;
-  const liquidHeight = 0.55;
+  const liquidHeight = 0.55 * Math.max(0.05, sourceLevelM / 1.85);
 
   return (
     <group

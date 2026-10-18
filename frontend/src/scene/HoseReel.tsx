@@ -8,16 +8,19 @@ export const HoseReel: React.FC = () => {
 
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
-  const isRunning = useSimulationStore((s) => s.status === 'running');
-  const pumpRpm = useSimulationStore((s) => s.parameters.pumpRpm);
+  const kinematics = useSimulationStore((s) => s.kinematics);
+  const operatingState = useSimulationStore((s) => s.operatingState);
   const wireframe = useSimulationStore((s) => s.displayOptions.wireframe);
 
   const isSelected = selectedComponentId === 'hosereel';
 
   useFrame((_, delta) => {
-    // Slowly rotate hose reel drum during extraction cycle
-    if (drumRef.current && isRunning) {
-      drumRef.current.rotation.z += (pumpRpm / 3000) * 0.45 * delta;
+    if (drumRef.current) {
+      if (operatingState === 'DEPLOY') {
+        drumRef.current.rotation.z += 0.8 * delta;
+      } else if (kinematics.isMaterialFlowing) {
+        drumRef.current.rotation.z += 0.35 * delta;
+      }
     }
   });
 

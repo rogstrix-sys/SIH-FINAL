@@ -29,6 +29,8 @@ export const ReportsView: React.FC = () => {
   const telemetry = useSimulationStore((s) => s.telemetry);
   const parameters = useSimulationStore((s) => s.parameters);
   const status = useSimulationStore((s) => s.status);
+  const materialBalance = useSimulationStore((s) => s.materialBalance);
+  const operatingState = useSimulationStore((s) => s.operatingState);
 
   // Compute energy consumption: kWh = (kW * hours)
   const hoursElapsed = telemetry.elapsedTimeSeconds / 3600.0;
@@ -183,27 +185,39 @@ export const ReportsView: React.FC = () => {
 
         {/* 2. Mass Balance & Energy Balance Table */}
         <div className="mt-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-300 print:text-black mb-3 flex items-center gap-2">
-            <Scale className="w-4 h-4 text-safety-500" />
-            <span>2. Process Mass & Electrical Energy Balance</span>
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-300 print:text-black flex items-center gap-2">
+              <Scale className="w-4 h-4 text-safety-500" />
+              <span>2. Process Mass & Electrical Energy Balance</span>
+            </h3>
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-400">
+              DISCREPANCY: ±{Math.abs(materialBalance.massBalanceDiscrepancyL).toFixed(4)} L (INVARIANT CONSERVED)
+            </span>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
             <div className="p-3 bg-graphite-950 print:bg-gray-100 rounded-lg border border-slate-800 print:border-gray-300 space-y-1">
-              <span className="text-slate-400 print:text-gray-600 block text-[10px]">TOTAL VAULT VOLUME</span>
-              <span className="text-base font-bold text-white print:text-black">
-                {formatVolume(parameters.containmentVolumeLiters)}
+              <span className="text-slate-400 print:text-gray-600 block text-[10px]">1. VAULT SOURCE REMAINING</span>
+              <span className="text-base font-bold text-amber-300 print:text-amber-700">
+                {Math.round(materialBalance.sourceVolumeL)} L
               </span>
-              <p className="text-[10px] text-slate-400 print:text-gray-500">Initial sludge depth: {parameters.initialSludgeDepthM} m</p>
+              <p className="text-[10px] text-slate-400 print:text-gray-500">Fluid level: {materialBalance.sourceLevelM.toFixed(2)} m</p>
             </div>
 
             <div className="p-3 bg-graphite-950 print:bg-gray-100 rounded-lg border border-slate-800 print:border-gray-300 space-y-1">
-              <span className="text-slate-400 print:text-gray-600 block text-[10px]">EVACUATED VOLUME</span>
-              <span className="text-base font-bold text-emerald-400 print:text-green-600">
-                {formatVolume(telemetry.volumeExtractedLiters)} (
-                {((telemetry.volumeExtractedLiters / Math.max(1, parameters.containmentVolumeLiters)) * 100).toFixed(1)}%)
+              <span className="text-slate-400 print:text-gray-600 block text-[10px]">2. MACHINE COLLECTION TANK</span>
+              <span className="text-base font-bold text-cyan-300 print:text-cyan-700">
+                {Math.round(materialBalance.collectionVolumeL)} L
               </span>
-              <p className="text-[10px] text-slate-400 print:text-gray-500">Remaining: {formatVolume(telemetry.volumeRemainingLiters)}</p>
+              <p className="text-[10px] text-slate-400 print:text-gray-500">Fill: {materialBalance.collectionFillPct.toFixed(1)}%</p>
+            </div>
+
+            <div className="p-3 bg-graphite-950 print:bg-gray-100 rounded-lg border border-slate-800 print:border-gray-300 space-y-1">
+              <span className="text-slate-400 print:text-gray-600 block text-[10px]">3. EXTERNAL RECEIVER TANK</span>
+              <span className="text-base font-bold text-sky-300 print:text-sky-700">
+                {Math.round(materialBalance.receiverVolumeL)} L
+              </span>
+              <p className="text-[10px] text-slate-400 print:text-gray-500">Discharge transfer volume</p>
             </div>
 
             <div className="p-3 bg-graphite-950 print:bg-gray-100 rounded-lg border border-slate-800 print:border-gray-300 space-y-1">
@@ -211,7 +225,7 @@ export const ReportsView: React.FC = () => {
               <span className="text-base font-bold text-yellow-400 print:text-yellow-600">
                 {energyKwh.toFixed(2)} kWh
               </span>
-              <p className="text-[10px] text-slate-400 print:text-gray-500">Specific energy: {specificEnergy.toFixed(2)} kWh/m³</p>
+              <p className="text-[10px] text-slate-400 print:text-gray-500">Specific: {specificEnergy.toFixed(2)} kWh/m³</p>
             </div>
           </div>
         </div>

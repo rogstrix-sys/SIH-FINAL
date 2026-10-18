@@ -5,14 +5,14 @@ import { useSimulationStore } from '../store/useSimulationStore';
 export const CollectionTank: React.FC = () => {
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
-  const volumeExtracted = useSimulationStore((s) => s.telemetry.volumeExtractedLiters);
-  const totalVolume = useSimulationStore((s) => s.parameters.containmentVolumeLiters);
+  const collectionVolumeL = useSimulationStore((s) => s.materialBalance.collectionVolumeL);
+  const collectionCapacityL = useSimulationStore((s) => s.engine.parameters.collectionTankCapacityL);
   const wireframe = useSimulationStore((s) => s.displayOptions.wireframe);
 
   const isSelected = selectedComponentId === 'tank';
 
-  // Fill ratio of collection vessel (0.0 to 1.0)
-  const fillRatio = Math.min(1.0, Math.max(0.02, volumeExtracted / Math.max(1, totalVolume)));
+  // Fill ratio of on-chassis collection vessel (0.0 to 1.0)
+  const fillRatio = Math.min(1.0, Math.max(0.01, collectionVolumeL / Math.max(1, collectionCapacityL)));
   // Sight glass height: max 0.65m tube
   const sightFluidHeight = 0.65 * fillRatio;
 

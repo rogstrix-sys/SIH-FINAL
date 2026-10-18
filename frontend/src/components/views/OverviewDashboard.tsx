@@ -10,7 +10,11 @@ import {
   VolumeX,
   Eye,
   Sliders,
-  Maximize2
+  Maximize2,
+  Scale,
+  Cpu,
+  Truck,
+  AlertCircle
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -45,6 +49,11 @@ export const OverviewDashboard: React.FC = () => {
   const history = useSimulationStore((s) => s.telemetryHistory);
   const eventLog = useSimulationStore((s) => s.eventLog);
   const status = useSimulationStore((s) => s.status);
+  const operatingState = useSimulationStore((s) => s.operatingState);
+  const materialBalance = useSimulationStore((s) => s.materialBalance);
+  const alarms = useSimulationStore((s) => s.alarms);
+  const interlocks = useSimulationStore((s) => s.interlocks);
+  const engineParams = useSimulationStore((s) => s.engine.parameters);
   
   const cameraPreset = useSimulationStore((s) => s.cameraPreset);
   const setCameraPreset = useSimulationStore((s) => s.setCameraPreset);
@@ -83,6 +92,85 @@ export const OverviewDashboard: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+      {/* 0. Operating Sequence Stepper & Mass Balance Monitor */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        {/* Sequence Stepper */}
+        <div className="lg:col-span-7 bg-graphite-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow-md">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono mb-2">
+            <span className="flex items-center gap-1.5 font-bold text-white uppercase tracking-wider text-[11px]">
+              <Cpu className="w-3.5 h-3.5 text-safety-500" />
+              Machine Operating Sequence
+            </span>
+            <span className="text-[10px] text-slate-400">Fixed Timestep Integration (Δt = 0.05s)</span>
+          </div>
+
+          <div className="grid grid-cols-6 gap-1 sm:gap-2">
+            {[
+              { id: 'IDLE', label: '1. IDLE' },
+              { id: 'DEPLOY', label: '2. DEPLOY' },
+              { id: 'PRIME', label: '3. PRIME' },
+              { id: 'EXTRACT', label: '4. EXTRACT' },
+              { id: 'DISCHARGE', label: '5. DISCHG' },
+              { id: 'COMPLETE', label: '6. DONE' }
+            ].map((step, idx) => {
+              const isActive = operatingState === step.id;
+              const stepOrder = ['IDLE', 'DEPLOY', 'PRIME', 'EXTRACT', 'DISCHARGE', 'COMPLETE'];
+              const isPassed = stepOrder.indexOf(operatingState) > idx;
+              return (
+                <div
+                  key={step.id}
+                  className={`px-2 py-1.5 rounded-lg border text-center font-mono text-[11px] transition-all ${
+                    isActive
+                      ? 'border-safety-500 bg-safety-500/15 text-safety-400 font-bold shadow-md shadow-safety-500/20 animate-pulse'
+                      : isPassed
+                      ? 'border-emerald-600/50 bg-emerald-950/30 text-emerald-400'
+                      : 'border-slate-800 bg-graphite-950/60 text-slate-400'
+                  }`}
+                >
+                  <div className="truncate">{step.label}</div>
+                  <div className="text-[9px] uppercase tracking-tighter opacity-80">
+                    {isActive ? 'ACTIVE' : isPassed ? 'PASSED' : 'STANDBY'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mass Balance Monitor */}
+        <div className="lg:col-span-5 bg-graphite-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow-md">
+          <div className="flex items-center justify-between text-xs font-mono mb-2">
+            <span className="flex items-center gap-1.5 font-bold text-white uppercase tracking-wider text-[11px]">
+              <Scale className="w-3.5 h-3.5 text-cyan-400" />
+              Strict Mass Balance Invariant
+            </span>
+            <span className="text-[10px] text-emerald-400 font-semibold px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40">
+              Δ {Math.abs(materialBalance.massBalanceDiscrepancyL).toFixed(4)} L
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 font-mono text-[11px]">
+            <div className="bg-graphite-950/80 border border-slate-800/80 rounded-lg p-2 text-center">
+              <div className="text-[10px] text-slate-400 uppercase">Septic Vault</div>
+              <div className="text-sm font-bold text-amber-300">{Math.round(materialBalance.sourceVolumeL)} L</div>
+              <div className="text-[9px] text-slate-400">Level: {materialBalance.sourceLevelM.toFixed(2)}m</div>
+            </div>
+
+            <div className="bg-graphite-950/80 border border-slate-800/80 rounded-lg p-2 text-center">
+              <div className="text-[10px] text-slate-400 uppercase">Machine Tank</div>
+              <div className="text-sm font-bold text-cyan-300">{Math.round(materialBalance.collectionVolumeL)} L</div>
+              <div className="text-[9px] text-slate-400">{materialBalance.collectionFillPct.toFixed(0)}% full</div>
+            </div>
+
+            <div className="bg-graphite-950/80 border border-slate-800/80 rounded-lg p-2 text-center">
+              <div className="text-[10px] text-slate-400 uppercase">Disposal Tanker</div>
+              <div className="text-sm font-bold text-sky-300">{Math.round(materialBalance.receiverVolumeL)} L</div>
+              <div className="text-[9px] text-slate-400">Transferred</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 1. Industrial Live KPI Ribbon */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {/* Volume Extraction */}

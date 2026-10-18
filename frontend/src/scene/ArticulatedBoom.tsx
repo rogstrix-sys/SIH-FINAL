@@ -12,37 +12,34 @@ export const ArticulatedBoom: React.FC = () => {
 
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
-  const isRunning = useSimulationStore((s) => s.status === 'running');
+  const kinematics = useSimulationStore((s) => s.kinematics);
+  const operatingState = useSimulationStore((s) => s.operatingState);
   const wireframe = useSimulationStore((s) => s.displayOptions.wireframe);
 
   const isSelected = selectedComponentId === 'boom';
 
-  useFrame((state, delta) => {
+  useFrame((state) => {
     const t = state.clock.getElapsedTime();
 
     if (turretRef.current && mainBoomRef.current && jibRef.current) {
-      if (isRunning) {
-        // Natural hydraulic breathing oscillation while supporting hose under vacuum
-        const baseSlew = -0.45 + Math.sin(t * 0.35) * 0.04;
-        const mainElevation = 0.65 + Math.sin(t * 0.5) * 0.03;
-        const jibFlex = -0.85 + Math.sin(t * 0.5 + 1.2) * 0.04;
+      const isFlowing = kinematics.isMaterialFlowing;
+      const breathe = isFlowing ? Math.sin(t * 1.5) * 0.02 : 0;
 
-        turretRef.current.rotation.y = baseSlew;
-        mainBoomRef.current.rotation.z = mainElevation;
-        jibRef.current.rotation.z = jibFlex;
+      // Base angles from kinematics with breathing during vacuum extraction
+      const slew = kinematics.boomSlewAngleRad;
+      const elevation = kinematics.boomElevationRad + breathe;
+      const flex = kinematics.jibFlexAngleRad + breathe * 0.8;
 
-        // Animate telescoping chrome cylinder rods
-        if (liftPistonRef.current) {
-          liftPistonRef.current.position.y = 0.28 + Math.sin(t * 0.5) * 0.02;
-        }
-        if (jibPistonRef.current) {
-          jibPistonRef.current.position.x = 0.22 + Math.sin(t * 0.5 + 1.2) * 0.02;
-        }
-      } else {
-        // Static deployed stance resting over demonstration tank
-        turretRef.current.rotation.y = -0.45;
-        mainBoomRef.current.rotation.z = 0.65;
-        jibRef.current.rotation.z = -0.85;
+      turretRef.current.rotation.y = slew;
+      mainBoomRef.current.rotation.z = elevation;
+      jibRef.current.rotation.z = flex;
+
+      // Animate telescoping chrome cylinder rods proportionally
+      if (liftPistonRef.current) {
+        liftPistonRef.current.position.y = 0.20 + kinematics.deployProgress * 0.09 + breathe * 0.5;
+      }
+      if (jibPistonRef.current) {
+        jibPistonRef.current.position.x = 0.16 + kinematics.deployProgress * 0.07 + breathe * 0.5;
       }
     }
   });

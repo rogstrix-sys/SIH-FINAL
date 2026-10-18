@@ -8,7 +8,8 @@ export const HoseNozzle: React.FC = () => {
 
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
-  const isRunning = useSimulationStore((s) => s.status === 'running');
+  const operatingState = useSimulationStore((s) => s.operatingState);
+  const isExtracting = operatingState === 'EXTRACT';
   const cutterEnabled = useSimulationStore((s) => s.parameters.cutterHeadEnabled);
   const cutterRpm = useSimulationStore((s) => s.parameters.cutterHeadSpeedRpm);
   const waterJetEnabled = useSimulationStore((s) => s.parameters.waterJetEnabled);
@@ -17,8 +18,8 @@ export const HoseNozzle: React.FC = () => {
   const isSelected = selectedComponentId === 'nozzle';
 
   useFrame((_, delta) => {
-    // Spin internal cutter blades if enabled
-    if (cutterRef.current && isRunning && cutterEnabled) {
+    // Spin internal cutter blades if enabled during extraction
+    if (cutterRef.current && isExtracting && cutterEnabled) {
       cutterRef.current.rotation.y += (cutterRpm / 60) * Math.PI * 2 * delta;
     }
   });
@@ -88,7 +89,7 @@ export const HoseNozzle: React.FC = () => {
               </mesh>
 
               {/* Hydro-jet fluid spray cones when water jetting is active */}
-              {waterJetEnabled && isRunning && (
+              {waterJetEnabled && isExtracting && (
                 <mesh position={[0, -0.08, 0]} rotation={[Math.PI, 0, 0]}>
                   <coneGeometry args={[0.04, 0.14, 12, 1, true]} />
                   <meshBasicMaterial color="#38bdf8" transparent opacity={0.65} wireframe />

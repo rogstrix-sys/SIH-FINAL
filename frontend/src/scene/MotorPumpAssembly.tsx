@@ -9,21 +9,20 @@ export const MotorPumpAssembly: React.FC = () => {
 
   const selectedComponentId = useSimulationStore((s) => s.selectedComponentId);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
-  const isRunning = useSimulationStore((s) => s.status === 'running');
-  const pumpRpm = useSimulationStore((s) => s.parameters.pumpRpm);
+  const shaftRpm = useSimulationStore((s) => s.kinematics.pumpShaftRpm);
   const wireframe = useSimulationStore((s) => s.displayOptions.wireframe);
 
   const isSelected = selectedComponentId === 'pump';
 
   useFrame((state, delta) => {
-    // Spin cooling fan
-    if (fanRef.current && isRunning) {
-      fanRef.current.rotation.x += (pumpRpm / 60) * Math.PI * 2 * delta;
+    // Spin cooling fan at exact pump shaft RPM
+    if (fanRef.current && shaftRpm > 0) {
+      fanRef.current.rotation.x += (shaftRpm / 60) * Math.PI * 2 * delta;
     }
 
-    // Micro-vibration jitter
-    if (groupRef.current && isRunning) {
-      const vib = (pumpRpm / 3000) * 0.002;
+    // Micro-vibration jitter proportional to load and RPM
+    if (groupRef.current && shaftRpm > 0) {
+      const vib = (shaftRpm / 3000) * 0.002;
       groupRef.current.position.y = 0.58 + Math.sin(state.clock.elapsedTime * 48) * vib;
     }
   });
@@ -136,8 +135,8 @@ export const MotorPumpAssembly: React.FC = () => {
             <cylinderGeometry args={[0.03, 0.03, 0.08, 12]} />
             <meshStandardMaterial
               color="#0f172a"
-              emissive={isRunning ? '#22c55e' : '#64748b'}
-              emissiveIntensity={isRunning ? 1.2 : 0.1}
+              emissive={shaftRpm > 0 ? '#22c55e' : '#64748b'}
+              emissiveIntensity={shaftRpm > 0 ? 1.2 : 0.1}
             />
           </mesh>
         ))}
