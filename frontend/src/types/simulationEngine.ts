@@ -14,16 +14,146 @@
 
 export type OperatingState =
   | 'IDLE'
+  | 'TRAVEL'
+  | 'POSITION'
+  | 'STABILIZE'
   | 'DEPLOY'
   | 'DEPLOYMENT'
+  | 'DEPLOY_HOSE'
   | 'PRIME'
   | 'PRIMING'
   | 'EXTRACT'
   | 'EXTRACTION'
+  | 'SETTLE'
+  | 'COMPACT'
+  | 'SECURE'
+  | 'TRANSPORT_READY'
   | 'DISCHARGE'
   | 'COMPLETE'
   | 'PAUSED'
   | 'FAULT';
+
+export type WorkflowStageId =
+  | 'TRAVEL'
+  | 'POSITION'
+  | 'STABILIZE'
+  | 'DEPLOY_HOSE'
+  | 'PRIME'
+  | 'EXTRACT'
+  | 'SETTLE'
+  | 'COMPACT'
+  | 'SECURE'
+  | 'TRANSPORT_READY'
+  | 'DISCHARGE'
+  | 'COMPLETE';
+
+export interface WorkflowStageDefinition {
+  id: WorkflowStageId;
+  order: number;
+  label: string;
+  name: string;
+  description: string;
+  requiredConditions: string[];
+}
+
+export const WORKFLOW_STAGES: readonly WorkflowStageDefinition[] = [
+  {
+    id: 'TRAVEL',
+    order: 1,
+    label: '1. Travel',
+    name: 'Vehicle Transit to Site',
+    description: 'Tracked vehicle drives from staging depot to sanitation worksite coordinates.',
+    requiredConditions: ['Stabilizers fully retracted (<0.05)', 'Boom & hose stowed', 'Piston retention pin locked', 'E-Stop disarmed']
+  },
+  {
+    id: 'POSITION',
+    order: 2,
+    label: '2. Position',
+    name: 'Stationary Site Positioning',
+    description: 'Vehicle halts at worksite, parking brakes applied, tracks isolated.',
+    requiredConditions: ['Vehicle stationary (speed = 0 m/s)', 'Piston locked in transport position']
+  },
+  {
+    id: 'STABILIZE',
+    order: 3,
+    label: '3. Stabilize',
+    name: 'Hydraulic Outrigger Deployment',
+    description: 'Deploy 4 telescoping outriggers to level chassis and relieve crawler ground load.',
+    requiredConditions: ['Vehicle stationary', 'Level ground or slope <= 25°']
+  },
+  {
+    id: 'DEPLOY_HOSE',
+    order: 4,
+    label: '4. Deploy Hose',
+    name: 'Boom & Umbilical Articulation',
+    description: 'Slew and elevate hydraulic crane boom, unreel Ø100mm hose, position suction nozzle into vault.',
+    requiredConditions: ['Stabilizers grounded (1.0 extension)', 'Travel tracks locked']
+  },
+  {
+    id: 'PRIME',
+    order: 5,
+    label: '5. Prime',
+    name: 'Vacuum Core Chamber Priming',
+    description: 'Spin rotary lobe pump at low speed, establish suction seal, verify vacuum integrity.',
+    requiredConditions: ['Boom and hose deployed', 'Suction line submerged in septic vault']
+  },
+  {
+    id: 'EXTRACT',
+    order: 6,
+    label: '6. Extract',
+    name: 'Slurry Evacuation & Transfer',
+    description: 'Positive displacement vacuum transfer of viscous septage from vault to mobile collection tank.',
+    requiredConditions: ['Pump primed', 'Collection tank < 95% capacity', 'Source vault > 10 L', 'Stabilizers engaged']
+  },
+  {
+    id: 'SETTLE',
+    order: 7,
+    label: '7. Settle',
+    name: 'Slurry Settling & Phase Dwell',
+    description: 'Halt extraction pump; allow entrapped gases to vent and colloidal solids to consolidate.',
+    requiredConditions: ['Pump stopped', 'Tank atmospheric PVRV vent open']
+  },
+  {
+    id: 'COMPACT',
+    order: 8,
+    label: '8. Compact',
+    name: 'Hydraulic Platen Dewatering',
+    description: 'Lower guided vertical cylinder; press porous platen into sludge bed; express liquid filtrate up to 180 bar.',
+    requiredConditions: ['Vehicle stationary', 'Stabilizers engaged', 'Pump stopped', 'Relief valve armed']
+  },
+  {
+    id: 'SECURE',
+    order: 9,
+    label: '9. Secure',
+    name: 'Platen Retraction & Retention Pin Latching',
+    description: 'Retract porous platen to top home position (0 mm); engage dual mechanical transport lock pins.',
+    requiredConditions: ['Platen at top home position (0 mm)', 'Stow crane boom and reeled hose']
+  },
+  {
+    id: 'TRANSPORT_READY',
+    order: 10,
+    label: '10. Transport Ready',
+    name: 'Transport Envelope Clearance',
+    description: 'Automated verification of transport invariants: outriggers up, platen pin locked, boom stowed.',
+    requiredConditions: ['Retention pins engaged', 'Stabilizers retracted (<0.05)', 'Boom stowed', 'No active faults']
+  },
+  {
+    id: 'DISCHARGE',
+    order: 11,
+    label: '11. Discharge',
+    name: 'Material Transfer to Receiving Tanker',
+    description: 'Open 4-inch discharge gate valve and transfer dewatered material to disposal transport tanker.',
+    requiredConditions: ['Receiving destination connected', 'Receiver capacity available', 'Discharge valve open']
+  },
+  {
+    id: 'COMPLETE',
+    order: 12,
+    label: '12. Complete',
+    name: 'Mission Cycle Complete',
+    description: 'Desludging and dewatering cycle completed; generate engineering report and metrics.',
+    requiredConditions: ['Collection vessel evacuated or batch target fulfilled']
+  }
+] as const;
 
 export type SludgeConsistency = 'liquid' | 'slurry' | 'viscous' | 'thick_crust';
 
@@ -75,16 +205,28 @@ export interface ActiveAlarms {
   excessiveVacuum: boolean;
   motorOverload: boolean;
   emergencyStopActive: boolean;
+  pistonExcessivePressure: boolean;
+  pistonTravelLimitFault: boolean;
+  invalidVehicleMovement: boolean;
+  unsecuredTransportConfig: boolean;
+  hydraulicSubsystemFault: boolean;
 }
 
 export interface SafetyInterlocks {
   isDeployed: boolean;             // True only when stabilizers & boom fully deployed
   isPrimed: boolean;               // True only when prime sequence completed
+  isStabilized: boolean;           // True when outriggers grounded
+  isHoseDeployed: boolean;         // True when boom & hose positioned
+  isTransportSecured: boolean;     // True when platen locked in home retention pins
+  isTransportReady: boolean;       // True when all travel envelope conditions verified
   preventExtractNotDeployed: boolean;
   preventExtractNotPrimed: boolean;
   preventExtractTankFull: boolean;
   preventExtractSourceEmpty: boolean;
   preventDischargeNoDestination: boolean; // Interlock: blocks discharge if receiver full or missing
+  preventTravelNotTransportReady: boolean;
+  preventCompactionNotStationary: boolean;
+  preventCompactionTransferActive: boolean;
   emergencyStopLatched: boolean;
 }
 
@@ -172,6 +314,8 @@ export interface EngineState {
   // Sequencing internal timers
   deployTimerSec: number;
   primeTimerSec: number;
+  settleTimerSec: number;
+  settleDurationSec: number;
   
   // Audit Trail
   events: SimulationEvent[];

@@ -20,6 +20,9 @@ import {
 import { DEMO_STAGES } from '../simulation/guidedDemoData';
 import {
   OperatingState,
+  WorkflowStageId,
+  WorkflowStageDefinition,
+  WORKFLOW_STAGES,
   EngineState,
   MaterialBalanceState,
   MachineKinematicsState,
@@ -40,7 +43,16 @@ import {
   triggerPrime,
   triggerExtract,
   triggerDischarge,
-  triggerManualDischarge
+  triggerManualDischarge,
+  triggerTravel,
+  triggerPosition,
+  triggerStabilize,
+  triggerDeployHose,
+  triggerSettle,
+  triggerCompact,
+  triggerSecure,
+  triggerTransportReady,
+  triggerAdvanceWorkflow
 } from '../simulation/deterministicEngine';
 import { createInitialTelemetry } from '../simulation/physicsEngine';
 import {
@@ -305,6 +317,16 @@ export interface SimulationStore {
   triggerExtract: () => void;
   triggerDischarge: () => void;
   triggerManualDischarge: () => void;
+  triggerTravel: () => void;
+  triggerPosition: () => void;
+  triggerStabilize: () => void;
+  triggerDeployHose: () => void;
+  triggerSettle: () => void;
+  triggerCompact: () => void;
+  triggerSecure: () => void;
+  triggerTransportReady: () => void;
+  triggerAdvanceWorkflow: () => void;
+  setWorkflowStage: (stage: WorkflowStageId) => void;
   setSimSpeed: (speed: number) => void;
   setActiveView: (view: NavView) => void;
   updateParameter: <K extends keyof SimulationParameters>(key: K, value: SimulationParameters[K]) => void;
@@ -709,6 +731,139 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       }
     },
 
+    triggerTravel: () => {
+      const { engine, compactionTelemetry, addEvent } = get();
+      if (!compactionTelemetry.isTransportLocked || compactionTelemetry.strokeMm > 5) {
+        addEvent('critical', 'INTERLOCK_BLOCK', 'Cannot TRAVEL: Compaction platen must be locked with retention pins in transport position.');
+        return;
+      }
+      const nextEngine = triggerTravel(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
+      });
+    },
+
+    triggerPosition: () => {
+      const { engine, stopVehicle } = get();
+      stopVehicle();
+      const nextEngine = triggerPosition(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: 'idle'
+      });
+    },
+
+    triggerStabilize: () => {
+      const { engine, stopVehicle } = get();
+      stopVehicle();
+      const nextEngine = triggerStabilize(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: 'running'
+      });
+    },
+
+    triggerDeployHose: () => {
+      const { engine } = get();
+      const nextEngine = triggerDeployHose(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: 'running'
+      });
+    },
+
+    triggerSettle: () => {
+      const { engine } = get();
+      const nextEngine = triggerSettle(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: 'running'
+      });
+    },
+
+    triggerCompact: () => {
+      const { engine, unlockTransportPosition, extendCompactionPiston } = get();
+      const nextEngine = triggerCompact(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: 'running'
+      });
+      unlockTransportPosition();
+      extendCompactionPiston();
+    },
+
+    triggerSecure: () => {
+      const { engine, retractCompactionPiston } = get();
+      const nextEngine = triggerSecure(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: 'running'
+      });
+      retractCompactionPiston();
+    },
+
+    triggerTransportReady: () => {
+      const { engine, lockTransportPosition } = get();
+      lockTransportPosition();
+      const nextEngine = triggerTransportReady(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: 'idle'
+      });
+    },
+
+    triggerAdvanceWorkflow: () => {
+      const { engine } = get();
+      const nextEngine = triggerAdvanceWorkflow(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        interlocks: nextEngine.interlocks,
+        status: nextEngine.operatingState === 'FAULT' ? 'alarm' : nextEngine.operatingState === 'COMPLETE' ? 'complete' : 'running'
+      });
+    },
+
+    setWorkflowStage: (stage: WorkflowStageId) => {
+      const store = get();
+      switch (stage) {
+        case 'TRAVEL': store.triggerTravel(); break;
+        case 'POSITION': store.triggerPosition(); break;
+        case 'STABILIZE': store.triggerStabilize(); break;
+        case 'DEPLOY_HOSE': store.triggerDeployHose(); break;
+        case 'PRIME': store.triggerPrime(); break;
+        case 'EXTRACT': store.triggerExtract(); break;
+        case 'SETTLE': store.triggerSettle(); break;
+        case 'COMPACT': store.triggerCompact(); break;
+        case 'SECURE': store.triggerSecure(); break;
+        case 'TRANSPORT_READY': store.triggerTransportReady(); break;
+        case 'DISCHARGE': store.triggerDischarge(); break;
+        case 'COMPLETE':
+          set((s) => ({
+            engine: { ...s.engine, operatingState: 'COMPLETE' },
+            operatingState: 'COMPLETE',
+            status: 'complete'
+          }));
+          break;
+      }
+    },
+
     setSimSpeed: (speed: number) => {
       set((state) => ({
         simSpeed: speed,
@@ -799,23 +954,34 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         state.interlocks.emergencyStopLatched ||
         state.alarms.emergencyStopActive ||
         state.interlocks.isDeployed ||
+        state.interlocks.isStabilized ||
         state.kinematics.stabilizerExtension > 0.05 ||
         (!state.compactionTelemetry.isTransportLocked && (state.compactionTelemetry.strokeMm > 5 || state.compactionTelemetry.pistonState !== 'LOCKED')) ||
+        state.operatingState === 'STABILIZE' ||
         state.operatingState === 'DEPLOY' ||
+        state.operatingState === 'DEPLOYMENT' ||
+        state.operatingState === 'DEPLOY_HOSE' ||
+        state.operatingState === 'PRIME' ||
+        state.operatingState === 'PRIMING' ||
         state.operatingState === 'EXTRACT' ||
         state.operatingState === 'EXTRACTION' ||
+        state.operatingState === 'SETTLE' ||
+        state.operatingState === 'COMPACT' ||
+        state.operatingState === 'SECURE' ||
         state.operatingState === 'DISCHARGE' ||
         state.operatingState === 'FAULT';
 
       const mobilityBlockReason =
         (state.interlocks.emergencyStopLatched || state.alarms.emergencyStopActive)
           ? 'EMERGENCY STOP (E-STOP) ACTUATED — Track drive inhibited'
-          : (state.interlocks.isDeployed || state.kinematics.stabilizerExtension > 0.05)
+          : (state.interlocks.isDeployed || state.interlocks.isStabilized || state.kinematics.stabilizerExtension > 0.05)
           ? 'STABILIZERS EXTENDED — Retract hydraulic outriggers to travel'
           : (!state.compactionTelemetry.isTransportLocked && (state.compactionTelemetry.strokeMm > 5 || state.compactionTelemetry.pistonState !== 'LOCKED'))
           ? 'COMPACTION PLATEN NOT LOCKED — Retract to top and engage transport lock pin before travel'
           : (state.operatingState === 'EXTRACT' || state.operatingState === 'EXTRACTION' || state.operatingState === 'DISCHARGE')
           ? 'ACTIVE SLURRY TRANSFER — Stop pump and stow umbilical before travel'
+          : state.operatingState === 'COMPACT'
+          ? 'ACTIVE COMPACTION — Retract platen before travel'
           : state.operatingState === 'FAULT'
           ? 'MACHINE FAULT ACTIVE — Clear system faults before travel'
           : null;
@@ -836,7 +1002,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       const isCompactionBlocked =
         state.mobilityTelemetry.isMoving ||
         nextMobility.isMoving ||
-        (state.kinematics.stabilizerExtension < 0.05 && !state.interlocks.isDeployed) ||
+        (state.kinematics.stabilizerExtension < 0.05 && !state.interlocks.isDeployed && !state.interlocks.isStabilized) ||
+        state.operatingState === 'TRAVEL' ||
         state.operatingState === 'EXTRACT' ||
         state.operatingState === 'EXTRACTION' ||
         state.operatingState === 'DISCHARGE' ||
@@ -848,7 +1015,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           ? 'EMERGENCY STOP (E-STOP) ACTUATED — Compaction cylinder isolated'
           : (state.mobilityTelemetry.isMoving || nextMobility.isMoving)
           ? 'VEHICLE IN MOTION — Stationary compaction operation only'
-          : (state.kinematics.stabilizerExtension < 0.05 && !state.interlocks.isDeployed)
+          : (state.kinematics.stabilizerExtension < 0.05 && !state.interlocks.isDeployed && !state.interlocks.isStabilized)
           ? 'STABILIZERS NOT DEPLOYED — Lower outriggers to stabilize tank frame'
           : (state.operatingState === 'EXTRACT' || state.operatingState === 'EXTRACTION' || state.operatingState === 'DISCHARGE')
           ? 'ACTIVE SLURRY TRANSFER — Stop pump before piston dewatering'
@@ -864,8 +1031,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         deltaSeconds
       );
 
-      // If pump engine is idle and not running, step mobility and compaction
-      if (state.engine.operatingState === 'IDLE' && state.status === 'idle') {
+      // If pump engine is idle/positioned and not active, step mobility and compaction
+      if ((state.engine.operatingState === 'IDLE' || state.engine.operatingState === 'POSITION') && state.status === 'idle') {
         const needsMobility =
           state.mobilityTelemetry.isMoving ||
           nextMobility.isMoving ||
@@ -919,7 +1086,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           ? 'alarm'
           : nextEngine.operatingState === 'COMPLETE'
           ? 'complete'
-          : nextEngine.operatingState === 'IDLE'
+          : (nextEngine.operatingState === 'IDLE' || nextEngine.operatingState === 'POSITION' || nextEngine.operatingState === 'TRANSPORT_READY')
           ? 'idle'
           : 'running';
 

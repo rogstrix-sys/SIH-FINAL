@@ -23,6 +23,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatPressureKpa, formatFlowRate, formatVolume, formatPpm, formatPercent, formatVibration, formatDuration } from '../../utils/units';
+import { OperationSequencePanel } from '../OperationSequencePanel';
 
 export const LiveOperationsView: React.FC = () => {
   const status = useSimulationStore((s) => s.status);
@@ -123,49 +124,8 @@ export const LiveOperationsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Sequence State Progression Ribbon */}
-      <div className="bg-graphite-900 border border-slate-800 rounded-xl p-3.5 shadow-md">
-        <div className="flex items-center justify-between text-xs text-slate-400 font-mono mb-2.5">
-          <span className="font-bold text-white uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-            <Radio className="w-3.5 h-3.5 text-safety-500" />
-            Deterministic Operating Stage Sequence
-          </span>
-          <span className="text-[10px] text-cyan-400 font-mono">
-            Elapsed: {formatDuration(telemetry.elapsedTimeSeconds)} | Speed: {simSpeed}x
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 font-mono text-xs">
-          {[
-            { id: 'IDLE', label: '1. IDLE', sub: 'Stationary Standby' },
-            { id: 'DEPLOY', label: '2. DEPLOY', sub: 'Extend Outriggers & Boom' },
-            { id: 'PRIME', label: '3. PRIME', sub: 'Vacuum Chamber Purge' },
-            { id: 'EXTRACT', label: '4. EXTRACT', sub: 'Viscous Sludge Evacuation' },
-            { id: 'DISCHARGE', label: '5. DISCHARGE', sub: 'Transfer to Tanker' },
-            { id: 'COMPLETE', label: '6. COMPLETE', sub: 'Cycle Completed' }
-          ].map((stage, idx) => {
-            const isActive = operatingState === stage.id;
-            const order = ['IDLE', 'DEPLOY', 'PRIME', 'EXTRACT', 'DISCHARGE', 'COMPLETE'];
-            const isPassed = order.indexOf(operatingState) > idx;
-
-            return (
-              <div
-                key={stage.id}
-                className={`p-2.5 rounded-lg border text-center transition-all ${
-                  isActive
-                    ? 'border-safety-500 bg-safety-500/15 text-safety-400 font-bold shadow-md shadow-safety-500/20'
-                    : isPassed
-                    ? 'border-emerald-600/40 bg-emerald-950/20 text-emerald-400'
-                    : 'border-slate-800 bg-graphite-950 text-slate-400'
-                }`}
-              >
-                <div className="font-bold">{stage.label}</div>
-                <div className="text-[9px] text-slate-400 mt-0.5">{stage.sub}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* 12-Stage Operating Sequence & Interlock Panel */}
+      <OperationSequencePanel />
 
       {/* Main Grid: Gas Matrix + Active Interlocks + Key Transducers */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">

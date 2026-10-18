@@ -14,7 +14,8 @@ import {
   TableProperties,
   AlertTriangle,
   CheckCircle2,
-  Truck
+  Truck,
+  Activity
 } from 'lucide-react';
 import { useSimulationStore, INSPECTABLE_COMPONENTS } from '../../store/useSimulationStore';
 import { DigitalTwinCanvas } from '../../scene/DigitalTwinCanvas';
@@ -27,6 +28,7 @@ import { TERRAIN_SCENARIOS } from '../../simulation/terrainFeasibilityModel';
 import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
 import { CrawlerMobilityController } from '../CrawlerMobilityController';
 import { SludgeCompactorController } from '../SludgeCompactorController';
+import { OperationSequencePanel } from '../OperationSequencePanel';
 
 export const Simulation3DView: React.FC = () => {
   const cameraPreset = useSimulationStore((s) => s.cameraPreset);
@@ -51,6 +53,7 @@ export const Simulation3DView: React.FC = () => {
   const triggerTankFullScenario = useSimulationStore((s) => s.triggerTankFullScenario);
 
   const [showComparison, setShowComparison] = useState(false);
+  const [showWorkflowSequencer, setShowWorkflowSequencer] = useState(false);
 
   const presets: { id: CameraPreset; label: string; desc: string }[] = [
     { id: 'reset', label: 'Reset', desc: 'Standard machine overview perspective' },
@@ -128,6 +131,16 @@ export const Simulation3DView: React.FC = () => {
             >
               <Sparkles className="w-3 h-3 text-amber-400" />
               Demo Tour
+            </button>
+            <button
+              onClick={() => setShowWorkflowSequencer(!showWorkflowSequencer)}
+              title="Open 12-Stage Operating State Machine & Interlock Sequencer"
+              className={`px-1.5 py-1 text-[11px] flex items-center gap-1 border-l border-slate-800 pl-2 font-semibold transition ${
+                showWorkflowSequencer ? 'text-safety-400 font-bold bg-safety-950/40 rounded' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <Activity className="w-3 h-3 text-safety-400" />
+              12-Stage Workflow
             </button>
           </div>
 
@@ -251,6 +264,22 @@ export const Simulation3DView: React.FC = () => {
         <div className="absolute inset-4 z-40 flex items-center justify-center p-4 bg-graphite-950/80 backdrop-blur-md overflow-y-auto">
           <div className="max-w-4xl w-full">
             <TerrainComparisonPanel onClose={() => setShowComparison(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* 12-Stage Workflow Modal Overlay */}
+      {showWorkflowSequencer && (
+        <div className="absolute inset-4 z-40 flex items-center justify-center p-4 bg-graphite-950/85 backdrop-blur-md overflow-y-auto">
+          <div className="max-w-5xl w-full relative">
+            <button
+              onClick={() => setShowWorkflowSequencer(false)}
+              className="absolute top-4 right-4 z-50 text-slate-400 hover:text-white p-2 rounded-lg bg-graphite-800/80 border border-slate-700"
+              title="Close Workflow Sequencer"
+            >
+              ✕
+            </button>
+            <OperationSequencePanel />
           </div>
         </div>
       )}

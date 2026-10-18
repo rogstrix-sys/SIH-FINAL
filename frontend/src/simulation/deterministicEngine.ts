@@ -170,22 +170,36 @@ export function createInitialEngineState(
       receiverTankFull: false,
       excessiveVacuum: false,
       motorOverload: false,
-      emergencyStopActive: false
+      emergencyStopActive: false,
+      pistonExcessivePressure: false,
+      pistonTravelLimitFault: false,
+      invalidVehicleMovement: false,
+      unsecuredTransportConfig: false,
+      hydraulicSubsystemFault: false
     },
 
     interlocks: {
       isDeployed: false,
       isPrimed: false,
+      isStabilized: false,
+      isHoseDeployed: false,
+      isTransportSecured: true,
+      isTransportReady: true,
       preventExtractNotDeployed: false,
       preventExtractNotPrimed: false,
       preventExtractTankFull: false,
       preventExtractSourceEmpty: false,
       preventDischargeNoDestination: false,
+      preventTravelNotTransportReady: false,
+      preventCompactionNotStationary: false,
+      preventCompactionTransferActive: false,
       emergencyStopLatched: false
     },
 
     deployTimerSec: 0.0,
     primeTimerSec: 0.0,
+    settleTimerSec: 0.0,
+    settleDurationSec: 4.0,
     events: initialEvents,
     recentEvents: []
   };
@@ -302,6 +316,7 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
 
   let deployTimer = state.deployTimerSec;
   let primeTimer = state.primeTimerSec;
+  let settleTimer = state.settleTimerSec ?? 0.0;
 
   // Deterministic helper to append simulation events
   let eventSeq = state.events.length;
@@ -319,7 +334,7 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
   };
 
   // =========================================================================
-  // 1. STATE SEQUENCING & LOGIC
+  // 1. STATE SEQUENCING & LOGIC (12-STAGE COMPLETE WORKFLOW)
   // =========================================================================
 
   switch (state.operatingState) {
@@ -338,21 +353,85 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
       break;
     }
 
+    case 'TRAVEL': {
+      // Vehicle in transit to worksite
+      // Safety interlock verification: vehicle cannot travel if outriggers extended or boom deployed or platen unlocked
+      if (kin.stabilizerExtension > 0.05 || kin.deployProgress > 0.05 || !itl.isTransportSecured) {
+        alm.invalidVehicleMovement = true;
+        itl.preventTravelNotTransportReady = true;
+        nextState = 'FAULT';
+        addEvt('critical', 'INTERLOCK_VIOLATION', 'Invalid vehicle transit: Machine not in secured transport envelope (stabilizers extended or platen pin disengaged).');
+        break;
+      }
+      tel.flowRateLpm = 0.0;
+      tel.flowRateM3H = 0.0;
+      kin.isMaterialFlowing = false;
+      break;
+    }
+
+    case 'POSITION': {
+      // Vehicle stopped and aligned at worksite staging point
+      tel.flowRateLpm = 0.0;
+      tel.flowRateM3H = 0.0;
+      kin.isMaterialFlowing = false;
+      break;
+    }
+
+    case 'STABILIZE': {
+      // Deploy outrigger stabilizer legs
+      deployTimer += dt;
+      const STABILIZE_DURATION = 3.0; // seconds
+      const progress = Math.min(1.0, deployTimer / STABILIZE_DURATION);
+      kin.stabilizerExtension = progress;
+
+      if (progress >= 1.0 && !itl.isStabilized) {
+        itl.isStabilized = true;
+        addEvt('info', 'AUTOMATION_SEQ', 'Stabilization complete: 4x hydraulic outriggers planted with ground contact.');
+        nextState = 'DEPLOY_HOSE';
+        deployTimer = 0.0;
+      }
+      break;
+    }
+
+    case 'DEPLOY_HOSE': {
+      // Articulate crane boom and unreel suction hose
+      deployTimer += dt;
+      const DEPLOY_DURATION = 3.5;
+      const progress = Math.min(1.0, deployTimer / DEPLOY_DURATION);
+      kin.deployProgress = progress;
+      kin.boomSlewAngleRad = THREE_Lerp(0.0, -0.45, progress);
+      kin.boomElevationRad = THREE_Lerp(0.2, 0.65, progress);
+      kin.jibFlexAngleRad = THREE_Lerp(-0.2, -0.85, progress);
+      kin.hoseReelRpm = 6.0;
+
+      if (progress >= 1.0 && !itl.isHoseDeployed) {
+        itl.isHoseDeployed = true;
+        itl.isDeployed = true;
+        kin.hoseReelRpm = 0.0;
+        addEvt('info', 'AUTOMATION_SEQ', 'Hose deployment complete: Crane boom articulated; nozzle seated in septic vault.');
+        nextState = 'PRIME';
+        primeTimer = 0.0;
+      }
+      break;
+    }
+
     case 'DEPLOY':
     case 'DEPLOYMENT': {
-      // Stabilizers extend to ground and boom pivots over septic tank
+      // Combined deployment (backward compatibility)
       deployTimer += dt;
-      const DEPLOY_DURATION = 3.5; // seconds
+      const DEPLOY_DURATION = 3.5;
       const progress = Math.min(1.0, deployTimer / DEPLOY_DURATION);
 
       kin.deployProgress = progress;
-      kin.stabilizerExtension = progress; // Outriggers contact ground
+      kin.stabilizerExtension = progress;
       kin.boomSlewAngleRad = THREE_Lerp(0.0, -0.45, progress);
       kin.boomElevationRad = THREE_Lerp(0.2, 0.65, progress);
       kin.jibFlexAngleRad = THREE_Lerp(-0.2, -0.85, progress);
 
       if (progress >= 1.0 && !itl.isDeployed) {
         itl.isDeployed = true;
+        itl.isStabilized = true;
+        itl.isHoseDeployed = true;
         addEvt('info', 'AUTOMATION_SEQ', 'Deployment complete: Stabilizers planted, articulated boom deployed over septic tank.');
         nextState = state.operatingState === 'DEPLOYMENT' ? 'PRIMING' : 'PRIME';
         primeTimer = 0.0;
@@ -364,10 +443,9 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
     case 'PRIMING': {
       // Pump priming and suction line integrity check
       primeTimer += dt;
-      const PRIME_DURATION = 2.5; // seconds
+      const PRIME_DURATION = 2.5;
       const progress = Math.min(1.0, primeTimer / PRIME_DURATION);
 
-      // Pump rotates at prime speed, small negative vacuum builds
       kin.pumpShaftRpm = 800.0;
       tel.suctionPressureKpa = THREE_Lerp(0.0, 18.0, progress);
       tel.motorPowerKw = 1.2;
@@ -383,7 +461,7 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
     case 'EXTRACT':
     case 'EXTRACTION': {
       // Interlock checks
-      if (!itl.isDeployed) {
+      if (!itl.isDeployed && !itl.isStabilized) {
         itl.preventExtractNotDeployed = true;
         nextState = 'FAULT';
         addEvt('critical', 'INTERLOCK_VIOLATION', 'Extraction blocked: Stabilizers or boom not deployed.');
@@ -402,14 +480,22 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
         alm.collectionTankFull = true;
         addEvt('warning', 'CAPACITY_LIMIT', `Collection tank full (${params.collectionTankCapacityL} L). Auto-transitioning to DISCHARGE.`);
         nextState = 'DISCHARGE';
+        kin.isMaterialFlowing = false;
+        kin.pumpShaftRpm = 0.0;
+        tel.flowRateLpm = 0.0;
         break;
       }
 
       // Check Source Tank Empty Interlock
       if (mat.sourceVolumeL <= 5.0) {
         itl.preventExtractSourceEmpty = true;
-        addEvt('info', 'SOURCE_DEPLETED', 'Source septic tank fully evacuated. Transitioning to DISCHARGE.');
-        nextState = 'DISCHARGE';
+        const targetState = state.operatingState === 'EXTRACTION' ? 'DISCHARGE' : 'SETTLE';
+        addEvt('info', 'SOURCE_DEPLETED', `Source septic tank fully evacuated. Transitioning to ${targetState}.`);
+        nextState = targetState;
+        kin.isMaterialFlowing = false;
+        kin.pumpShaftRpm = 0.0;
+        tel.flowRateLpm = 0.0;
+        settleTimer = 0.0;
         break;
       }
 
@@ -492,9 +578,80 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
 
       // Check if target extraction volume reached
       if (mat.cycleExtractedL >= params.targetExtractionVolumeL) {
-        addEvt('success', 'BATCH_TARGET', `Target batch extraction volume (${params.targetExtractionVolumeL} L) achieved. Transitioning to DISCHARGE.`);
-        nextState = 'DISCHARGE';
+        if (state.operatingState === 'EXTRACTION') {
+          addEvt('success', 'BATCH_TARGET', `Target batch extraction volume (${params.targetExtractionVolumeL} L) achieved. Transitioning to DISCHARGE.`);
+          nextState = 'DISCHARGE';
+        } else {
+          addEvt('success', 'BATCH_TARGET', `Target batch extraction volume (${params.targetExtractionVolumeL} L) achieved. Transitioning to SETTLE.`);
+          nextState = 'SETTLE';
+        }
+        kin.isMaterialFlowing = false;
+        kin.pumpShaftRpm = 0.0;
+        tel.flowRateLpm = 0.0;
+        settleTimer = 0.0;
       }
+      break;
+    }
+
+    case 'SETTLE': {
+      // Settling dwell period before mechanical dewatering
+      settleTimer += dt;
+      tel.flowRateLpm = 0.0;
+      tel.flowRateM3H = 0.0;
+      kin.isMaterialFlowing = false;
+      kin.pumpShaftRpm = 0.0;
+
+      const duration = state.settleDurationSec || 4.0;
+      if (settleTimer >= duration) {
+        addEvt('info', 'AUTOMATION_SEQ', `Settling phase complete (${duration.toFixed(1)}s dwell). Transitioning to COMPACT.`);
+        nextState = 'COMPACT';
+      }
+      break;
+    }
+
+    case 'COMPACT': {
+      // Sludge dewatering via hydraulic compaction platen
+      tel.flowRateLpm = 0.0;
+      tel.flowRateM3H = 0.0;
+      kin.isMaterialFlowing = false;
+      kin.pumpShaftRpm = 0.0;
+      break;
+    }
+
+    case 'SECURE': {
+      // Machine securing sequence: boom and outriggers stowed
+      deployTimer += dt;
+      const SECURE_DURATION = 3.0;
+      const progress = Math.min(1.0, deployTimer / SECURE_DURATION);
+
+      kin.boomSlewAngleRad = THREE_Lerp(-0.45, 0.0, progress);
+      kin.boomElevationRad = THREE_Lerp(0.65, 0.2, progress);
+      kin.jibFlexAngleRad = THREE_Lerp(-0.85, -0.2, progress);
+      kin.stabilizerExtension = THREE_Lerp(1.0, 0.0, progress);
+      kin.deployProgress = 1.0 - progress;
+
+      if (progress >= 1.0) {
+        kin.stabilizerExtension = 0.0;
+        kin.deployProgress = 0.0;
+        itl.isDeployed = false;
+        itl.isStabilized = false;
+        itl.isHoseDeployed = false;
+        itl.isTransportSecured = true;
+        itl.isTransportReady = true;
+        addEvt('info', 'AUTOMATION_SEQ', 'Machine secured: Boom stowed, stabilizers retracted, transport pins engaged.');
+        nextState = 'TRANSPORT_READY';
+        deployTimer = 0.0;
+      }
+      break;
+    }
+
+    case 'TRANSPORT_READY': {
+      // Confirmed roadworthy configuration
+      tel.flowRateLpm = 0.0;
+      tel.flowRateM3H = 0.0;
+      kin.isMaterialFlowing = false;
+      kin.pumpShaftRpm = 0.0;
+      itl.isTransportReady = true;
       break;
     }
 
@@ -613,6 +770,7 @@ export function stepSimulationEngine(state: EngineState, dtSeconds: number): Eng
     interlocks: itl,
     deployTimerSec: deployTimer,
     primeTimerSec: primeTimer,
+    settleTimerSec: settleTimer,
     events
   };
 }
@@ -716,17 +874,25 @@ export function triggerResolveFault(state: EngineState): EngineState {
       emergencyStopActive: false,
       excessiveVacuum: false,
       motorOverload: false,
-      receiverTankFull: false
+      receiverTankFull: false,
+      pistonExcessivePressure: false,
+      pistonTravelLimitFault: false,
+      invalidVehicleMovement: false,
+      unsecuredTransportConfig: false,
+      hydraulicSubsystemFault: false
     },
     interlocks: {
       ...state.interlocks,
       emergencyStopLatched: false,
       preventExtractNotDeployed: false,
       preventExtractNotPrimed: false,
-      preventDischargeNoDestination: false
+      preventDischargeNoDestination: false,
+      preventTravelNotTransportReady: false,
+      preventCompactionNotStationary: false,
+      preventCompactionTransferActive: false
     }
   };
-  return appendEvent(next, 'info', 'FAULT_RESET', 'Fault acknowledged and reset by operator. Machine restored to IDLE.');
+  return appendEvent(next, 'info', 'FAULT_RESET', 'Fault acknowledged and reset by operator. Machine restored to safe IDLE baseline.');
 }
 
 export function triggerDeploy(state: EngineState): EngineState {
@@ -816,6 +982,181 @@ export function triggerManualDischarge(state: EngineState): EngineState {
 
 export function triggerReset(state: EngineState): EngineState {
   return createInitialEngineState(state.parameters, state.alarmLimits);
+}
+
+export function triggerTravel(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  if (!state.interlocks.isTransportSecured || !state.interlocks.isTransportReady || state.kinematics.stabilizerExtension > 0.05 || state.kinematics.deployProgress > 0.05) {
+    const next: EngineState = {
+      ...state,
+      operatingState: 'FAULT',
+      alarms: { ...state.alarms, invalidVehicleMovement: true, unsecuredTransportConfig: true },
+      interlocks: { ...state.interlocks, preventTravelNotTransportReady: true }
+    };
+    return appendEvent(next, 'critical', 'INTERLOCK_BLOCK', 'Cannot TRAVEL: Machine not in secured transport envelope. Retract stabilizers and lock platen pins first.');
+  }
+  const next: EngineState = {
+    ...state,
+    operatingState: 'TRAVEL',
+    isPaused: false
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'TRAVEL initiated: Vehicle moving along designated access route.');
+}
+
+export function triggerPosition(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  const next: EngineState = {
+    ...state,
+    operatingState: 'POSITION',
+    isPaused: false
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'POSITION confirmed: Vehicle stationary at designated sanitation vault staging zone.');
+}
+
+export function triggerStabilize(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  const next: EngineState = {
+    ...state,
+    operatingState: 'STABILIZE',
+    isPaused: false,
+    deployTimerSec: 0.0
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'STABILIZE initiated: Deploying 4x telescoping hydraulic outriggers.');
+}
+
+export function triggerDeployHose(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  if (!state.interlocks.isStabilized && state.kinematics.stabilizerExtension < 0.9) {
+    return appendEvent(state, 'warning', 'INTERLOCK_BLOCK', 'Cannot DEPLOY HOSE: Stabilizers must be grounded first to level chassis.');
+  }
+  const next: EngineState = {
+    ...state,
+    operatingState: 'DEPLOY_HOSE',
+    isPaused: false,
+    deployTimerSec: 0.0
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'DEPLOY HOSE initiated: Articulating crane boom and positioning nozzle in vault.');
+}
+
+export function triggerSettle(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  const next: EngineState = {
+    ...state,
+    operatingState: 'SETTLE',
+    isPaused: false,
+    settleTimerSec: 0.0,
+    kinematics: {
+      ...state.kinematics,
+      isMaterialFlowing: false,
+      pumpShaftRpm: 0.0
+    },
+    telemetry: {
+      ...state.telemetry,
+      flowRateLpm: 0.0,
+      flowRateM3H: 0.0
+    }
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'SETTLE initiated: Extraction pump stopped; starting phase consolidation dwell.');
+}
+
+export function triggerCompact(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  if (
+    state.operatingState === 'TRAVEL' ||
+    (state.kinematics.stabilizerExtension < 0.05 && !state.interlocks.isDeployed && !state.interlocks.isStabilized)
+  ) {
+    const next: EngineState = {
+      ...state,
+      operatingState: 'FAULT',
+      interlocks: { ...state.interlocks, preventCompactionNotStationary: true }
+    };
+    return appendEvent(next, 'critical', 'INTERLOCK_BLOCK', 'Cannot COMPACT: Vehicle must be stationary and stabilizers deployed to support pressing loads.');
+  }
+  const next: EngineState = {
+    ...state,
+    operatingState: 'COMPACT',
+    isPaused: false,
+    kinematics: {
+      ...state.kinematics,
+      isMaterialFlowing: false,
+      pumpShaftRpm: 0.0
+    }
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'COMPACT initiated: Driving vertical compaction cylinder into sludge bed.');
+}
+
+export function triggerSecure(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  const next: EngineState = {
+    ...state,
+    operatingState: 'SECURE',
+    isPaused: false,
+    deployTimerSec: 0.0,
+    interlocks: {
+      ...state.interlocks,
+      isTransportSecured: true
+    }
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'SECURE initiated: Stowing boom, retracting outriggers, and latching transport pins.');
+}
+
+export function triggerTransportReady(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  const next: EngineState = {
+    ...state,
+    operatingState: 'TRANSPORT_READY',
+    isPaused: false,
+    kinematics: {
+      ...state.kinematics,
+      stabilizerExtension: 0.0,
+      deployProgress: 0.0
+    },
+    interlocks: {
+      ...state.interlocks,
+      isTransportReady: true,
+      isTransportSecured: true,
+      isDeployed: false,
+      isStabilized: false,
+      preventTravelNotTransportReady: false
+    }
+  };
+  return appendEvent(next, 'success', 'TRANSPORT_CLEARED', 'TRANSPORT READY: All roadworthiness invariants verified.');
+}
+
+export function triggerAdvanceWorkflow(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+
+  switch (state.operatingState) {
+    case 'IDLE':
+      return triggerTravel(state);
+    case 'TRAVEL':
+      return triggerPosition(state);
+    case 'POSITION':
+      return triggerStabilize(state);
+    case 'STABILIZE':
+      return triggerDeployHose(state);
+    case 'DEPLOY_HOSE':
+    case 'DEPLOY':
+      return triggerPrime(state);
+    case 'PRIME':
+      return triggerExtract(state);
+    case 'EXTRACT':
+      return triggerSettle(state);
+    case 'SETTLE':
+      return triggerCompact(state);
+    case 'COMPACT':
+      return triggerSecure(state);
+    case 'SECURE':
+      return triggerTransportReady(state);
+    case 'TRANSPORT_READY':
+      return triggerDischarge(state);
+    case 'DISCHARGE':
+      return triggerStart(state);
+    case 'COMPLETE':
+      return triggerReset(state);
+    default:
+      return state;
+  }
 }
 
 function appendEvent(
