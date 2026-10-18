@@ -325,7 +325,7 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
 
           // Smoothly align vehicle with road tangent
           vMesh.position.copy(currentPoint);
-          vMesh.position.y += 0.35; // Tire ground offset
+          vMesh.position.y += 0.11; // Tire ground contact flush on road ribbon
 
           // Align vehicle heading (+Z) with road tangent
           vMesh.rotation.y = Math.atan2(tangent.x, tangent.z);
@@ -384,6 +384,24 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
           vMesh.position.addScaledVector(headingVec, speedMps * delta);
           vMesh.rotation.y = vehicleHeadingRef.current;
           vMesh.rotation.x = 0;
+
+          // Keep vehicle grounded on road surface during manual drive
+          if (roadCurve) {
+            const testSamples = 40;
+            let nearestDistSq = Infinity;
+            let nearestY = vMesh.position.y;
+            for (let s = 0; s < testSamples; s++) {
+              const testPt = roadCurve.getPointAt(s / testSamples);
+              const dSq = (vMesh.position.x - testPt.x) ** 2 + (vMesh.position.z - testPt.z) ** 2;
+              if (dSq < nearestDistSq) {
+                nearestDistSq = dSq;
+                nearestY = testPt.y;
+              }
+            }
+            if (nearestDistSq < 25.0) {
+              vMesh.position.y = THREE.MathUtils.lerp(vMesh.position.y, nearestY + 0.11, 0.25);
+            }
+          }
 
           // Pitch and Roll Inertia
           chassisPitchRef.current = keys.forward ? -2.2 : keys.brake ? 3.8 : 0;
@@ -510,7 +528,9 @@ export const CanyonExpedition3D: React.FC<CanyonExpedition3DProps> = ({
           setElevationM(Math.round(1850 + vMesh.position.y * 14));
 
           // Zone name based on position
-          if (vMesh.position.x > -16 && vMesh.position.x < 16 && Math.abs(vMesh.position.z - (-18)) < 4) {
+          if (vMesh.position.x < -36 && vMesh.position.z >= -46 && vMesh.position.z <= 6) {
+            setCurrentZoneName('BRO Kinnaur Gorge Mountain Tunnel (52m)');
+          } else if (vMesh.position.x > -16 && vMesh.position.x < 16 && Math.abs(vMesh.position.z - (-18)) < 4) {
             setCurrentZoneName('High Canyon Wooden Suspension Bridge');
           } else if (vMesh.position.y < 2.0) {
             setCurrentZoneName('Lower Canyon River Gorge Ford');
