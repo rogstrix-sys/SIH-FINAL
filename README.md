@@ -105,13 +105,35 @@ sih 26258/
 │   ├── references.md                  # Genuine academic & standards citations
 │   ├── presentation_deck.md           # 12-slide presentation outline
 │   ├── demonstration_script.md        # Step-by-step evaluator demo guide
-│   └── validation_material_spec.md    # BOM & sensors for physical testing
+├── dashboard/                         # TERRA-VAC 450 Multi-Physics Desludging Simulation Dashboard
+│   ├── index.html                     # Interactive HTML5 Canvas physics engine & SCADA telemetry
+│   └── README.md                      # Detailed technical documentation & operating guide
 └── README.md
 ```
 
 ---
 
-## 4. Quick Start & Installation Guide
+## 4. TERRA-VAC 450 Simulation Dashboard
+
+The repository includes a dedicated standalone simulation dashboard (`dashboard/index.html`) engineered for Problem Statement **SIH26258** (Ministry of Jal Shakti / SBM 2.0 / NAMASTE compliance).
+
+### Core Simulation Capabilities:
+- **Hillside Rollover & Slope Incline**: Live Center of Mass (CoM) trajectory, dynamic anti-slosh baffle damping, and static tipping margin ($h\tan\theta < b/2$) up to $35^\circ$.
+- **Automated Piston Dewatering Ram (12.8 kN / 3.5 bar)**: Real-time ballscrew displacement squeezing raw slurry against a $150\,\mu\text{m}$ wedge-wire screen, expelling $68\%$ free water to soakage and concentrating cake from $4.2\%$ to $22.8\%\text{ TS}$ ($3.2\times$ payload capacity).
+- **Progressive Cavity Screw Pump (PCP) vs. Vacuum Cavitation**: Animated cutaway demonstrating mechanical displacement at $3,500\text{m}$ altitude (Leh) with zero cavitation loss.
+- **Cold-Climate Rheology & PTC Heating**: $1,450\text{ RPM}$ Tungsten-Carbide cutter and $+18^\circ\text{C}$ thermal boundary layer liquefaction down to $-15^\circ\text{C}$.
+- **Ex-d Zone 1 Gas Telemetry**: OSHA-compliant $\text{H}_2\text{S}$ ($<10\text{ ppm}$) and $\text{CH}_4$ ($<10\%\text{ LEL}$) sniffer telemetry for zero-manual scavenging.
+
+To run the simulation dashboard:
+```bash
+python -m http.server 8000 --directory dashboard
+# Open http://localhost:8000
+```
+*(Also accessible directly via Vite frontend static route at `http://localhost:5173/dashboard.html`)*
+
+---
+
+## 5. Quick Start & Installation Guide
 
 ### Prerequisites
 - Python 3.10+ (Tested under Python 3.14.6)
