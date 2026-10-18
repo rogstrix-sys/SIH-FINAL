@@ -34,6 +34,10 @@ import {
   triggerReset,
   triggerEmergencyStop,
   triggerResolveFault,
+  triggerDeploy,
+  triggerPrime,
+  triggerExtract,
+  triggerDischarge,
   triggerManualDischarge
 } from '../simulation/deterministicEngine';
 import { createInitialTelemetry } from '../simulation/physicsEngine';
@@ -238,6 +242,10 @@ export interface SimulationStore {
   stepSimulation: (stepSeconds?: number) => void;
   triggerEmergencyStop: () => void;
   triggerResolveFault: () => void;
+  triggerDeploy: () => void;
+  triggerPrime: () => void;
+  triggerExtract: () => void;
+  triggerDischarge: () => void;
   triggerManualDischarge: () => void;
   setSimSpeed: (speed: number) => void;
   setActiveView: (view: NavView) => void;
@@ -299,11 +307,16 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       time: `00:${t.toString().padStart(2, '0')}`,
       timestamp: t,
       flowRate: 0,
+      flowRateLpm: 0,
       vacuum: 0,
       power: 0,
+      motorLoadPct: 0,
       h2s: 2.0,
       ch4: 0.15,
       sludgeLevel: initialParams.initialSludgeDepthM,
+      sourceVolumeL: 3800,
+      collectionVolumeL: 0,
+      receiverVolumeL: 0,
       vibration: 0.2
     };
   });
@@ -402,11 +415,16 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           time: '00:00',
           timestamp: 0,
           flowRate: 0,
+          flowRateLpm: 0,
           vacuum: 0,
           power: 0,
+          motorLoadPct: 0,
           h2s: 2.0,
           ch4: 0.15,
           sludgeLevel: parameters.initialSludgeDepthM,
+          sourceVolumeL: freshEngine.materialBalance.sourceVolumeL,
+          collectionVolumeL: freshEngine.materialBalance.collectionVolumeL,
+          receiverVolumeL: freshEngine.materialBalance.receiverVolumeL,
           vibration: 0.2
         }
       ];
@@ -468,6 +486,66 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       addEvent('info', 'OPERATOR_CMD', 'Manual discharge to external disposal tanker initiated.');
     },
 
+    triggerDeploy: () => {
+      const { engine, addEvent } = get();
+      const nextEngine = triggerDeploy(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
+      });
+      if (nextEngine.operatingState === 'FAULT') {
+        addEvent('critical', 'INTERLOCK_TRIP', 'Deploy interlock blocked.');
+      } else {
+        addEvent('info', 'OPERATOR_CMD', 'Manual DEPLOY triggered: Stabilizers extending and boom positioning.');
+      }
+    },
+
+    triggerPrime: () => {
+      const { engine, addEvent } = get();
+      const nextEngine = triggerPrime(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
+      });
+      if (nextEngine.operatingState === 'FAULT') {
+        addEvent('critical', 'INTERLOCK_TRIP', 'Prime blocked: Machine must be fully deployed first.');
+      } else {
+        addEvent('info', 'OPERATOR_CMD', 'Manual PRIME triggered: Vacuum preparation sequence running.');
+      }
+    },
+
+    triggerExtract: () => {
+      const { engine, addEvent } = get();
+      const nextEngine = triggerExtract(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
+      });
+      if (nextEngine.operatingState === 'FAULT') {
+        addEvent('critical', 'INTERLOCK_TRIP', 'Extract blocked: Machine must be primed and tanks ready.');
+      } else {
+        addEvent('info', 'OPERATOR_CMD', 'Manual EXTRACT triggered: Slurry vacuum suction pump engaged.');
+      }
+    },
+
+    triggerDischarge: () => {
+      const { engine, addEvent } = get();
+      const nextEngine = triggerDischarge(engine);
+      set({
+        engine: nextEngine,
+        operatingState: nextEngine.operatingState,
+        status: nextEngine.operatingState === 'FAULT' ? 'alarm' : 'running'
+      });
+      if (nextEngine.operatingState === 'FAULT') {
+        addEvent('critical', 'INTERLOCK_TRIP', 'Discharge blocked.');
+      } else {
+        addEvent('info', 'OPERATOR_CMD', 'Manual DISCHARGE triggered: Evacuating collection tank to external tanker.');
+      }
+    },
+
     setSimSpeed: (speed: number) => {
       set((state) => ({
         simSpeed: speed,
@@ -516,15 +594,27 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     },
 
     updateEngineParameter: (key, value) => {
-      set((state) => ({
-        engine: {
-          ...state.engine,
-          parameters: {
-            ...state.engine.parameters,
-            [key]: value
-          }
+      set((state) => {
+        const nextParams = {
+          ...state.engine.parameters,
+          [key]: value
+        };
+        const nextMaterial = { ...state.materialBalance };
+        if (key === 'collectionTankCapacityL') {
+          nextMaterial.collectionFillPct = Math.min(
+            100,
+            (nextMaterial.collectionVolumeL / Number(value)) * 100
+          );
         }
-      }));
+        return {
+          engine: {
+            ...state.engine,
+            parameters: nextParams,
+            materialBalance: nextMaterial
+          },
+          materialBalance: nextMaterial
+        };
+      });
     },
 
     tickSimulation: (deltaSeconds: number) => {
@@ -602,15 +692,25 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           .toString()
           .padStart(2, '0');
 
+        const flowRateLpm = parseFloat(nextEngine.telemetry.flowRateLpm.toFixed(1));
+        const motorLoadPct = parseFloat(
+          Math.min(100, Math.max(0, (nextEngine.telemetry.motorPowerKw / 15.0) * 100)).toFixed(1)
+        );
+
         const newPoint: TelemetryPoint = {
           time: `${mm}:${ss}`,
           timestamp: nextTelemetry.elapsedTimeSeconds,
           flowRate: parseFloat(nextTelemetry.extractionRateM3H.toFixed(2)),
+          flowRateLpm,
           vacuum: Math.abs(parseFloat(nextTelemetry.suctionPressureKpa.toFixed(1))),
           power: parseFloat(nextTelemetry.motorPowerKw.toFixed(2)),
+          motorLoadPct,
           h2s: parseFloat(nextTelemetry.h2sConcentrationPpm.toFixed(1)),
           ch4: parseFloat(nextTelemetry.ch4ConcentrationPct.toFixed(2)),
           sludgeLevel: parseFloat(nextTelemetry.sludgeLevelM.toFixed(2)),
+          sourceVolumeL: parseFloat(nextEngine.materialBalance.sourceVolumeL.toFixed(1)),
+          collectionVolumeL: parseFloat(nextEngine.materialBalance.collectionVolumeL.toFixed(1)),
+          receiverVolumeL: parseFloat(nextEngine.materialBalance.receiverVolumeL.toFixed(1)),
           vibration: parseFloat(nextTelemetry.vibrationRmsMmS.toFixed(2))
         };
 

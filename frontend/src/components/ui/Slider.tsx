@@ -36,15 +36,29 @@ export const Slider: React.FC<SliderProps> = ({
         <label htmlFor={id} className="font-medium text-slate-300 flex items-center gap-1.5">
           {label}
         </label>
-        <span
-          className={`font-mono text-xs px-2 py-0.5 rounded border transition-colors ${
-            isDanger
-              ? 'bg-rose-950/80 text-rose-300 border-rose-700/60 font-semibold'
-              : 'bg-graphite-900 text-safety-400 border-slate-800'
-          }`}
-        >
-          {value} {unit}
-        </span>
+        <div className="flex items-center gap-1.5 font-mono text-xs">
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              if (!isNaN(val)) {
+                onChange(Math.min(max, Math.max(min, val)));
+              }
+            }}
+            aria-label={`${label} numeric input`}
+            className={`w-16 px-1.5 py-0.5 rounded border text-right font-mono text-xs bg-graphite-950 transition-colors focus:outline-none focus:ring-1 focus:ring-safety-500 disabled:opacity-40 disabled:cursor-not-allowed ${
+              isDanger
+                ? 'bg-rose-950/80 text-rose-300 border-rose-700/60 font-semibold'
+                : 'text-safety-400 border-slate-700 hover:border-slate-600'
+            }`}
+          />
+          {unit && <span className="text-slate-400 text-[11px] font-mono">{unit}</span>}
+        </div>
       </div>
 
       {description && <p className="text-[11px] text-slate-500 leading-tight">{description}</p>}

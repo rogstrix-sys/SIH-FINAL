@@ -9,6 +9,10 @@ import {
   triggerEmergencyStop,
   triggerResolveFault,
   triggerManualDischarge,
+  triggerDeploy,
+  triggerPrime,
+  triggerExtract,
+  triggerDischarge,
   calculateEffectiveViscosity,
   calculateFluidDynamics
 } from '../deterministicEngine';
@@ -210,4 +214,65 @@ describe('Deterministic Simulation Engine', () => {
     expect(jetted).toBeLessThan(rawViscosity);
     expect(jetted).toBeCloseTo(560, 0); // ~44% reduction
   });
+
+  it('9. Enforces discrete operator trigger interlocks (Deploy -> Prime -> Extract -> Discharge)', () => {
+    let state = createInitialEngineState();
+    expect(state.operatingState).toBe('IDLE');
+
+    // Trigger extract directly before deploy & prime should be blocked by interlock
+    state = triggerExtract(state);
+    expect(state.operatingState).toBe('IDLE');
+    expect(state.events[0].source).toBe('INTERLOCK_BLOCK');
+
+    // Trigger deploy
+    state = triggerDeploy(state);
+    expect(state.operatingState).toBe('DEPLOY');
+
+    // Step through deploy sequence
+    while (state.kinematics.deployProgress < 1.0) {
+      state = stepSimulationEngine(state, 0.1);
+    }
+    expect(state.interlocks.isDeployed).toBe(true);
+
+    // Trigger prime
+    state = triggerPrime(state);
+    expect(state.operatingState).toBe('PRIME');
+
+    // Step through prime sequence
+    while (!state.interlocks.isPrimed) {
+      state = stepSimulationEngine(state, 0.1);
+    }
+    expect(state.interlocks.isPrimed).toBe(true);
+
+    // Trigger extract
+    state = triggerExtract(state);
+    expect(state.operatingState).toBe('EXTRACT');
+
+    // Step extraction until some material is collected
+    state = stepSimulationEngine(state, 1.0);
+    expect(state.materialBalance.collectionVolumeL).toBeGreaterThan(0);
+
+    // Trigger discharge
+    state = triggerDischarge(state);
+    expect(state.operatingState).toBe('DISCHARGE');
+  });
+
+  it('10. Reset resets model, kinematics, and tanks cleanly to IDLE baseline', () => {
+    let state = createInitialEngineState();
+    state = triggerStart(state);
+    for (let i = 0; i < 20; i++) {
+      state = stepSimulationEngine(state, 0.2);
+    }
+
+    const resetState = triggerReset(state);
+    expect(resetState.operatingState).toBe('IDLE');
+    expect(resetState.isPaused).toBe(false);
+    expect(resetState.simulatedTimeSec).toBe(0);
+    expect(resetState.materialBalance.collectionVolumeL).toBe(0);
+    expect(resetState.materialBalance.receiverVolumeL).toBe(0);
+    expect(resetState.kinematics.deployProgress).toBe(0);
+    expect(resetState.kinematics.stabilizerExtension).toBe(0);
+    expect(resetState.alarms.emergencyStopActive).toBe(false);
+  });
 });
+

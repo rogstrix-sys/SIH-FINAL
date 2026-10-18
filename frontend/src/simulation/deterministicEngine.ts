@@ -653,13 +653,73 @@ export function triggerResolveFault(state: EngineState): EngineState {
   return appendEvent(next, 'info', 'FAULT_RESET', 'Fault acknowledged and reset by operator. Machine restored to IDLE.');
 }
 
-export function triggerManualDischarge(state: EngineState): EngineState {
-  if (state.operatingState !== 'EXTRACT') return state;
+export function triggerDeploy(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  if (state.operatingState !== 'IDLE') return state;
   const next: EngineState = {
     ...state,
-    operatingState: 'DISCHARGE'
+    operatingState: 'DEPLOY',
+    isPaused: false,
+    deployTimerSec: 0.0
   };
-  return appendEvent(next, 'info', 'OPERATOR_CMD', 'Manual discharge command issued by operator.');
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'Manual DEPLOY sequence initiated: Extending stabilizers and positioning boom.');
+}
+
+export function triggerPrime(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  if (!state.interlocks.isDeployed && state.kinematics.deployProgress < 0.95) {
+    const next = {
+      ...state,
+      interlocks: { ...state.interlocks, preventExtractNotDeployed: true }
+    };
+    return appendEvent(next, 'warning', 'INTERLOCK_BLOCK', 'Cannot PRIME: Machine stabilizers and boom must be fully deployed first.');
+  }
+  const next: EngineState = {
+    ...state,
+    operatingState: 'PRIME',
+    isPaused: false,
+    primeTimerSec: 0.0
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'Manual PRIME sequence initiated: Priming pump suction chamber.');
+}
+
+export function triggerExtract(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  if (!state.interlocks.isDeployed) {
+    return appendEvent(state, 'critical', 'INTERLOCK_BLOCK', 'Extraction interlock tripped: Machine is not deployed.');
+  }
+  if (!state.interlocks.isPrimed) {
+    return appendEvent(state, 'critical', 'INTERLOCK_BLOCK', 'Extraction interlock tripped: Pump chamber is not primed.');
+  }
+  if (state.materialBalance.collectionFillPct >= 100) {
+    return appendEvent(state, 'warning', 'CAPACITY_BLOCK', 'Cannot EXTRACT: Collection tank is already at 100% capacity.');
+  }
+  if (state.materialBalance.sourceVolumeL <= 10) {
+    return appendEvent(state, 'warning', 'LEVEL_BLOCK', 'Cannot EXTRACT: Source tank is empty.');
+  }
+  const next: EngineState = {
+    ...state,
+    operatingState: 'EXTRACT',
+    isPaused: false
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'Manual EXTRACT initiated: Starting slurry vacuum suction.');
+}
+
+export function triggerDischarge(state: EngineState): EngineState {
+  if (state.operatingState === 'FAULT') return state;
+  if (state.materialBalance.collectionVolumeL <= 0.5) {
+    return appendEvent(state, 'warning', 'DISCHARGE_BLOCK', 'Cannot DISCHARGE: Collection tank has no material to transfer.');
+  }
+  const next: EngineState = {
+    ...state,
+    operatingState: 'DISCHARGE',
+    isPaused: false
+  };
+  return appendEvent(next, 'info', 'OPERATOR_CMD', 'DISCHARGE initiated: Evacuating collection tank to external receiver.');
+}
+
+export function triggerManualDischarge(state: EngineState): EngineState {
+  return triggerDischarge(state);
 }
 
 export function triggerReset(state: EngineState): EngineState {
