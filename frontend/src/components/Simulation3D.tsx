@@ -2861,7 +2861,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         const t = pathProgressRef.current;
         const pt = roadCurveRef.current.getPoint(t);
         const tangent = roadCurveRef.current.getTangent(t).normalize();
-        const nextPt = roadCurveRef.current.getPoint(Math.min(0.999, t + 0.005));
+        const tNext = Math.min(0.999, t + 0.006);
+        const nextPt = roadCurveRef.current.getPoint(tNext);
+        const nextTangent = roadCurveRef.current.getTangent(tNext).normalize();
 
         vehicleGroupRef.current.position.set(pt.x, pt.y + 0.28, pt.z);
 
@@ -2872,21 +2874,35 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         // Grade & Elevation telemetry
         const gradeDeg =
           Math.atan2(tangent.y, Math.sqrt(tangent.x * tangent.x + tangent.z * tangent.z)) * (180 / Math.PI);
+        const gradeRad = (gradeDeg * Math.PI) / 180;
         const currentGradeDeg = Math.round(Math.abs(gradeDeg) * 10) / 10;
         setCurrentInclineDeg(currentGradeDeg);
         setCurrentAltitudeM(Math.round(1850 + pt.y * 30));
 
-        // Lateral curve curvature G-force
-        const baseLateralG = (nextPt.x - pt.x) * 15;
+        // Accurate Centripetal Lateral G-Force from True Road Curvature (kappa = dTheta / ds)
+        const h1 = Math.atan2(tangent.x, tangent.z);
+        const h2 = Math.atan2(nextTangent.x, nextTangent.z);
+        let dHeading = h2 - h1;
+        while (dHeading > Math.PI) dHeading -= Math.PI * 2;
+        while (dHeading < -Math.PI) dHeading += Math.PI * 2;
+
+        const ds = Math.max(0.1, pt.distanceTo(nextPt));
+        const curvature = dHeading / ds; // rad/m (+ for left turn, - for right turn)
+
+        const effectiveSpeedKmh = activeStressTest === 'hill_brake' ? 0 : vehicleSpeedKmh;
+        const speedMs = (effectiveSpeedKmh * 1000) / 3600;
+        const rawLateralG = (speedMs * speedMs * curvature) / 9.81;
+
+        // Realistic Lateral G: mountain crawl is 0.05G - 0.25G; stress test pushes to 0.38G
         const currentLateralG =
-          activeStressTest === 'hairpin_turn' ? 0.58 : Math.round(baseLateralG * 10) / 10;
+          activeStressTest === 'hairpin_turn'
+            ? (!hasBaffles ? 0.38 : 0.22)
+            : Math.max(-0.35, Math.min(0.35, Math.round(rawLateralG * 100) / 100));
         setLateralGForce(currentLateralG);
 
         // Climbing mechanical power required (kW)
         const massKg = 620 + payloadLiters * 1.1;
         const inclineSin = Math.sin((Math.abs(gradeDeg) * Math.PI) / 180);
-        const effectiveSpeedKmh = activeStressTest === 'hill_brake' ? 0 : vehicleSpeedKmh;
-        const speedMs = (effectiveSpeedKmh * 1000) / 3600;
         const powerKw =
           activeStressTest === 'freeze_surge'
             ? 11.4
@@ -2913,19 +2929,24 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
         // =====================================================================
         // Dynamic Chassis Suspension & Inertial Transfer (Pitch, Roll & Bounce)
+        // Stiff mountain crawler suspension: realistic ~1.8°/G roll, max ±3.4°
         // =====================================================================
-        const gradeRad = (gradeDeg * Math.PI) / 180;
-        const throttleFactor = driveModeRef.current === 'manual' ? manualThrottleRef.current : 0.8;
-        let targetPitch = -gradeRad * 0.15 - throttleFactor * 0.04;
-        let targetRoll = -currentLateralG * 0.09;
+        const throttleFactor = driveModeRef.current === 'manual' ? manualThrottleRef.current : (effectiveSpeedKmh > 2 ? 0.5 : 0);
+        let targetPitch = -throttleFactor * 0.015; // mild 0.8° acceleration squat
+        let targetRoll = -currentLateralG * 0.035;  // 1.8° body roll per lateral G
 
         // Stress test pitch & roll spikes
         if (activeStressTestRef.current === 'hill_brake') {
           // Hard nose-dive under -4.2 m/s² deceleration
-          targetPitch = !hasBafflesRef.current ? -0.22 : -0.11;
+          targetPitch = !hasBafflesRef.current ? -0.045 : -0.022; // 2.5° vs 1.2°
         } else if (activeStressTestRef.current === 'hairpin_turn') {
-          targetRoll = !hasBafflesRef.current ? -0.16 : -0.07;
+          // Centrifugal lateral lean on sharp hairpin
+          targetRoll = !hasBafflesRef.current ? -0.052 : -0.026; // 3.0° vs 1.5°
         }
+
+        // Hard physical mechanical suspension bump-stop limits: max ±3.4° roll, ±2.8° pitch
+        targetRoll = Math.max(-0.06, Math.min(0.06, targetRoll));
+        targetPitch = Math.max(-0.05, Math.min(0.03, targetPitch));
 
         chassisPitchRef.current = THREE.MathUtils.lerp(chassisPitchRef.current, targetPitch, 0.1);
         chassisRollRef.current = THREE.MathUtils.lerp(chassisRollRef.current, targetRoll, 0.1);
@@ -2953,13 +2974,13 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           const springRumble = rumble * 12;
 
           // FL (Front Left)
-          suspensionSpringsRef.current[0].scale.y = Math.max(0.55, Math.min(1.45, 1.0 - p - r + springRumble));
+          suspensionSpringsRef.current[0].scale.y = Math.max(0.78, Math.min(1.22, 1.0 - p - r + springRumble));
           // RL (Rear Left)
-          suspensionSpringsRef.current[1].scale.y = Math.max(0.55, Math.min(1.45, 1.0 + p - r - springRumble));
+          suspensionSpringsRef.current[1].scale.y = Math.max(0.78, Math.min(1.22, 1.0 + p - r - springRumble));
           // FR (Front Right)
-          suspensionSpringsRef.current[2].scale.y = Math.max(0.55, Math.min(1.45, 1.0 - p + r + springRumble));
+          suspensionSpringsRef.current[2].scale.y = Math.max(0.78, Math.min(1.22, 1.0 - p + r + springRumble));
           // RR (Rear Right)
-          suspensionSpringsRef.current[3].scale.y = Math.max(0.55, Math.min(1.45, 1.0 + p + r - springRumble));
+          suspensionSpringsRef.current[3].scale.y = Math.max(0.78, Math.min(1.22, 1.0 + p + r - springRumble));
 
           if (damperPistonsRef.current.length === 4) {
             damperPistonsRef.current[0].position.y = 0.10 * suspensionSpringsRef.current[0].scale.y;
@@ -3036,15 +3057,15 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         // =====================================================================
         // Dynamic 3D Rollover Safety Pyramid & Stability Vector Calculation
         // =====================================================================
-        const comY = hasLowComBatteryRef.current ? 0.42 : 0.58;
+        const comY = hasLowComBatteryRef.current ? 0.36 : 0.52;
         const baseSurgeOffset = (currentSurgeCm / 100) * (slopeDegRef.current / 28.0);
         let dynamicSurgeZ = -0.28 - baseSurgeOffset;
-        let dynamicSurgeX = 0;
+        let dynamicSurgeX = (!hasBafflesRef.current ? 0.08 : 0.015) * (currentLateralG / 0.35);
 
         if (activeStressTestRef.current === 'hill_brake') {
-          dynamicSurgeZ += !hasBafflesRef.current ? 0.16 : 0.02;
+          dynamicSurgeZ += !hasBafflesRef.current ? 0.14 : 0.02;
         } else if (activeStressTestRef.current === 'hairpin_turn') {
-          dynamicSurgeX += !hasBafflesRef.current ? 0.12 : 0.02;
+          dynamicSurgeX += !hasBafflesRef.current ? 0.10 : 0.02;
         }
 
         if (comCrosshairRef.current) {
