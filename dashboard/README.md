@@ -27,6 +27,10 @@ This interactive simulation dashboard models and validates the physics, kinemati
    - Ex-d Zone 1 electrochemical sensor telemetry ($\text{H}_2\text{S} < 10\text{ ppm}$, $\text{CH}_4 < 10\%\text{ LEL}$).
 6. **7 Geographic Administrative Zones**:
    - Shimla, Leh, Aizawl, Kedarnath, Tawang, Munnar, and Ooty with dynamic CPCB-compliant FSTP manifest generation.
+7. **Bespoke Human-Engineered Visual Architecture (Bharat-Jal SCADA Mk-IV)**:
+   - **Tactile Mil-Spec SCADA Mode**: Dark titanium and graphite alloy terminal (`#070b12`) with Saffron Gold (`#f59e0b`) alerts, milled aluminum chamfered bezels with fastener accents (`+`), diagonal safety hazard striping on rollover threshold limits, and live NavIC L5 satellite GPS coordinate tracking.
+   - **Executive Technical Whitepaper Mode**: 1-click toggle to a crisp, high-contrast engineering drafting room layout (`#f8fafc`) with blueprint navy typography and drafting grid backgrounds.
+   - **Knurled Metal Controls**: Tactile range sliders with embossed ticks and physical feedback feel.
 
 ---
 
