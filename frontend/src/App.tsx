@@ -10,6 +10,10 @@ import { PrototypePlanningView } from './components/views/PrototypePlanningView'
 import { SensorsView } from './components/views/SensorsView';
 import { ParametersView } from './components/views/ParametersView';
 import { ReportsView } from './components/views/ReportsView';
+import { CutterSystemView } from './components/views/CutterSystemView';
+import { ThermalManagementView } from './components/views/ThermalManagementView';
+import { HydraulicCompactionView } from './components/views/HydraulicCompactionView';
+import { TelemetryAlarmsView } from './components/views/TelemetryAlarmsView';
 import { GuidedDemoTour } from './components/GuidedDemoTour';
 
 // Field / Scenario exploration components
@@ -191,8 +195,12 @@ export const App: React.FC = () => {
           <main className="flex-1 flex flex-col overflow-hidden bg-graphite-950">
             {activeView === 'overview' && <OverviewDashboard />}
             {activeView === 'simulation3d' && <Simulation3DView />}
-            {activeView === 'terrain' && <TerrainScenariosView />}
             {activeView === 'operations' && <LiveOperationsView />}
+            {activeView === 'thermal' && <ThermalManagementView />}
+            {activeView === 'cutter' && <CutterSystemView />}
+            {activeView === 'compaction' && <HydraulicCompactionView />}
+            {activeView === 'telemetry' && <TelemetryAlarmsView />}
+            {activeView === 'terrain' && <TerrainScenariosView />}
             {activeView === 'sensors' && <SensorsView />}
             {activeView === 'analysis' && <EngineeringAnalysisView />}
             {activeView === 'reports' && <ReportsView />}

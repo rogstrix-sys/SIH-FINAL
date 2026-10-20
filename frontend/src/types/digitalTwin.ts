@@ -3,8 +3,12 @@ export type SimulationStatus = 'idle' | 'running' | 'paused' | 'alarm' | 'comple
 export type NavView =
   | 'overview'
   | 'simulation3d'
-  | 'terrain'
   | 'operations'
+  | 'thermal'
+  | 'cutter'
+  | 'compaction'
+  | 'telemetry'
+  | 'terrain'
   | 'analysis'
   | 'prototype'
   | 'sensors'

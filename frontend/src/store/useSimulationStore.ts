@@ -85,6 +85,21 @@ import {
   INITIAL_COMPACTION_TELEMETRY
 } from '../types/sludgeCompaction';
 import { stepSludgeCompaction } from '../utils/sludgeCompactionModel';
+import {
+  CutterOperatingMode,
+  CutterSystemParameters,
+  CutterSystemTelemetry,
+  DEFAULT_CUTTER_PARAMS,
+  INITIAL_CUTTER_TELEMETRY
+} from '../types/cutterSystem';
+import { calculateCutterPhysics } from '../utils/cutterPhysics';
+import {
+  ThermalManagementParameters,
+  ThermalManagementTelemetry,
+  DEFAULT_THERMAL_PARAMS,
+  INITIAL_THERMAL_TELEMETRY
+} from '../types/thermalManagement';
+import { calculateThermalPhysics } from '../utils/thermalPhysics';
 
 export const DEFAULT_PARAMETERS: SimulationParameters = {
   pumpRpm: 1850,
@@ -259,6 +274,42 @@ export const INSPECTABLE_COMPONENTS: Record<string, ComponentInspectionData> = {
       'Agitation Cone': '0.8 m fluidized cone diameter'
     }
   },
+  macerator: {
+    id: 'macerator',
+    name: 'Tungsten-Carbide Inline Rotary Macerator & Cutter Head',
+    type: 'Mechanical Solid Waste Shredding Subsystem',
+    status: 'nominal',
+    temperatureC: 34.2,
+    pressureBar: 2.4,
+    vibrationMmS: 1.6,
+    description: 'High-torque rotary cutter drum equipped with helical tungsten-carbide teeth and stationary counter-shear blades. Shreds non-biodegradable rags, sanitary textiles, and consolidated fibrous silt to <6mm fragments before entering the progressive cavity suction core.',
+    specifications: {
+      'Cutter Geometry': '8x Helical Tungsten-Carbide Cutting Teeth with Counter-Anvil',
+      'Rotational Speed': '0 to 1,800 RPM (1,450 RPM nominal continuous)',
+      'Drive Unit': '3.5 kW Brushless Permanent Magnet AC (PMAC) Motor',
+      'Torque Capacity': '35 Nm peak before electronic anti-jam overload cutoff',
+      'Blockage Protection': 'Automatic electronic reverse cycle (400 ms pulse)',
+      'Particle Target': '< 6 mm nominal fibrous particulate reduction'
+    }
+  },
+  heater: {
+    id: 'heater',
+    name: 'PTC Electric Thermal Jacket & Boundary Layer Liquefier',
+    type: 'Cold-Climate Thermal Rheology Subsystem',
+    status: 'nominal',
+    temperatureC: 28.5,
+    pressureBar: 0,
+    vibrationMmS: 0.1,
+    description: 'Positive Temperature Coefficient (PTC) ceramic heating jacket enclosing the suction throat and progressive cavity intake. Generates a localized +22°C boundary layer heating zone that liquefies sub-zero lipid crystallization and reduces apparent septage viscosity from 2,800 cP to 320 cP.',
+    specifications: {
+      'Heating Core': 'Ceramic PTC Self-Limiting Electric Heating Bands',
+      'Thermal Rating': '3.2 kW total heat generation (230V / 14A rated)',
+      'Operating Envelope': '-15°C to +35°C ambient temperature rating',
+      'Core Setpoint': '+18°C active slurry liquefaction target',
+      'Overheat Interlock': 'Thermal fuse with 65°C automatic fail-safe disconnect',
+      'Viscosity Reduction': '88.5% apparent viscosity drop across freezing regime'
+    }
+  },
   septictank: {
     id: 'septictank',
     name: 'Dual-Compartment Demonstration Septic Vault',
@@ -383,6 +434,24 @@ export interface SimulationStore {
   resetCompactionOverpressure: () => void;
   updateCompactionParams: (partial: Partial<SludgeCompactionParameters>) => void;
   setCompactionStrokePct: (pct: number) => { accepted: boolean; reason?: string; strokeMm?: number; strokePct?: number };
+
+  // Rotary Macerator & Cutter Subsystem
+  cutterParams: CutterSystemParameters;
+  cutterTelemetry: CutterSystemTelemetry;
+  setCutterEnabled: (enabled: boolean) => void;
+  setCutterRpm: (rpm: number) => void;
+  toggleCutterReverse: () => void;
+  setCutterMode: (mode: CutterOperatingMode) => void;
+  resetCutterJam: () => void;
+  updateCutterParams: (partial: Partial<CutterSystemParameters>) => void;
+
+  // Cold-Climate Thermal Management & Heating Jacket
+  thermalParams: ThermalManagementParameters;
+  thermalTelemetry: ThermalManagementTelemetry;
+  setHeaterEnabled: (enabled: boolean) => void;
+  setAmbientTempC: (tempC: number) => void;
+  setTargetTempC: (tempC: number) => void;
+  updateThermalParams: (partial: Partial<ThermalManagementParameters>) => void;
 }
 
 function syncEngineParamsFromDigitalTwin(
@@ -508,6 +577,12 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     compactionParams: { ...DEFAULT_COMPACTION_PARAMS },
     compactionTelemetry: { ...INITIAL_COMPACTION_TELEMETRY },
 
+    cutterParams: { ...DEFAULT_CUTTER_PARAMS },
+    cutterTelemetry: { ...INITIAL_CUTTER_TELEMETRY },
+
+    thermalParams: { ...DEFAULT_THERMAL_PARAMS },
+    thermalTelemetry: { ...INITIAL_THERMAL_TELEMETRY },
+
     selectedScenario: 'level_paved',
     terrainParams: { ...DEFAULT_TERRAIN_PARAMS },
     stabilityThresholds: { ...DEFAULT_STABILITY_THRESHOLDS },
@@ -612,7 +687,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         feasibility: freshFeasibility,
         mobilityTelemetry: { ...INITIAL_MOBILITY_TELEMETRY },
         mobilityInputs: { ...INITIAL_MOBILITY_INPUTS },
-        compactionTelemetry: { ...INITIAL_COMPACTION_TELEMETRY }
+        compactionTelemetry: { ...INITIAL_COMPACTION_TELEMETRY },
+        cutterTelemetry: { ...INITIAL_CUTTER_TELEMETRY },
+        thermalTelemetry: { ...INITIAL_THERMAL_TELEMETRY }
       });
       addEvent('info', 'SYSTEM_RESET', 'Machine kinematics, tanks, and telemetry reset to initial IDLE baseline.');
     },
@@ -1032,7 +1109,37 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         deltaSeconds
       );
 
-      // If pump engine is idle/positioned and not active, step mobility and compaction
+      // 3. Step Rotary Macerator Cutter & Thermal Systems
+      const isCutterBlocked =
+        state.interlocks.emergencyStopLatched ||
+        state.alarms.emergencyStopActive ||
+        state.cutterTelemetry.overloadTrip;
+
+      const nextCutterPhys = calculateCutterPhysics(
+        isCutterBlocked ? false : state.cutterTelemetry.enabled,
+        isCutterBlocked ? 0 : state.cutterTelemetry.rpm,
+        state.cutterTelemetry.isReversed,
+        8.5,
+        state.cutterParams
+      );
+      const nextCutter = {
+        ...state.cutterTelemetry,
+        ...nextCutterPhys,
+        interlockBlocked: isCutterBlocked,
+        interlockReason: isCutterBlocked ? 'EMERGENCY STOP / OVERLOAD TRIP ACTIVE' : null
+      };
+
+      const isPumpingActive = state.operatingState === 'EXTRACT' || state.operatingState === 'DISCHARGE';
+      const nextThermal = calculateThermalPhysics(
+        state.thermalTelemetry.heaterEnabled,
+        state.thermalTelemetry.ambientTempC,
+        state.thermalTelemetry.targetTempC,
+        nextCutter.rpm,
+        isPumpingActive,
+        state.thermalParams
+      );
+
+      // If pump engine is idle/positioned and not active, step mobility, compaction, cutter and thermal
       if ((state.engine.operatingState === 'IDLE' || state.engine.operatingState === 'POSITION') && state.status === 'idle') {
         const needsMobility =
           state.mobilityTelemetry.isMoving ||
@@ -1057,7 +1164,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         if (needsMobility || needsCompaction) {
           set({
             ...(needsMobility ? { mobilityTelemetry: nextMobility } : {}),
-            ...(needsCompaction ? { compactionTelemetry: nextCompaction } : {})
+            ...(needsCompaction ? { compactionTelemetry: nextCompaction } : {}),
+            cutterTelemetry: nextCutter,
+            thermalTelemetry: nextThermal
           });
         }
         return;
@@ -1190,7 +1299,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         alarmsActive: alarmCount,
         feasibility: nextFeasibility,
         mobilityTelemetry: nextMobility,
-        compactionTelemetry: nextCompaction
+        compactionTelemetry: nextCompaction,
+        cutterTelemetry: nextCutter,
+        thermalTelemetry: nextThermal
       });
 
       // Update Guided Demo timer & auto-advance
@@ -1813,6 +1924,220 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       }));
 
       return { accepted: true, strokeMm, strokePct: clampedPct };
+    },
+
+    setCutterEnabled: (enabled: boolean) => {
+      const { cutterTelemetry, cutterParams, addEvent } = get();
+      const nextPhys = calculateCutterPhysics(
+        enabled,
+        cutterTelemetry.rpm,
+        cutterTelemetry.isReversed,
+        8.5,
+        cutterParams
+      );
+      set((s) => ({
+        cutterTelemetry: {
+          ...s.cutterTelemetry,
+          ...nextPhys,
+          enabled,
+          mode: enabled ? (s.cutterTelemetry.isReversed ? 'anti_jam' : 'continuous') : 'standby'
+        },
+        parameters: {
+          ...s.parameters,
+          cutterHeadEnabled: enabled
+        }
+      }));
+      addEvent('info', 'CUTTER_CMD', `Rotary macerator cutter ${enabled ? 'ARMED & RUNNING' : 'STOPPED'}.`);
+    },
+
+    setCutterRpm: (rpm: number) => {
+      const { cutterTelemetry, cutterParams } = get();
+      const clampedRpm = Math.max(0, Math.min(cutterParams.maxRpm, rpm));
+      const nextPhys = calculateCutterPhysics(
+        cutterTelemetry.enabled,
+        clampedRpm,
+        cutterTelemetry.isReversed,
+        8.5,
+        cutterParams
+      );
+      set((s) => ({
+        cutterTelemetry: {
+          ...s.cutterTelemetry,
+          ...nextPhys,
+          rpm: clampedRpm
+        },
+        parameters: {
+          ...s.parameters,
+          cutterHeadSpeedRpm: clampedRpm
+        }
+      }));
+    },
+
+    toggleCutterReverse: () => {
+      const { cutterTelemetry, cutterParams, addEvent } = get();
+      const nextReversed = !cutterTelemetry.isReversed;
+      const nextPhys = calculateCutterPhysics(
+        cutterTelemetry.enabled,
+        cutterTelemetry.rpm,
+        nextReversed,
+        8.5,
+        cutterParams
+      );
+      set((s) => ({
+        cutterTelemetry: {
+          ...s.cutterTelemetry,
+          ...nextPhys,
+          isReversed: nextReversed,
+          mode: nextReversed ? 'anti_jam' : 'continuous',
+          isJammed: false
+        }
+      }));
+      addEvent(
+        'warning',
+        'CUTTER_DIR',
+        nextReversed
+          ? 'AUTOCLEAN: Macerator cutter direction REVERSED for anti-jam clearance!'
+          : 'Cutter returned to forward high-shear continuous rotation.'
+      );
+    },
+
+    setCutterMode: (mode: CutterOperatingMode) => {
+      const { cutterParams, addEvent } = get();
+      let rpm = 1450;
+      let isReversed = false;
+      let enabled = true;
+
+      if (mode === 'standby') {
+        enabled = false;
+        rpm = 0;
+      } else if (mode === 'continuous') {
+        enabled = true;
+        rpm = 1450;
+        isReversed = false;
+      } else if (mode === 'anti_jam') {
+        enabled = true;
+        rpm = 950;
+        isReversed = true;
+      } else if (mode === 'shredding') {
+        enabled = true;
+        rpm = 1800;
+        isReversed = false;
+      }
+
+      const nextPhys = calculateCutterPhysics(enabled, rpm, isReversed, 8.5, cutterParams);
+      set((s) => ({
+        cutterTelemetry: {
+          ...s.cutterTelemetry,
+          ...nextPhys,
+          enabled,
+          rpm,
+          isReversed,
+          mode,
+          isJammed: false
+        },
+        parameters: {
+          ...s.parameters,
+          cutterHeadEnabled: enabled,
+          cutterHeadSpeedRpm: rpm
+        }
+      }));
+      addEvent('info', 'CUTTER_MODE', `Cutter operating mode switched to ${mode.toUpperCase()}.`);
+    },
+
+    resetCutterJam: () => {
+      const { cutterParams, addEvent } = get();
+      const nextPhys = calculateCutterPhysics(true, 1450, false, 8.5, cutterParams);
+      set((s) => ({
+        cutterTelemetry: {
+          ...s.cutterTelemetry,
+          ...nextPhys,
+          enabled: true,
+          isReversed: false,
+          isJammed: false,
+          overloadTrip: false,
+          interlockBlocked: false,
+          interlockReason: null
+        }
+      }));
+      addEvent('info', 'CUTTER_RESET', 'Cutter blockage fault cleared. System returned to forward maceration.');
+    },
+
+    updateCutterParams: (partial: Partial<CutterSystemParameters>) => {
+      set((s) => ({
+        cutterParams: { ...s.cutterParams, ...partial }
+      }));
+    },
+
+    setHeaterEnabled: (enabled: boolean) => {
+      const { thermalTelemetry, thermalParams, cutterTelemetry, operatingState, addEvent } = get();
+      const isPumping = operatingState === 'EXTRACT' || operatingState === 'DISCHARGE';
+      const nextTherm = calculateThermalPhysics(
+        enabled,
+        thermalTelemetry.ambientTempC,
+        thermalTelemetry.targetTempC,
+        cutterTelemetry.rpm,
+        isPumping,
+        thermalParams
+      );
+      set((s) => ({
+        thermalTelemetry: {
+          ...s.thermalTelemetry,
+          ...nextTherm
+        }
+      }));
+      addEvent(
+        'info',
+        'THERMAL_CMD',
+        `PTC ceramic heating jacket ${enabled ? 'ENGAGED (+18°C liquefaction active)' : 'DISENGAGED'}.`
+      );
+    },
+
+    setAmbientTempC: (tempC: number) => {
+      const { thermalTelemetry, thermalParams, cutterTelemetry, operatingState } = get();
+      const isPumping = operatingState === 'EXTRACT' || operatingState === 'DISCHARGE';
+      const nextTherm = calculateThermalPhysics(
+        thermalTelemetry.heaterEnabled,
+        tempC,
+        thermalTelemetry.targetTempC,
+        cutterTelemetry.rpm,
+        isPumping,
+        thermalParams
+      );
+      set((s) => ({
+        thermalTelemetry: {
+          ...s.thermalTelemetry,
+          ...nextTherm
+        },
+        parameters: {
+          ...s.parameters,
+          ambientTempC: tempC
+        }
+      }));
+    },
+
+    setTargetTempC: (tempC: number) => {
+      const { thermalTelemetry, thermalParams, cutterTelemetry, operatingState } = get();
+      const isPumping = operatingState === 'EXTRACT' || operatingState === 'DISCHARGE';
+      const nextTherm = calculateThermalPhysics(
+        thermalTelemetry.heaterEnabled,
+        thermalTelemetry.ambientTempC,
+        tempC,
+        cutterTelemetry.rpm,
+        isPumping,
+        thermalParams
+      );
+      set((s) => ({
+        thermalTelemetry: {
+          ...s.thermalTelemetry,
+          ...nextTherm
+        }
+      }));
+    },
+
+    updateThermalParams: (partial: Partial<ThermalManagementParameters>) => {
+      set((s) => ({
+        thermalParams: { ...s.thermalParams, ...partial }
+      }));
     }
   };
 });

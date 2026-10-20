@@ -167,7 +167,7 @@ export const BhavyamDashboardView: React.FC<BhavyamDashboardViewProps> = ({
         <div className="flex items-center space-x-2 font-mono">
           <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
           <span className="font-bold text-white uppercase tracking-wider text-[11px]">
-            Bharat-Jal SCADA Mk-IV Telemetry Bridge
+            Integrated SCADA Telemetry Bridge
           </span>
           <span className="text-slate-500">|</span>
           <span className="text-teal-300 font-semibold">
@@ -202,7 +202,7 @@ export const BhavyamDashboardView: React.FC<BhavyamDashboardViewProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center space-x-1 text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition"
-            title="Open standalone Bhavyam Dashboard in new browser window"
+            title="Open Integrated SCADA Dashboard in new browser window"
           >
             <span>Popout</span>
             <ExternalLink className="w-3 h-3" />
@@ -226,12 +226,12 @@ export const BhavyamDashboardView: React.FC<BhavyamDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Embedded Bhavyam SCADA Mk-IV Dashboard Frame */}
+      {/* Embedded SCADA Dashboard Frame */}
       <div className={`w-full relative ${isCompact ? 'h-[640px]' : 'h-[1400px] min-h-[1000px]'}`}>
         <iframe
           ref={iframeRef}
           src="/dashboard.html"
-          title="Bhavyam Multi-Physics Desludging Dashboard"
+          title="Integrated Multi-Physics SCADA Dashboard"
           className="w-full h-full border-0 block"
           onLoad={() => {
             setIsIframeLoaded(true);

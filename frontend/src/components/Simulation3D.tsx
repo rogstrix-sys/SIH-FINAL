@@ -274,9 +274,11 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const [reliefPressureLimitBar, setReliefPressureLimitBar] = useState<number>(180);
   const [isReliefValveOpen, setIsReliefValveOpen] = useState<boolean>(false);
 
-  // Bhavyam SCADA Dashboard Unified Layout & Store Integration
+  // Unified Multi-Physics Telemetry Subscriptions
   const storeCompactionTelemetry = useSimulationStore((s) => s.compactionTelemetry);
   const setStoreCompactionStrokePct = useSimulationStore((s) => s.setCompactionStrokePct);
+  const storeCutterTelemetry = useSimulationStore((s) => s.cutterTelemetry);
+  const storeThermalTelemetry = useSimulationStore((s) => s.thermalTelemetry);
   const [displayLayout, setDisplayLayout] = useState<'3d' | 'split' | 'scada'>('split');
 
   // Synchronize 3D Piston model with unified useSimulationStore / Bhavyam SCADA
@@ -3972,7 +3974,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           suctionVacuumKpaRef.current = -68.5;
           extractionRateLpmRef.current = 150.0;
           if (maceratorBladesRef.current) {
-            maceratorBladesRef.current.rotation.z += delta * 28;
+            const rpm = storeCutterTelemetry?.enabled ? storeCutterTelemetry.rpm : 1450;
+            const dir = storeCutterTelemetry?.isReversed ? -1 : 1;
+            const spinSpeed = (rpm / 60) * Math.PI * 2 * dir;
+            maceratorBladesRef.current.rotation.z += delta * spinSpeed;
           }
 
           // Transfer sludge from source vault into vehicle collection tank (Strict conservation: V_source + V_tank = 1200L)
@@ -5369,7 +5374,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </p>
           </div>
 
-          {/* View Mode Selector: 3D Only vs Split View (3D + Bhavyam SCADA) vs SCADA Full */}
+          {/* View Mode Selector: 3D Only vs Split View (3D + Telemetry) vs Full Telemetry Console */}
             <div className="flex items-center rounded-lg bg-slate-900 p-0.5 border border-slate-700">
               <button
                 onClick={() => setDisplayLayout('3d')}
@@ -5380,7 +5385,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 }`}
                 title="Full 3D Mountain Terrain Simulator Viewport"
               >
-                3D Sim Only
+                3D Simulation
               </button>
               <button
                 onClick={() => setDisplayLayout('split')}
@@ -5389,10 +5394,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                     ? 'bg-teal-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Synchronized Split View: 3D Mountain Sim + Bhavyam SCADA Mk-IV Multi-Physics Dashboard"
+                title="Synchronized Split View: 3D Mountain Sim + Multi-Physics Telemetry"
               >
                 <Sliders className="w-3.5 h-3.5 text-teal-300" />
-                <span>Split: 3D + Bhavyam SCADA</span>
+                <span>Split: 3D + Telemetry</span>
               </button>
               <button
                 onClick={() => setDisplayLayout('scada')}
@@ -5401,9 +5406,9 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                     ? 'bg-amber-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Dedicated Bharat-Jal SCADA Mk-IV Multi-Physics Dashboard"
+                title="Dedicated Multi-Physics Telemetry Console"
               >
-                Bhavyam SCADA Full
+                Full Telemetry Console
               </button>
             </div>
 

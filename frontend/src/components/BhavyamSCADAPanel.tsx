@@ -241,7 +241,7 @@ export const BhavyamSCADAPanel: React.FC<BhavyamSCADAPanelProps> = ({
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
           <span className="text-white font-bold uppercase tracking-wider text-[11px]">
-            Bhavyam SCADA Mk-IV Dewatering Ram
+            Hydraulic Compaction & Dewatering Ram
           </span>
         </div>
 
@@ -279,7 +279,7 @@ export const BhavyamSCADAPanel: React.FC<BhavyamSCADAPanelProps> = ({
       <div className="bg-graphite-950/90 p-4 rounded-xl border border-teal-500/40 shadow-xl space-y-3 font-mono">
         <div className="flex items-center justify-between">
           <label
-            htmlFor="bhavyam-piston-slider"
+            htmlFor="piston-stroke-slider"
             className="text-teal-400 flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px]"
           >
             <Sliders className="w-3.5 h-3.5 text-teal-400" />
@@ -293,7 +293,7 @@ export const BhavyamSCADAPanel: React.FC<BhavyamSCADAPanelProps> = ({
         {/* Master Piston Stroke Slider */}
         <div className="space-y-1">
           <input
-            id="bhavyam-piston-slider"
+            id="piston-stroke-slider"
             type="range"
             min="0"
             max="100"
@@ -499,7 +499,7 @@ export const BhavyamSCADAPanel: React.FC<BhavyamSCADAPanelProps> = ({
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-teal-400 group-hover:rotate-12 transition-transform" />
             <span className="font-bold">
-              {showFullScadaLab ? 'Collapse Multi-Physics Laboratory' : 'Expand Full Bhavyam Multi-Physics Laboratory'}
+              {showFullScadaLab ? 'Collapse Multi-Physics Laboratory' : 'Expand Integrated Multi-Physics Laboratory'}
             </span>
             <span className="text-[10px] text-slate-400 font-normal">
               (Slope Stability, Macerator & Altitude PCP Cavitation)
@@ -512,7 +512,7 @@ export const BhavyamSCADAPanel: React.FC<BhavyamSCADAPanelProps> = ({
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 flex items-center gap-1"
-              title="Open standalone Bhavyam SCADA in new browser tab"
+              title="Open Integrated SCADA Dashboard in new browser tab"
             >
               <span>Popout</span>
               <ExternalLink className="w-3 h-3" />
@@ -532,7 +532,7 @@ export const BhavyamSCADAPanel: React.FC<BhavyamSCADAPanelProps> = ({
               <iframe
                 ref={iframeRef}
                 src="/dashboard.html"
-                title="Bhavyam Multi-Physics SCADA Laboratory"
+                title="Integrated Multi-Physics SCADA Laboratory"
                 className="w-full h-full border-0 block"
                 onLoad={() => {
                   setIsIframeReady(true);

@@ -5,7 +5,11 @@ import {
   Activity,
   FileText,
   Mountain,
-  Compass
+  Compass,
+  Flame,
+  Zap,
+  Layers,
+  Sliders
 } from 'lucide-react';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { NavView } from '../types/digitalTwin';
@@ -27,9 +31,43 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'simulation3d',
-    label: '3D Machine',
+    label: '3D Simulation',
     icon: Box,
-    description: 'Full-canvas interactive digital twin mechanical model'
+    description: 'Full-canvas interactive 3D digital twin mechanical model'
+  },
+  {
+    id: 'operations',
+    label: 'Machine Controls',
+    icon: Sliders,
+    badge: 'LIVE',
+    description: 'Live machine sequencing, vacuum pump & crawler controls'
+  },
+  {
+    id: 'thermal',
+    label: 'Thermal Management',
+    icon: Flame,
+    badge: 'PTC',
+    description: 'PTC heating jacket & cold-climate sludge liquefaction'
+  },
+  {
+    id: 'cutter',
+    label: 'Cutter System',
+    icon: Zap,
+    badge: '1450 RPM',
+    description: 'Tungsten-carbide rotary macerator & anti-jam cutter'
+  },
+  {
+    id: 'compaction',
+    label: 'Hydraulic Compaction',
+    icon: Layers,
+    badge: '180 BAR',
+    description: 'Axial dewatering ram, platen displacement & cake consolidation'
+  },
+  {
+    id: 'telemetry',
+    label: 'Telemetry & Alarms',
+    icon: Activity,
+    description: 'Real-time multi-physics charts, safety trips & event log'
   },
   {
     id: 'terrain',
@@ -37,13 +75,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: Mountain,
     badge: 'SIH',
     description: 'Climatic zones and steep hilly access models'
-  },
-  {
-    id: 'operations',
-    label: 'Live Operations',
-    icon: Activity,
-    badge: 'LIVE',
-    description: 'Real-time sequencing, safety interlocks & gas matrix'
   },
   {
     id: 'analysis',

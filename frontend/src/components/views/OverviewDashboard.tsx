@@ -149,7 +149,7 @@ export const OverviewDashboard: React.FC = () => {
   // Local UI State
   const [overviewMode, setOverviewMode] = useState<'standard' | 'scada'>('standard');
   const [activeChartTab, setActiveChartTab] = useState<'flowRate' | 'tankBalance' | 'powerEnergy' | 'eventTimeline'>('flowRate');
-  const [paramPanelTab, setParamPanelTab] = useState<'machine' | 'terrain' | 'bhavyam'>('bhavyam');
+  const [paramPanelTab, setParamPanelTab] = useState<'machine' | 'terrain' | 'compaction'>('compaction');
   const [showComparisonPanel, setShowComparisonPanel] = useState(false);
   const [showModelLimitations, setShowModelLimitations] = useState(false);
 
@@ -1145,10 +1145,10 @@ export const OverviewDashboard: React.FC = () => {
                 type="button"
                 onClick={() => setOverviewMode('scada')}
                 className="text-[10px] text-teal-400 hover:text-teal-300 flex items-center gap-1 font-mono uppercase bg-teal-950/60 hover:bg-teal-900/60 px-2 py-0.5 rounded border border-teal-500/30 transition"
-                title="Launch Full Bhavyam SCADA Mk-IV Multi-Physics Console"
+                title="Launch Integrated Multi-Physics SCADA Console"
               >
                 <Sliders className="w-3 h-3 text-teal-400" />
-                <span>SCADA Mk-IV</span>
+                <span>SCADA Console</span>
               </button>
               <Badge
                 variant={
@@ -1310,7 +1310,7 @@ export const OverviewDashboard: React.FC = () => {
             >
               <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
               <Sliders className="w-3.5 h-3.5 text-teal-300" />
-              <span>Bhavyam SCADA Mk-IV Multi-Physics</span>
+              <span>Multi-Physics SCADA Console</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-900 text-teal-200 border border-teal-700/60 font-bold">
                 7 ZONES
               </span>
@@ -1478,11 +1478,11 @@ export const OverviewDashboard: React.FC = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => setOverviewMode('scada')}
-                title="Launch Full Bhavyam SCADA Mk-IV Multi-Physics View"
+                title="Launch Integrated Multi-Physics SCADA View"
                 className="text-[10px] py-1 px-2 font-mono flex items-center gap-1 text-teal-400 hover:text-teal-200"
               >
                 <Sliders className="w-3 h-3 text-teal-400" />
-                SCADA Mk-IV
+                SCADA Console
               </Button>
               <Button
                 variant="ghost"
@@ -1538,36 +1538,36 @@ export const OverviewDashboard: React.FC = () => {
 
         {/* Right Column: Parameters Panel & Terrain Feasibility */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          {/* Card with Tab Switcher: Bhavyam SCADA vs Machine Actuators vs Terrain Feasibility */}
+          {/* Card with Tab Switcher: Compaction vs Machine Actuators vs Terrain Feasibility */}
           <Card
             title={
-              paramPanelTab === 'bhavyam'
-                ? 'Bhavyam SCADA Mk-IV Dewatering'
+              paramPanelTab === 'compaction'
+                ? 'Hydraulic Compaction & Dewatering'
                 : paramPanelTab === 'machine'
                 ? 'Machine Parameters'
                 : 'Terrain Feasibility Model'
             }
             subtitle={
-              paramPanelTab === 'bhavyam'
+              paramPanelTab === 'compaction'
                 ? 'In-situ compaction ram & multi-physics telemetry'
                 : paramPanelTab === 'machine'
                 ? 'Actuator setpoints & fluid properties'
                 : 'Kinematic inclination & route losses'
             }
-            icon={<Sliders className={`w-4 h-4 ${paramPanelTab === 'bhavyam' ? 'text-teal-400' : 'text-safety-500'}`} />}
+            icon={<Sliders className={`w-4 h-4 ${paramPanelTab === 'compaction' ? 'text-teal-400' : 'text-safety-500'}`} />}
             headerAction={
               <div className="flex items-center bg-graphite-950 p-0.5 rounded-lg border border-slate-800 font-mono text-[10px]">
                 <button
                   type="button"
-                  onClick={() => setParamPanelTab('bhavyam')}
+                  onClick={() => setParamPanelTab('compaction')}
                   className={`px-2 py-0.5 rounded font-semibold transition-colors flex items-center gap-1 ${
-                    paramPanelTab === 'bhavyam'
+                    paramPanelTab === 'compaction'
                       ? 'bg-teal-500 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-                  SCADA Dewater
+                  Compaction
                 </button>
                 <button
                   type="button"
@@ -1594,7 +1594,7 @@ export const OverviewDashboard: React.FC = () => {
               </div>
             }
           >
-            {paramPanelTab === 'bhavyam' ? (
+            {paramPanelTab === 'compaction' ? (
               <BhavyamSCADAPanel />
             ) : paramPanelTab === 'machine' ? (
               <div className="space-y-3.5 text-xs">
@@ -1953,7 +1953,7 @@ export const OverviewDashboard: React.FC = () => {
                     className="w-full mt-2 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
                   >
                     <Sliders className="w-3.5 h-3.5 text-teal-400" />
-                    <span>Control in Bhavyam SCADA Mk-IV</span>
+                    <span>Open Compaction Console</span>
                   </button>
                 )}
               </div>
