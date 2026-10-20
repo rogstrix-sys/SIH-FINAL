@@ -65,6 +65,21 @@ describe('Rotary Macerator & Thermal Management Multi-Physics Integration', () =
       expect(state.cutterTelemetry.rpm).toBe(0);
       expect(state.parameters.cutterHeadEnabled).toBe(false);
     });
+
+    it('handles overload trip trigger and clears jam successfully', () => {
+      const store = useSimulationStore.getState();
+
+      // Enable and set max speed
+      store.setCutterEnabled(true);
+      store.setCutterRpm(1800);
+      expect(useSimulationStore.getState().cutterTelemetry.enabled).toBe(true);
+
+      // Simulate jam clear action
+      store.resetCutterJam();
+      const state = useSimulationStore.getState();
+      expect(state.cutterTelemetry.overloadTrip).toBe(false);
+      expect(state.cutterTelemetry.isReversed).toBe(false);
+    });
   });
 
   describe('Thermal Management & Sub-Zero Sludge Liquefaction', () => {

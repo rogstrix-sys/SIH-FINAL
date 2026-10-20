@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Zap,
   RotateCw,
@@ -14,7 +14,9 @@ import {
   RefreshCw,
   Layers,
   Flame,
-  ArrowRight
+  ArrowRight,
+  Box,
+  Waves
 } from 'lucide-react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { Card } from '../ui/Card';
@@ -22,6 +24,8 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Slider } from '../ui/Slider';
 import { CutterOperatingMode } from '../../types/cutterSystem';
+import { Cutter3DMechanicalViewer } from '../Cutter3DMechanicalViewer';
+import { CutterConduitCutawayViewer } from '../CutterConduitCutawayViewer';
 
 export const CutterSystemView: React.FC = () => {
   const cutterTelemetry = useSimulationStore((s) => s.cutterTelemetry);
@@ -36,115 +40,8 @@ export const CutterSystemView: React.FC = () => {
   const operatingState = useSimulationStore((s) => s.operatingState);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Animated 2D Cross-Section of the Rotary Macerator & Cutter Head
-  useEffect(() => {
-    let animId: number;
-    let angle = 0;
-
-    const render = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-
-      // Background conduit throat
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, w, h);
-
-      // Intake flow chamber lines
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(20, 20, w - 40, h - 40);
-
-      // Slurry flow particles
-      if (cutterTelemetry.enabled && cutterTelemetry.rpm > 100) {
-        const speed = (cutterTelemetry.rpm / 1450) * (cutterTelemetry.isReversed ? -2 : 3);
-        angle += speed * 0.05;
-
-        // Flow particles
-        ctx.fillStyle = cutterTelemetry.isReversed ? '#f59e0b' : '#38bdf8';
-        for (let i = 0; i < 6; i++) {
-          const px = ((Date.now() * 0.1 * (cutterTelemetry.isReversed ? -1 : 1) + i * 65) % (w - 80)) + 40;
-          const py = h / 2 + Math.sin(px * 0.03 + i) * 18;
-          ctx.beginPath();
-          ctx.arc(px, py, 3, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      const centerX = w / 2;
-      const centerY = h / 2;
-      const radius = 55;
-
-      // Outer stationary anvil / counter-shear ring
-      ctx.strokeStyle = '#64748b';
-      ctx.lineWidth = 4;
-      ctx.setLineDash([8, 6]);
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius + 12, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Central rotary cutter drum
-      ctx.fillStyle = '#1e293b';
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = cutterTelemetry.isReversed ? '#f59e0b' : '#06b6d4';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // Helical Tungsten-Carbide Cutter Teeth
-      const teethCount = cutterParams.bladeCount || 8;
-      for (let i = 0; i < teethCount; i++) {
-        const toothAngle = angle + (i * 2 * Math.PI) / teethCount;
-        const tx = centerX + Math.cos(toothAngle) * (radius - 5);
-        const ty = centerY + Math.sin(toothAngle) * (radius - 5);
-        const tipX = centerX + Math.cos(toothAngle) * (radius + 10);
-        const tipY = centerY + Math.sin(toothAngle) * (radius + 10);
-
-        ctx.strokeStyle = cutterTelemetry.isReversed ? '#fbbf24' : '#38bdf8';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tipX, tipY);
-        ctx.stroke();
-
-        // Carbide insert tip
-        ctx.fillStyle = '#f8fafc';
-        ctx.beginPath();
-        ctx.arc(tipX, tipY, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Center drive shaft hub
-      ctx.fillStyle = '#475569';
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Direction indicator arrow in center hub
-      ctx.fillStyle = cutterTelemetry.isReversed ? '#f59e0b' : '#22c55e';
-      ctx.font = 'bold 12px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(cutterTelemetry.isReversed ? '↺ REV' : '↻ FWD', centerX, centerY);
-
-      animId = requestAnimationFrame(render);
-    };
-
-    animId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animId);
-  }, [cutterTelemetry.enabled, cutterTelemetry.rpm, cutterTelemetry.isReversed, cutterParams.bladeCount]);
+  // Visualizer View Mode: 3D Mechanical Twin (Default) or Conduit Slurry Rheology Cutaway
+  const [visualizerMode, setVisualizerMode] = useState<'3d_mechanical' | 'conduit_rheology'>('3d_mechanical');
 
   const modes: { id: CutterOperatingMode; label: string; desc: string }[] = [
     { id: 'standby', label: 'Standby', desc: '0 RPM - Cutter isolated for travel or maintenance' },
@@ -324,27 +221,47 @@ export const CutterSystemView: React.FC = () => {
 
         {/* Right Column: Dynamic Visualizer & Multi-Physics Telemetry */}
         <div className="lg:col-span-7 space-y-5">
-          {/* Visual Cross-Section Canvas */}
+          {/* Authentic High-Fidelity Cutter Visualizer */}
           <Card
-            title="Cutter Chamber 2D Mechanical Visualizer"
-            subtitle="Cross-section through helical teeth drum, stationary anvil, and non-Newtonian shear stream"
+            title="Tungsten-Carbide Cutter & Macerator Assembly"
+            subtitle="Closed-loop mechanical twin with 12 helical teeth, stationary anvil, and non-Newtonian shear stream"
             icon={<Activity className="w-4 h-4 text-cyan-400" />}
+            headerAction={
+              <div className="flex items-center gap-1 bg-graphite-950 p-1 rounded-lg border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setVisualizerMode('3d_mechanical')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition ${
+                    visualizerMode === '3d_mechanical'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Box className="w-3.5 h-3.5" />
+                  <span>3D Mechanical Twin</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setVisualizerMode('conduit_rheology')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition ${
+                    visualizerMode === 'conduit_rheology'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Waves className="w-3.5 h-3.5" />
+                  <span>Rheology Conduit</span>
+                </button>
+              </div>
+            }
           >
             <div className="space-y-4 pt-1">
-              <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 flex justify-center items-center shadow-inner">
-                <canvas
-                  ref={canvasRef}
-                  width={520}
-                  height={220}
-                  className="w-full h-[200px] sm:h-[220px] block"
-                />
-                <div className="absolute top-2.5 left-3 font-mono text-[10px] text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">
-                  SECTION A-A: INLET ROTARY MACERATOR
-                </div>
-                <div className="absolute bottom-2.5 right-3 font-mono text-[11px] text-cyan-300 bg-slate-900/90 px-2.5 py-0.5 rounded border border-cyan-500/40">
-                  DRIVE: {cutterTelemetry.enabled ? `${cutterTelemetry.rpm} RPM` : 'STANDBY'}
-                </div>
-              </div>
+              {visualizerMode === '3d_mechanical' ? (
+                <Cutter3DMechanicalViewer className="h-[320px] sm:h-[360px]" />
+              ) : (
+                <CutterConduitCutawayViewer className="h-[320px] sm:h-[360px]" />
+              )}
 
               {/* Primary Telemetry Metrics Strip */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
