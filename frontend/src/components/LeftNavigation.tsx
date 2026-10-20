@@ -157,6 +157,13 @@ export const LeftNavigation: React.FC<LeftNavigationProps> = ({ onOpenLegacyView
             <Mountain className="w-3.5 h-3.5 text-emerald-400" />
             <span className="truncate">Mountain Terrain Sim</span>
           </button>
+          <button
+            onClick={() => onOpenLegacyView('bhavyam')}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-graphite-900 transition-colors"
+          >
+            <Sliders className="w-3.5 h-3.5 text-teal-400" />
+            <span className="truncate">Bhavyam SCADA Mk-IV</span>
+          </button>
         </div>
       )}
     </aside>

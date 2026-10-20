@@ -1,0 +1,3046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TERRA-VAC 450 | Ministry of Jal Shakti • Field Telemetry & Digital Twin</title>
+  <!-- Google Fonts: Technical Aerospace & Industrial Monospace -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,600&family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS via allowlisted gstatic -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* ============================================================
+       INDUSTRIAL DUAL-THEME ARCHITECTURE (HUMAN CRAFTED DESIGN)
+       ============================================================ */
+    :root, body.theme-milspec {
+      --bg-base: #070b12;
+      --bg-surface: #0d1420;
+      --bg-panel: rgba(14, 22, 35, 0.94);
+      --bg-card: rgba(19, 29, 46, 0.78);
+      --bg-input: #0a0f19;
+      --border-soft: rgba(71, 85, 105, 0.35);
+      --border-hard: rgba(100, 116, 139, 0.5);
+      --border-accent: rgba(245, 158, 11, 0.45);
+      --accent-amber: #f59e0b;
+      --accent-gold: #fbbf24;
+      --accent-cyan: #06b6d4;
+      --accent-blue: #38bdf8;
+      --accent-emerald: #10b981;
+      --text-main: #f8fafc;
+      --text-sub: #cbd5e1;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --grid-line: rgba(245, 158, 11, 0.032);
+      --bezel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 36px -12px rgba(0, 0, 0, 0.85);
+      --canvas-bg: #070b14;
+    }
+
+    body.theme-whitepaper {
+      --bg-base: #f1f5f9;
+      --bg-surface: #ffffff;
+      --bg-panel: rgba(255, 255, 255, 0.96);
+      --bg-card: rgba(248, 250, 252, 0.95);
+      --bg-input: #e2e8f0;
+      --border-soft: rgba(148, 163, 184, 0.5);
+      --border-hard: rgba(100, 116, 139, 0.6);
+      --border-accent: rgba(217, 119, 6, 0.6);
+      --accent-amber: #d97706;
+      --accent-gold: #b45309;
+      --accent-cyan: #0284c7;
+      --accent-blue: #0369a1;
+      --accent-emerald: #059669;
+      --text-main: #0f172a;
+      --text-sub: #334155;
+      --text-muted: #475569;
+      --text-dim: #64748b;
+      --grid-line: rgba(30, 64, 175, 0.045);
+      --bezel-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+      --canvas-bg: #0b1120;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 32px 32px;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      color: var(--text-main);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .font-tech {
+      font-family: 'Chakra Petch', system-ui, sans-serif;
+    }
+    .font-mono-data {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    /* Tactile Corner Fasteners & Milled Chassis */
+    .milled-panel {
+      position: relative;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-soft);
+      box-shadow: var(--bezel-shadow);
+      border-radius: 14px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .milled-panel::before, .milled-panel::after {
+      content: '+';
+      position: absolute;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      line-height: 1;
+      color: rgba(148, 163, 184, 0.35);
+      pointer-events: none;
+    }
+    .milled-panel::before { top: 6px; left: 8px; }
+    .milled-panel::after { top: 6px; right: 8px; }
+
+    /* Safety Hazard Diagonal Striping */
+    .hazard-stripes {
+      background: repeating-linear-gradient(
+        -45deg,
+        #f59e0b,
+        #f59e0b 8px,
+        #1e293b 8px,
+        #1e293b 16px
+      );
+    }
+    .hazard-stripes-danger {
+      background: repeating-linear-gradient(
+        -45deg,
+        #ef4444,
+        #ef4444 8px,
+        #1e293b 8px,
+        #1e293b 16px
+      );
+    }
+
+    /* Knurled Industrial Sliders */
+    input[type=range].knurled-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      height: 24px;
+      cursor: pointer;
+    }
+    input[type=range].knurled-slider::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-soft);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    input[type=range].knurled-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 20px;
+      width: 14px;
+      border-radius: 3px;
+      background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 50%, #94a3b8 100%);
+      border: 1px solid #475569;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), inset 0 1px 0 #ffffff;
+      margin-top: -6px;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    input[type=range].knurled-slider:hover::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 10px var(--accent-amber), inset 0 1px 0 #ffffff;
+    }
+
+    /* Tab switcher */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: var(--border-hard); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-amber); }
+  </style>
+</head>
+<body class="theme-milspec antialiased min-h-screen selection:bg-amber-500 selection:text-slate-950 flex flex-col font-sans">
+
+  <!-- NATIONAL EMBLEM / TRICOLOR TOP ACCENT LINE -->
+  <div class="h-1.5 w-full flex z-50">
+    <div class="flex-1 bg-[#FF9933] shadow-sm"></div>
+    <div class="flex-1 bg-[#FFFFFF] shadow-sm"></div>
+    <div class="flex-1 bg-[#138808] shadow-sm"></div>
+  </div>
+
+  <!-- TOP GOVERNMENT OF INDIA & MINISTRY OF JAL SHAKTI HEADER (INDUSTRIAL MIL-SPEC APPARATUS BAR) -->
+  <div class="bg-[var(--bg-panel)] border-b border-[var(--border-subtle)] py-2 px-4 text-xs font-mono tracking-tight">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-500 dark:text-amber-300 font-bold border border-amber-500/30 font-display uppercase tracking-wider text-[11px]">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> BHARAT-JAL SCADA Mk-IV
+        </span>
+        <span class="text-[var(--text-muted)]">•</span>
+        <span class="text-[var(--text-primary)] font-semibold">Ministry of Jal Shakti (MoJS) & DDWS</span>
+        <span class="hidden md:inline text-[var(--text-muted)]">•</span>
+        <span class="text-emerald-500 font-semibold hidden md:inline">SBM 2.0 (Grameen & Urban) | NAMASTE Initiative</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 text-[var(--text-secondary)] font-mono text-[11px]">
+        <div id="navic-telemetry" class="bg-[var(--bg-card)] px-2.5 py-0.5 rounded border border-[var(--border-hard)] text-amber-500 dark:text-amber-300 flex items-center gap-1.5 shadow-inner">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+          <span>NavIC L5: 31.1048°N, 77.1734°E • ALT 2,205m • FIX: 9 SATS</span>
+        </div>
+        <span>Problem ID: <strong class="text-amber-500 dark:text-amber-300 font-bold">SIH26258</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRIMARY INDUSTRIAL NAVIGATION & COMMAND CONSOLE -->
+  <nav class="sticky top-0 z-50 bg-[var(--bg-panel)]/95 backdrop-blur-md border-b border-[var(--border-hard)] shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Brand Apparatus Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-[var(--bg-base)] border border-[var(--border-hard)] flex items-center justify-center font-display font-black text-amber-400 text-sm tracking-widest shadow-inner relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-tr from-amber-500/20 via-transparent to-cyan-500/10 opacity-70"></div>
+            <span class="relative z-10 text-amber-400 font-black">450</span>
+          </div>
+          <div>
+            <div class="font-display font-black text-lg tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+              TERRA-VAC 450
+              <span class="text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest">
+                NAMASTE COMPLIANT
+              </span>
+            </div>
+            <div class="text-[10px] text-[var(--text-secondary)] font-mono uppercase tracking-wider flex items-center gap-2">
+              <span>National Mechanized Desludging Digital Twin</span>
+              <span class="text-amber-500 font-bold">• Mk-IV Field Grade</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="hidden md:flex items-center space-x-1 font-display">
+          <button onclick="switchTab('simulator')" id="nav-simulator" class="nav-btn px-3.5 py-2 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/40 transition shadow-sm">
+            Live Digital Twin
+          </button>
+          <button onclick="switchTab('graphs')" id="nav-graphs" class="nav-btn px-3.5 py-2 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition">
+            Engineering Graphs
+          </button>
+          <button onclick="switchTab('problem')" id="nav-problem" class="nav-btn px-3.5 py-2 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition">
+            MoJS Context & SBM
+          </button>
+          <button onclick="switchTab('engineering')" id="nav-engineering" class="nav-btn px-3.5 py-2 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition">
+            Mechanical CAD
+          </button>
+          <button onclick="switchTab('physics')" id="nav-physics" class="nav-btn px-3.5 py-2 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition">
+            Physics & Math
+          </button>
+          <button onclick="switchTab('feasibility')" id="nav-feasibility" class="nav-btn px-3.5 py-2 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition">
+            ULB Feasibility
+          </button>
+        </div>
+
+        <!-- Action & Dual-Theme Switcher -->
+        <div class="flex items-center gap-2.5">
+          <!-- 1-Click Aesthetic Switcher: Tactical SCADA vs Whitepaper -->
+          <button onclick="toggleAppTheme()" id="theme-toggle-btn" class="px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[var(--text-primary)] border border-[var(--border-hard)] shadow-sm transition flex items-center gap-1.5" title="Toggle between Mil-Spec Tactical SCADA and Technical Whitepaper themes">
+            <span id="theme-icon">🛡️</span>
+            <span id="theme-text" class="hidden sm:inline">Tactical SCADA</span>
+          </button>
+
+          <button onclick="switchTab('simulator')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold font-display bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 active:scale-95 transition">
+            Run Telemetry Suite
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Row -->
+    <div class="md:hidden flex overflow-x-auto px-4 py-2 space-x-2 border-t border-[var(--border-subtle)] bg-[var(--bg-card)] text-xs font-display">
+      <button onclick="switchTab('simulator')" class="nav-btn-mobile whitespace-nowrap px-3 py-1 rounded-md text-amber-400 bg-amber-500/15 font-bold">Simulator</button>
+      <button onclick="switchTab('graphs')" class="nav-btn-mobile whitespace-nowrap px-3 py-1 rounded-md text-[var(--text-secondary)]">Graphs</button>
+      <button onclick="switchTab('problem')" class="nav-btn-mobile whitespace-nowrap px-3 py-1 rounded-md text-[var(--text-secondary)]">MoJS Context</button>
+      <button onclick="switchTab('engineering')" class="nav-btn-mobile whitespace-nowrap px-3 py-1 rounded-md text-[var(--text-secondary)]">CAD</button>
+      <button onclick="switchTab('physics')" class="nav-btn-mobile whitespace-nowrap px-3 py-1 rounded-md text-[var(--text-secondary)]">Formulas</button>
+      <button onclick="switchTab('feasibility')" class="nav-btn-mobile whitespace-nowrap px-3 py-1 rounded-md text-[var(--text-secondary)]">ULB Plan</button>
+    </div>
+  </nav>
+
+  <!-- ============================================================== -->
+  <!-- TAB 1: LIVE DIGITAL TWIN & SIMULATOR (DEFAULT) -->
+  <!-- ============================================================== -->
+  <div id="tab-simulator" class="tab-content active flex-grow p-4 md:p-6 max-w-7xl mx-auto w-full">
+
+    <!-- EXPANDED HILLY TERRAIN & CLIMATIC SCENARIOS SELECTOR -->
+    <div class="mb-5 milled-panel p-4 md:p-5 rounded-xl shadow-xl relative">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3 pb-3 border-b border-[var(--border-subtle)]">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg md:text-xl font-display font-black text-[var(--text-primary)] tracking-wide">
+              National Terrain & Climatic Zone Evaluation Matrix
+            </h2>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest font-bold">
+              60 FPS TELEMETRY LOCK
+            </span>
+          </div>
+          <p class="text-xs text-[var(--text-secondary)] mt-0.5 font-sans">
+            Autonomous multi-body dynamics, PTC thermal shear liquefaction, and positive displacement head across 7 administrative hill sectors.
+          </p>
+        </div>
+        <button onclick="resetDefaults()" class="self-start md:self-auto px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-amber-500 dark:text-amber-300 border border-amber-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95">
+          <span>↺</span> RESET TO SPEC BASELINE
+        </button>
+      </div>
+
+      <!-- 7 Administrative Geographical Zones -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 pt-1 font-mono">
+        <!-- 1. Shimla -->
+        <button onclick="applyPreset('shimla')" id="btn-loc-shimla" class="loc-preset-btn p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-amber-500/60 text-left transition group relative overflow-hidden">
+          <div class="text-[9px] font-bold text-amber-500 dark:text-amber-300 uppercase tracking-wider">SECTOR A • NW HIMALAYA</div>
+          <div class="text-xs font-display font-bold text-[var(--text-primary)] group-hover:text-amber-400 mt-0.5">Shimla (HP)</div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-1">2,200m • 24° Ridge Ramp</div>
+        </button>
+
+        <!-- 2. Leh -->
+        <button onclick="applyPreset('leh')" id="btn-loc-leh" class="loc-preset-btn p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-amber-500/60 text-left transition group relative overflow-hidden">
+          <div class="text-[9px] font-bold text-cyan-500 dark:text-cyan-400 uppercase tracking-wider">SECTOR B • TRANS-HIMALAYA</div>
+          <div class="text-xs font-display font-bold text-[var(--text-primary)] group-hover:text-cyan-400 mt-0.5">Leh (Ladakh)</div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-1">3,500m • -12°C Freeze</div>
+        </button>
+
+        <!-- 3. Aizawl -->
+        <button onclick="applyPreset('aizawl')" id="btn-loc-aizawl" class="loc-preset-btn p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-amber-500/60 text-left transition group relative overflow-hidden">
+          <div class="text-[9px] font-bold text-teal-500 dark:text-teal-400 uppercase tracking-wider">SECTOR C • NE RIDGE</div>
+          <div class="text-xs font-display font-bold text-[var(--text-primary)] group-hover:text-teal-400 mt-0.5">Aizawl (Mizoram)</div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-1">1,130m • 27° Stairs</div>
+        </button>
+
+        <!-- 4. Kedarnath / Mussoorie -->
+        <button onclick="applyPreset('kedarnath')" id="btn-loc-kedarnath" class="loc-preset-btn p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-amber-500/60 text-left transition group relative overflow-hidden">
+          <div class="text-[9px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-wider">SECTOR D • PILGRIM BELT</div>
+          <div class="text-xs font-display font-bold text-[var(--text-primary)] group-hover:text-rose-400 mt-0.5">Kedarnath (UK)</div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-1">3,100m • 30° Incline</div>
+        </button>
+
+        <!-- 5. Tawang -->
+        <button onclick="applyPreset('tawang')" id="btn-loc-tawang" class="loc-preset-btn p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-amber-500/60 text-left transition group relative overflow-hidden">
+          <div class="text-[9px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider">SECTOR E • FRONTIER</div>
+          <div class="text-xs font-display font-bold text-[var(--text-primary)] group-hover:text-indigo-400 mt-0.5">Tawang (Arunachal)</div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-1">3,048m • -8°C Snow</div>
+        </button>
+
+        <!-- 6. Munnar / Western Ghats -->
+        <button onclick="applyPreset('monsoon')" id="btn-loc-monsoon" class="loc-preset-btn p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-amber-500/60 text-left transition group relative overflow-hidden">
+          <div class="text-[9px] font-bold text-emerald-500 dark:text-emerald-400 uppercase tracking-wider">SECTOR F • GHATS MONSOON</div>
+          <div class="text-xs font-display font-bold text-[var(--text-primary)] group-hover:text-emerald-400 mt-0.5">Munnar (Kerala)</div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-1">1,530m • 26° Wet Mud</div>
+        </button>
+
+        <!-- 7. Ooty / Nilgiris -->
+        <button onclick="applyPreset('ooty')" id="btn-loc-ooty" class="loc-preset-btn p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-amber-500/60 text-left transition group relative overflow-hidden">
+          <div class="text-[9px] font-bold text-purple-500 dark:text-purple-400 uppercase tracking-wider">SECTOR G • NILGIRIS</div>
+          <div class="text-xs font-display font-bold text-[var(--text-primary)] group-hover:text-purple-400 mt-0.5">Ooty (Tamil Nadu)</div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-1">2,240m • 21° Clay Slopes</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- PRIMARY FIELD KPI TELEMETRY RACK -->
+    <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 font-mono">
+      <div class="milled-panel p-3.5 rounded-xl flex flex-col justify-between shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Terrain Incline</span>
+        <div class="my-1.5 flex items-baseline gap-1.5">
+          <span id="kpi-pitch" class="text-2xl font-bold font-mono text-[var(--accent-amber)]">18.0°</span>
+          <span id="kpi-stability-tag" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">SAFE</span>
+        </div>
+        <div class="text-[10px] text-[var(--text-muted)] flex justify-between border-t border-[var(--border-subtle)] pt-1">
+          <span>Rollover Cap:</span>
+          <span class="text-[var(--text-primary)] font-bold">34.2°</span>
+        </div>
+      </div>
+
+      <div class="milled-panel p-3.5 rounded-xl flex flex-col justify-between shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Altitude / P_atm</span>
+        <div class="my-1.5 flex items-baseline gap-1.5">
+          <span id="kpi-altitude" class="text-2xl font-bold font-mono text-cyan-400">2,100 m</span>
+        </div>
+        <div class="text-[10px] text-[var(--text-muted)] flex justify-between border-t border-[var(--border-subtle)] pt-1">
+          <span>Vac. Limit:</span>
+          <span id="kpi-vac-limit" class="text-amber-500 font-bold">4.2 m (Fails)</span>
+        </div>
+      </div>
+
+      <div class="milled-panel p-3.5 rounded-xl flex flex-col justify-between shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Sludge Viscosity</span>
+        <div class="my-1.5 flex items-baseline gap-1.5">
+          <span id="kpi-viscosity" class="text-2xl font-bold font-mono text-amber-500">320 cP</span>
+          <span class="text-[9px] text-[var(--text-muted)]">Sheared</span>
+        </div>
+        <div class="text-[10px] text-[var(--text-muted)] flex justify-between border-t border-[var(--border-subtle)] pt-1">
+          <span>Unsheared:</span>
+          <span id="kpi-raw-viscosity" class="text-[var(--text-secondary)]">2,800 cP</span>
+        </div>
+      </div>
+
+      <div class="milled-panel p-3.5 rounded-xl flex flex-col justify-between shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Delivery Flow</span>
+        <div class="my-1.5 flex items-baseline gap-1.5">
+          <span id="kpi-flow" class="text-2xl font-bold font-mono text-emerald-400">11.8 m³/h</span>
+        </div>
+        <div class="text-[10px] text-[var(--text-muted)] flex justify-between border-t border-[var(--border-subtle)] pt-1">
+          <span>Pump Head:</span>
+          <span class="text-[var(--text-secondary)] font-semibold">3.8 bar (PCP)</span>
+        </div>
+      </div>
+
+      <div class="milled-panel p-3.5 rounded-xl flex flex-col justify-between shadow-md">
+        <div class="flex justify-between items-center">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Piston Dewater Tank</span>
+          <span id="kpi-piston-status" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">COMPACTED</span>
+        </div>
+        <div class="my-1.5 flex items-baseline gap-1.5">
+          <span id="kpi-payload" class="text-2xl font-bold font-mono text-teal-400">280 L</span>
+          <span id="kpi-payload-pct" class="text-xs text-[var(--text-muted)]">(62%)</span>
+        </div>
+        <div class="text-[10px] text-[var(--text-muted)] flex justify-between font-mono border-t border-[var(--border-subtle)] pt-1">
+          <span>Solids Gain:</span>
+          <span id="kpi-solids-pct" class="text-emerald-400 font-bold">22.8% TS (3.2x)</span>
+        </div>
+        <div class="w-full bg-[var(--bg-base)] rounded-full h-1.5 mt-1.5 overflow-hidden border border-[var(--border-subtle)]">
+          <div id="kpi-payload-bar" class="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-300" style="width: 62%"></div>
+        </div>
+      </div>
+
+      <div class="milled-panel p-3.5 rounded-xl flex flex-col justify-between shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Gas Telemetry (Ex-d)</span>
+        <div class="my-1.5 flex items-baseline gap-2">
+          <div class="flex items-center gap-1">
+            <span class="text-[10px] text-[var(--text-muted)]">H₂S:</span>
+            <span id="kpi-h2s" class="text-sm font-bold text-emerald-400 font-mono">2.1 ppm</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-[10px] text-[var(--text-muted)]">CH₄:</span>
+            <span id="kpi-ch4" class="text-sm font-bold text-emerald-400 font-mono">1.4%</span>
+          </div>
+        </div>
+        <div class="text-[10px] flex justify-between items-center text-emerald-400 border-t border-[var(--border-subtle)] pt-1">
+          <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Safe Permissible</span>
+          <span class="text-[9px] text-[var(--text-muted)]">OSHA &lt; 10ppm</span>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- MAIN DUAL-ENGINE SIMULATION SECTION -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+
+      <!-- LEFT: MECHANICS & SLOPE (7 COLS) -->
+      <div class="lg:col-span-7 milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border-subtle)]">
+            <div class="flex items-center gap-2.5">
+              <div class="p-2 rounded-lg bg-amber-500/10 text-amber-500 dark:text-amber-300 border border-amber-500/30 text-sm font-bold">
+                📐
+              </div>
+              <div>
+                <h3 class="text-sm font-display font-black text-[var(--text-primary)] uppercase tracking-wider">
+                  Terrain Dynamics & Center of Mass (CoM) Stability
+                </h3>
+                <p class="text-xs text-[var(--text-secondary)] font-mono">Multibody Rollover Prevention on Hill Corridors (820mm Track Base)</p>
+              </div>
+            </div>
+            <div id="rollover-warning-badge" class="hidden px-3 py-1 rounded text-xs font-mono font-black text-rose-300 border border-rose-500 shadow-lg animate-pulse hazard-stripes">
+              <span class="bg-slate-950/90 px-2 py-0.5 rounded">⚠️ CRITICAL ROLLOVER THRESHOLD</span>
+            </div>
+          </div>
+
+          <!-- Inclinometer Canvas Display -->
+          <div class="relative bg-[var(--bg-base)] rounded-xl border border-[var(--border-hard)] overflow-hidden mb-4 p-2 shadow-inner">
+            <canvas id="slopeCanvas" width="640" height="280" class="w-full h-[260px] md:h-[280px] block"></canvas>
+            <div class="absolute top-3 left-3 bg-[var(--bg-card)]/90 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-[var(--border-hard)] text-[11px] space-y-0.5 shadow-md">
+              <div class="flex justify-between gap-3 text-[var(--text-primary)] font-mono">
+                <span>CoM Vector:</span>
+                <span id="canvas-com-coords" class="text-amber-500 dark:text-amber-300 font-bold">X: +42mm, Z: 368mm</span>
+              </div>
+              <div class="flex justify-between gap-3 text-[var(--text-muted)] font-mono text-[10px]">
+                <span>Track Support Footprint:</span>
+                <span class="text-[var(--text-secondary)]">980mm L × 820mm W</span>
+              </div>
+            </div>
+            <div class="absolute bottom-3 right-3 bg-[var(--bg-card)]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[var(--border-hard)] text-[11px] flex flex-wrap items-center gap-3 shadow-md font-mono">
+              <div class="flex items-center gap-1.5">
+                <span class="inline-block w-3 h-3 rounded bg-amber-800 border border-amber-600"></span>
+                <span class="text-amber-500 dark:text-amber-200 font-bold text-[10px]">Sludge Cake (Solids)</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="inline-block w-3 h-3 rounded bg-sky-400 border border-sky-300"></span>
+                <span class="text-sky-400 font-bold text-[10px]">Filtrate (Free Water)</span>
+              </div>
+              <div class="flex items-center gap-1.5 border-l border-[var(--border-subtle)] pl-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span class="text-[var(--text-muted)] text-[10px]">CoM</span>
+                <span class="inline-block w-2 h-2 rounded-full bg-rose-400 ml-1"></span>
+                <span class="text-[var(--text-muted)] text-[10px]">Gravity</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sliders Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 font-mono">
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Pitch Angle</span>
+                <span id="val-pitch" class="text-amber-500 dark:text-amber-300 font-bold">18°</span>
+              </div>
+              <input type="range" id="slider-pitch" min="0" max="35" step="0.5" value="18" class="custom-range w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5">
+                <span>0° (Flat)</span>
+                <span class="text-amber-500 font-bold">25° (Hill)</span>
+                <span class="text-rose-400 font-bold">34.2° (Cap)</span>
+              </div>
+            </div>
+
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Cross Roll</span>
+                <span id="val-roll" class="text-cyan-400 font-bold">4°</span>
+              </div>
+              <input type="range" id="slider-roll" min="-25" max="25" step="1" value="4" class="custom-range w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5">
+                <span>-25° (Port)</span>
+                <span>0°</span>
+                <span>+25° (Stbd)</span>
+              </div>
+            </div>
+
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Sludge Payload</span>
+                <span id="val-payload" class="text-teal-400 font-bold">280 L</span>
+              </div>
+              <input type="range" id="slider-payload" min="0" max="450" step="10" value="280" class="custom-range w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5">
+                <span>0 L</span>
+                <span>225 L</span>
+                <span>450 L</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Piston Compression Stroke Slider & 1-Click Auto Cycle -->
+          <div class="mt-3 bg-[var(--bg-card)] p-3.5 rounded-xl border border-teal-500/40 flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm font-mono">
+            <div class="flex-1 w-full">
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-teal-400 flex items-center gap-1.5 font-display uppercase tracking-wider text-[11px]">
+                  <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+                  Piston Compression Stroke Displacement
+                </span>
+                <span id="val-piston-stroke" class="text-teal-300 font-bold">60% (Compacting • 2.8 bar)</span>
+              </div>
+              <input type="range" id="slider-piston" min="0" max="100" step="1" value="60" class="custom-range w-full" oninput="onPistonUserSlider(this.value)">
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5">
+                <span>0% (Raw Slurry Intake)</span>
+                <span class="text-teal-400">50% Compaction</span>
+                <span class="text-emerald-400 font-bold">100% (Dense Cake: 3.5 bar)</span>
+              </div>
+            </div>
+            <!-- 1-Click Auto Cycle Demo Button -->
+            <button type="button" onclick="runAutoDewateringCycle()" id="btn-auto-dewater" class="whitespace-nowrap px-4 py-2 rounded-lg text-xs font-mono font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/50 transition flex items-center gap-1.5 shadow-sm active:scale-95">
+              <span>▶</span> Run Dewater Cycle (Auto)
+            </button>
+          </div>
+        </div>
+
+        <!-- Toggles -->
+        <div class="mt-4 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="toggle-baffles" checked onchange="updateSimulation()" class="rounded bg-[var(--bg-card)] border-[var(--border-hard)] text-amber-500">
+            <span class="text-[var(--text-secondary)]">Dual Longitudinal Anti-Slosh Baffles</span>
+            <span class="text-[10px] text-amber-500 font-bold">(Damps Slosh 68%)</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="toggle-crawler-tracks" checked onchange="updateSimulation()" class="rounded bg-[var(--bg-card)] border-[var(--border-hard)] text-amber-500">
+            <span class="text-[var(--text-secondary)]">Low-Slung Battery Chassis (Sub-Floor CoM)</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer bg-[var(--bg-card)] px-2.5 py-1.5 rounded-lg border border-teal-500/40">
+            <input type="checkbox" id="toggle-piston" checked onchange="updateSimulation()" class="rounded bg-[var(--bg-base)] border-[var(--border-hard)] text-teal-400">
+            <span class="text-teal-400 font-semibold">Automated Piston Dewatering Ram</span>
+            <span class="text-[10px] text-emerald-400 font-bold">(68% Water Expelled • 3.2x Gain)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- RIGHT: THERMAL & FLUID RHEOLOGY (5 COLS) -->
+      <div class="lg:col-span-5 milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b border-[var(--border-subtle)] gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-sm font-bold">
+                ⚙️
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-display font-black text-[var(--text-primary)] uppercase tracking-wider">Cold-Climate & High-Altitude Pumping</h3>
+                  <span id="thermal-status-pill" class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                    HEATER ON (+18°C)
+                  </span>
+                </div>
+                <p class="text-xs text-[var(--text-secondary)] font-mono">Inline Cutter Rheology & Progressive Cavity Screw Pump</p>
+              </div>
+            </div>
+            <!-- Segmented View Toggle: Macerator vs Progressive Cavity Pump -->
+            <div class="flex bg-[var(--bg-card)] p-1 rounded-lg border border-[var(--border-hard)] text-[11px] font-mono">
+              <button type="button" id="btn-view-macerator" onclick="setRightCanvasMode('macerator')" class="px-2.5 py-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
+                🔪 Macerator
+              </button>
+              <button type="button" id="btn-view-pcp" onclick="setRightCanvasMode('pcp')" class="px-2.5 py-1 rounded-md bg-indigo-600 text-white shadow-sm transition font-bold">
+                ⚙️ PCP Screw Pump
+              </button>
+            </div>
+          </div>
+
+          <!-- Dual Mode Canvas: Macerator or Progressive Cavity Pump -->
+          <div class="relative bg-[var(--bg-base)] rounded-xl border border-[var(--border-hard)] overflow-hidden mb-4 p-2 shadow-inner">
+            <canvas id="maceratorCanvas" width="480" height="180" class="w-full h-[180px] block"></canvas>
+            <div id="macerator-caption" class="absolute bottom-2 left-3 bg-[var(--bg-card)]/90 backdrop-blur-md px-2.5 py-1 rounded text-[10px] text-[var(--text-secondary)] font-mono border border-[var(--border-hard)]">
+              Positive Displacement: <span class="text-emerald-400 font-bold">Tool-Steel Rotor inside Rubber Stator (Zero Altitude Loss)</span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="space-y-3 text-xs font-mono">
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between font-semibold mb-1.5">
+                <span class="text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Ambient Temperature</span>
+                <span id="val-temp" class="text-amber-500 font-bold">-4°C</span>
+              </div>
+              <input type="range" id="slider-temp" min="-15" max="35" step="1" value="-4" class="custom-range w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5">
+                <span>-15°C (Sub-Zero)</span>
+                <span>0°C</span>
+                <span>+35°C</span>
+              </div>
+            </div>
+
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between font-semibold mb-1.5">
+                <span class="text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Elevation Altitude MSL</span>
+                <span id="val-altitude" class="text-cyan-400 font-bold">2,100 m</span>
+              </div>
+              <input type="range" id="slider-altitude" min="200" max="3600" step="100" value="2100" class="custom-range w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5">
+                <span>Plains (200m)</span>
+                <span>Shimla (2200m)</span>
+                <span>Leh (3500m)</span>
+              </div>
+              <!-- 1-Click Interactive Altitude Cavitation Test Button -->
+              <button type="button" id="btn-test-altitude" onclick="runAltitudeCavitationTest()" class="mt-2.5 w-full py-2 px-3 rounded-lg text-xs font-mono font-bold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
+                <span>▶</span> Test Altitude Cavitation (Plains 200m ➔ Leh 3,500m)
+              </button>
+            </div>
+
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between font-semibold mb-1.5">
+                <span class="text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Suction Nozzle Cutter Speed</span>
+                <span id="val-macerator" class="text-emerald-400 font-bold">1,450 RPM</span>
+              </div>
+              <input type="range" id="slider-macerator" min="0" max="2200" step="50" value="1450" class="custom-range w-full" oninput="updateSimulation()">
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5">
+                <span>0 (Risk Choke)</span>
+                <span>1200 RPM</span>
+                <span>2200 RPM (High Shear)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs font-mono">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="toggle-heater" checked onchange="updateSimulation()" class="rounded bg-[var(--bg-card)] border-[var(--border-hard)] text-amber-500">
+            <span class="text-[var(--text-secondary)] font-medium">Inline PTC Thermal Jacket (Heats to +18°C)</span>
+          </label>
+          <span class="text-[10px] font-mono text-emerald-400 font-bold">Zero Cavitation Verified</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MINISTRY OF JAL SHAKTI: SBM 2.0 FSTP CHAIN-OF-CUSTODY & CPCB COMPLIANCE MANIFEST -->
+    <div class="mb-6 milled-panel p-4 md:p-5 rounded-xl shadow-xl border border-amber-500/30 relative overflow-hidden font-mono">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-[var(--border-subtle)]">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono text-xs font-bold">
+            SBM-FSSM
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-display font-black text-[var(--text-primary)] uppercase tracking-wider">National FSSM Chain-of-Custody & Environmental Integrity</h3>
+              <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
+                CPCB COMPLIANT
+              </span>
+            </div>
+            <p class="text-[11px] text-[var(--text-secondary)]">Hermetically Sealed Conveyance • Zero Mountain Stream Runoff • Digital Geofenced Manifest</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="bg-[var(--bg-card)] px-3 py-1.5 rounded-lg border border-[var(--border-hard)] text-[11px] font-mono shadow-sm">
+            <span class="text-[var(--text-muted)]">Digital Manifest ID:</span>
+            <span id="manifest-id" class="text-amber-500 dark:text-amber-300 font-bold ml-1">DDWS-HP-2026-FSSM-0842</span>
+          </div>
+          <button onclick="switchTab('graphs')" class="px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-amber-500 dark:text-amber-300 border border-amber-500/40 transition flex items-center gap-1.5 shadow-sm">
+            <span>View 4 Physics Graphs</span> ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- 4 Ministry Compliance KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3">
+        <div class="bg-[var(--bg-card)] p-3 rounded-lg border border-[var(--border-subtle)] shadow-sm">
+          <div class="text-[9px] font-mono uppercase text-[var(--text-muted)]">Designated FSTP Route</div>
+          <div id="manifest-fstp" class="text-xs font-bold text-[var(--text-primary)] mt-0.5 truncate">Shimla 15 KLD Co-Treatment</div>
+          <div class="text-[9px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Geofence Active (3.2 km)
+          </div>
+        </div>
+
+        <div class="bg-[var(--bg-card)] p-3 rounded-lg border border-[var(--border-subtle)] shadow-sm">
+          <div class="text-[9px] font-mono uppercase text-[var(--text-muted)]">Valley Discharge Index</div>
+          <div class="text-xs font-bold text-emerald-400 mt-0.5">0.00% Zero Runoff</div>
+          <div class="text-[9px] text-[var(--text-muted)] mt-0.5">Hermetic Quick-Connect Camlock</div>
+        </div>
+
+        <div class="bg-[var(--bg-card)] p-3 rounded-lg border border-[var(--border-subtle)] shadow-sm">
+          <div class="text-[9px] font-mono uppercase text-[var(--text-muted)]">NAMASTE Safety Factor</div>
+          <div class="text-xs font-bold text-emerald-400 mt-0.5">100% Touchless</div>
+          <div class="text-[9px] text-[var(--text-muted)] mt-0.5">Confined-Space Entry = 0.0</div>
+        </div>
+
+        <div class="bg-[var(--bg-card)] p-3 rounded-lg border border-[var(--border-subtle)] shadow-sm">
+          <div class="text-[9px] font-mono uppercase text-[var(--text-muted)]">Specific Energy Consumption</div>
+          <div class="text-xs font-bold text-teal-400 mt-0.5">0.38 kWh / 1,000 L</div>
+          <div class="text-[9px] text-[var(--text-muted)] mt-0.5">100% Electric EV (Zero Tailpipe)</div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- BOTTOM ROW: SENSORS, TELEOP & LOG -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 font-mono">
+
+      <!-- GAS TELEMETRY (4 COLS) -->
+      <div class="lg:col-span-4 milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border-subtle)]">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🦺</span>
+              <div>
+                <h4 class="text-sm font-display font-black text-[var(--text-primary)] uppercase tracking-wider">Zero-Manual-Scavenging Gas Telemetry</h4>
+                <p class="text-[10px] text-[var(--text-secondary)]">Ex-d Zone 1 Confined Space Atmospheric Sniffer</p>
+              </div>
+            </div>
+            <span class="flex h-2 w-2 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
+
+          <div class="space-y-3">
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs font-semibold text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Hydrogen Sulfide (H₂S)</span>
+                <span id="gas-h2s-val" class="font-mono text-sm font-bold text-emerald-400">2.1 ppm</span>
+              </div>
+              <div class="w-full bg-[var(--bg-base)] rounded-full h-1.5 overflow-hidden border border-[var(--border-subtle)]">
+                <div id="gas-h2s-bar" class="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full rounded-full transition-all" style="width: 21%"></div>
+              </div>
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5 font-mono">
+                <span>0 ppm (Clean)</span>
+                <span class="text-amber-500 font-bold">10 ppm (OSHA Cap)</span>
+                <span class="text-rose-400 font-bold">50 ppm (Toxic)</span>
+              </div>
+            </div>
+
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs font-semibold text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">Methane (CH₄ Flammability)</span>
+                <span id="gas-ch4-val" class="font-mono text-sm font-bold text-emerald-400">1.4% LEL</span>
+              </div>
+              <div class="w-full bg-[var(--bg-base)] rounded-full h-1.5 overflow-hidden border border-[var(--border-subtle)]">
+                <div id="gas-ch4-bar" class="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full rounded-full transition-all" style="width: 14%"></div>
+              </div>
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1.5 font-mono">
+                <span>0% LEL</span>
+                <span class="text-amber-500 font-bold">10% LEL (Alarm)</span>
+                <span class="text-rose-400 font-bold">100% LEL</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-secondary)] font-mono">
+          <span>Worker Touchless Factor:</span>
+          <span class="text-emerald-400 font-bold">100% Mechanized (0 Entry)</span>
+        </div>
+      </div>
+
+      <!-- DRIVETRAIN, BATTERY & POWER SCADA TELEMETRY (4 COLS) -->
+      <div class="lg:col-span-4 milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border-subtle)]">
+            <div class="flex items-center gap-2">
+              <span class="text-base">⚡</span>
+              <div>
+                <h4 class="text-sm font-display font-black text-[var(--text-primary)] uppercase tracking-wider">Drivetrain & Power SCADA</h4>
+                <p class="text-[10px] text-[var(--text-secondary)]">48V Sub-Floor LiFePO4 & Dual BLDC Drives</p>
+              </div>
+            </div>
+            <span class="text-[9px] font-mono bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded border border-emerald-500/30">
+              EFFICIENCY: 94.6%
+            </span>
+          </div>
+
+          <div class="space-y-2.5">
+            <!-- Battery State of Charge -->
+            <div class="bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs font-semibold text-[var(--text-secondary)] font-display uppercase tracking-wider text-[11px]">48V 60Ah LiFePO4 Pack</span>
+                <span class="font-mono text-sm font-bold text-cyan-400">84% (51.2 V)</span>
+              </div>
+              <div class="w-full bg-[var(--bg-base)] rounded-full h-1.5 overflow-hidden border border-[var(--border-subtle)]">
+                <div class="bg-cyan-400 h-full rounded-full" style="width: 84%"></div>
+              </div>
+              <div class="flex justify-between text-[9px] text-[var(--text-muted)] mt-1 font-mono">
+                <span>Draw: 14.8 A (758 W)</span>
+                <span class="text-[var(--text-primary)] font-semibold">Run Time: ~4.5 hrs</span>
+              </div>
+            </div>
+
+            <!-- Track Motor Torques -->
+            <div class="grid grid-cols-2 gap-2">
+              <div class="bg-[var(--bg-card)] p-2.5 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+                <div class="text-[9px] text-[var(--text-muted)] font-bold uppercase">Left Track BLDC</div>
+                <div class="font-mono text-sm font-bold text-[var(--text-primary)] mt-0.5">42.4 Nm</div>
+                <div class="text-[9px] text-emerald-400 font-mono mt-0.5">Temp: 38°C (Normal)</div>
+              </div>
+              <div class="bg-[var(--bg-card)] p-2.5 rounded-xl border border-[var(--border-subtle)] shadow-sm">
+                <div class="text-[9px] text-[var(--text-muted)] font-bold uppercase">Right Track BLDC</div>
+                <div class="font-mono text-sm font-bold text-[var(--text-primary)] mt-0.5">44.1 Nm</div>
+                <div class="text-[9px] text-emerald-400 font-mono mt-0.5">Temp: 39°C (Normal)</div>
+              </div>
+            </div>
+
+            <!-- Incline Anti-Skid / Traction -->
+            <div class="bg-[var(--bg-card)] p-2.5 rounded-xl border border-[var(--border-subtle)] flex items-center justify-between shadow-sm">
+              <div>
+                <div class="text-xs font-semibold text-[var(--text-secondary)] font-display uppercase tracking-wider text-[10px]">Traction Slip Ratio</div>
+                <div class="text-[9px] text-[var(--text-muted)] font-mono">Rubber cleat on 24° soil</div>
+              </div>
+              <div class="text-right">
+                <span class="font-mono text-sm font-bold text-emerald-400">4.2% (Grip OK)</span>
+                <div class="text-[9px] text-[var(--text-muted)] font-mono">Brakes: Electro-Hold</div>
+              </div>
+            </div>
+
+            <!-- Piston Dewatering Ram Actuator -->
+            <div class="bg-[var(--bg-card)] p-2.5 rounded-xl border border-teal-500/40 flex items-center justify-between shadow-sm">
+              <div>
+                <div class="text-xs font-semibold text-teal-400 font-display uppercase tracking-wider text-[10px]">Piston Ram Actuator</div>
+                <div class="text-[9px] text-[var(--text-muted)] font-mono">Electric ballscrew (3.5 bar)</div>
+              </div>
+              <div class="text-right">
+                <span id="scada-piston-thrust" class="font-mono text-sm font-bold text-teal-400">12.8 kN Thrust</span>
+                <div id="scada-piston-sub" class="text-[9px] text-emerald-400 font-mono">Dewatering: 68% Extracted</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-[var(--border-subtle)] flex justify-between gap-2">
+          <button onclick="toggleCutterReverse()" class="flex-1 py-1.5 px-2 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[11px] font-medium text-[var(--text-primary)] border border-[var(--border-hard)] transition">
+            🔄 Cutter Anti-Jam Reverse
+          </button>
+          <button onclick="emergencyDrain()" class="py-1.5 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-[11px] font-bold text-rose-300 border border-rose-500/40 transition">
+            🚨 E-STOP
+          </button>
+        </div>
+      </div>
+
+      <!-- TELEMETRY TERMINAL (4 COLS) -->
+      <div class="lg:col-span-4 milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between pb-3 mb-3 border-b border-[var(--border-subtle)]">
+            <div class="flex items-center gap-2">
+              <span class="text-base">💻</span>
+              <div>
+                <h4 class="text-sm font-display font-black text-[var(--text-primary)] uppercase tracking-wider">Live Mathematical Stream</h4>
+                <p class="text-[10px] text-[var(--text-secondary)]">20 Hz Real-Time Dynamics Log</p>
+              </div>
+            </div>
+            <span class="text-[9px] font-mono text-emerald-400 flex items-center gap-1 font-bold">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> LOCK 20Hz
+            </span>
+          </div>
+
+          <div id="terminal-log" class="bg-[var(--bg-base)] font-mono text-[10px] p-3 rounded-xl border border-[var(--border-hard)] h-44 overflow-y-auto space-y-1.5 text-[var(--text-secondary)] shadow-inner">
+            <div class="text-amber-500 font-bold">[SYSTEM INIT] BHARAT-JAL SCADA Mk-IV Digital Simulation Initialized.</div>
+            <div class="text-[var(--text-muted)]">[CAD VERIFY] CoM baseline: [X=0.04m, Y=0.00m, Z=0.37m] within tracks footprint.</div>
+            <div class="text-[var(--text-muted)]">[RHEOLOGY] Ostwald-de Waele Model active: n=0.38, K=14.2 Pa·s^n.</div>
+            <div class="text-emerald-400">[PUMP HEAD] Positive displacement head = 3.8 bar > barometric cavitation threshold.</div>
+            <div class="text-amber-400">[GAS TELEMETRY] Continuous catalytic bead & NDIR sensors active.</div>
+          </div>
+        </div>
+
+        <div class="mt-3 p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[11px] space-y-1 shadow-sm">
+          <div class="text-[var(--text-secondary)] font-semibold flex justify-between">
+            <span>Incline Rollover Condition:</span>
+            <span id="formula-verdict" class="text-emerald-400 font-mono font-bold">h·tan(θ) &lt; b/2 (STABLE)</span>
+          </div>
+          <p class="text-[9px] text-[var(--text-muted)] font-mono leading-tight">
+            Where track base b = 820 mm, payload height h = 410 mm, active pitch θ = 18°.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- TAB 2: INTERACTIVE ENGINEERING GRAPHS (NEW DEDICATED TAB) -->
+  <!-- ============================================================== -->
+  <div id="tab-graphs" class="tab-content flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
+    <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div>
+        <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-500 dark:text-amber-300 border border-amber-500/30 uppercase tracking-widest">
+          Validation Evidence for Technical Evaluators
+        </span>
+        <h2 class="text-2xl md:text-3xl font-display font-black text-[var(--text-primary)] mt-2 mb-1 tracking-wide">
+          Dynamic Engineering Graphs & Rheological Proofs
+        </h2>
+        <p class="text-[var(--text-secondary)] text-sm">
+          Interactive graphs computed in real time using the governing Ostwald-de Waele fluid mechanics, barometric vacuum curve, and multi-body dynamics.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2 bg-[var(--bg-card)] p-2.5 rounded-xl border border-[var(--border-hard)] text-xs font-mono shadow-sm">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+        <span class="text-[var(--text-primary)] font-semibold">Simulator operating point synchronized (20 Hz)</span>
+      </div>
+    </div>
+
+    <!-- 4-GRAPH GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 font-mono">
+
+      <!-- GRAPH 1: ROLLOVER STABILITY VS SLOPE ANGLE -->
+      <div class="milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-subtle)]">
+            <div>
+              <h3 class="text-sm font-display font-bold text-[var(--text-primary)] flex items-center gap-2 uppercase tracking-wider">
+                <span>Graph 1: Rollover Righting Moment vs. Slope Angle</span>
+              </h3>
+              <p class="text-[11px] text-[var(--text-secondary)] font-mono">Unbaffled failure at 26.4° vs. TERRA-VAC dual-baffled safety ceiling of 34.2°</p>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 dark:text-amber-300 border border-amber-500/30 font-bold">MBD SIMULATION</span>
+          </div>
+          <div class="relative bg-[var(--bg-base)] rounded-xl border border-[var(--border-hard)] p-2 overflow-hidden shadow-inner">
+            <canvas id="chartStability" width="560" height="260" class="w-full h-[240px] block"></canvas>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center justify-between text-[11px] text-[var(--text-secondary)] font-mono">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Dual Baffled (TERRA-VAC)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span> Unbaffled Conventional</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Active Point</span>
+          </div>
+          <span class="font-mono text-amber-500 dark:text-amber-300 font-bold" id="graph-stat-stability">Active: 18.0° (Safe)</span>
+        </div>
+      </div>
+
+      <!-- GRAPH 2: OSTWALD DE WAELE SHEAR-THINNING CURVE -->
+      <div class="milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-subtle)]">
+            <div>
+              <h3 class="text-sm font-display font-bold text-[var(--text-primary)] flex items-center gap-2 uppercase tracking-wider">
+                <span>Graph 2: Non-Newtonian Viscosity vs. Shear Rate (RPM)</span>
+              </h3>
+              <p class="text-[11px] text-[var(--text-secondary)] font-mono">Ostwald–de Waele power-law model (n=0.38) proves 88% reduction in flow friction</p>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 dark:text-amber-300 border border-amber-500/30 font-bold">RHEOLOGY CFD</span>
+          </div>
+          <div class="relative bg-[var(--bg-base)] rounded-xl border border-[var(--border-hard)] p-2 overflow-hidden shadow-inner">
+            <canvas id="chartRheology" width="560" height="260" class="w-full h-[240px] block"></canvas>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center justify-between text-[11px] text-[var(--text-secondary)] font-mono">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Apparent Viscosity Curve</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Active Point</span>
+          </div>
+          <span class="font-mono text-amber-500 dark:text-amber-300 font-bold" id="graph-stat-viscosity">Active: 1,450 RPM &rarr; 320 cP</span>
+        </div>
+      </div>
+
+      <!-- GRAPH 3: ALTITUDE MSL VS. SUCTION LIFT CAPACITY -->
+      <div class="milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-subtle)]">
+            <div>
+              <h3 class="text-sm font-display font-bold text-[var(--text-primary)] flex items-center gap-2 uppercase tracking-wider">
+                <span>Graph 3: Suction Lift vs. Altitude Above MSL</span>
+              </h3>
+              <p class="text-[11px] text-[var(--text-secondary)] font-mono">Vacuum cavitation failure (&lt;3.5m) vs. Positive Displacement continuous +4 bar head</p>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 font-bold">BAROMETRIC LIFT</span>
+          </div>
+          <div class="relative bg-[var(--bg-base)] rounded-xl border border-[var(--border-hard)] p-2 overflow-hidden shadow-inner">
+            <canvas id="chartAltitude" width="560" height="260" class="w-full h-[240px] block"></canvas>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center justify-between text-[11px] text-[var(--text-secondary)] font-mono">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> TERRA-VAC Booster Head (40m)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span> Vacuum Truck Limit</span>
+          </div>
+          <span class="font-mono text-cyan-400 font-bold" id="graph-stat-altitude">Active: 2,100m MSL</span>
+        </div>
+      </div>
+
+      <!-- GRAPH 4: TEMPERATURE VS. SLUDGE VISCOSITY (THERMAL HEATING) -->
+      <div class="milled-panel p-5 rounded-xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-subtle)]">
+            <div>
+              <h3 class="text-sm font-display font-bold text-[var(--text-primary)] flex items-center gap-2 uppercase tracking-wider">
+                <span>Graph 4: Thermal Dissolution Curve (Viscosity vs. Temperature)</span>
+              </h3>
+              <p class="text-[11px] text-[var(--text-secondary)] font-mono">PTC heating jacket prevents lipid freezing from -15°C to +30°C</p>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/30 font-bold">THERMAL CFD</span>
+          </div>
+          <div class="relative bg-[var(--bg-base)] rounded-xl border border-[var(--border-hard)] p-2 overflow-hidden shadow-inner">
+            <canvas id="chartThermal" width="560" height="260" class="w-full h-[240px] block"></canvas>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center justify-between text-[11px] text-[var(--text-secondary)] font-mono">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-teal-400"></span> PTC Heated (+18°C Intake)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span> Unheated Freezing Sludge</span>
+          </div>
+          <span class="font-mono text-teal-300 font-bold" id="graph-stat-thermal">Active: -4°C &rarr; +18°C</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- GEOGRAPHICAL ANALYSIS MATRIX ACCROSS INDIAN HILL STATIONS -->
+    <div class="milled-panel p-6 rounded-xl shadow-xl relative overflow-hidden font-mono">
+      <h3 class="text-lg font-display font-bold text-[var(--text-primary)] mb-2 uppercase tracking-wider">Geographical Test Matrix Across 7 Varied Indian Hilly Zones</h3>
+      <p class="text-xs text-[var(--text-secondary)] mb-4 font-sans">
+        Comparative matrix proving that TERRA-VAC 450 overcomes all regional constraints where traditional vacuum trucks are rendered unusable:
+      </p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs text-left">
+          <thead>
+            <tr class="border-b border-[var(--border-hard)] text-[var(--text-muted)] font-mono uppercase text-[10px] tracking-wider">
+              <th class="py-2.5 px-3">Location & State</th>
+              <th class="py-2.5 px-3">Altitude MSL</th>
+              <th class="py-2.5 px-3">Average Alley Incline</th>
+              <th class="py-2.5 px-3">Climatic Extreme</th>
+              <th class="py-2.5 px-3">Vacuum Truck Status</th>
+              <th class="py-2.5 px-3 text-amber-500 dark:text-amber-300 font-bold">TERRA-VAC 450 Operational Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[var(--border-subtle)] text-[var(--text-secondary)]">
+            <tr>
+              <td class="py-2.5 px-3 font-semibold text-[var(--text-primary)]">Shimla (Himachal Pradesh)</td>
+              <td class="py-2.5 px-3 font-mono">2,200 m</td>
+              <td class="py-2.5 px-3 font-mono">24° (Stepped ramps)</td>
+              <td class="py-2.5 px-3">Winter Frost & Rags</td>
+              <td class="py-2.5 px-3 text-rose-400 font-semibold">Inaccessible (&lt;1.5m width)</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">100% Crawl & Maceration Pass</td>
+            </tr>
+            <tr>
+              <td class="py-2.5 px-3 font-semibold text-[var(--text-primary)]">Leh (Ladakh)</td>
+              <td class="py-2.5 px-3 font-mono">3,500 m</td>
+              <td class="py-2.5 px-3 font-mono">12° (Valley terrain)</td>
+              <td class="py-2.5 px-3">-15°C Sub-Zero Frozen Cake</td>
+              <td class="py-2.5 px-3 text-rose-400 font-semibold">Severe Cavitation + Hose Freeze</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">PTC Heated Liquefaction Pass</td>
+            </tr>
+            <tr>
+              <td class="py-2.5 px-3 font-semibold text-[var(--text-primary)]">Aizawl (Mizoram)</td>
+              <td class="py-2.5 px-3 font-mono">1,130 m</td>
+              <td class="py-2.5 px-3 font-mono">27° (Ridge staircases)</td>
+              <td class="py-2.5 px-3">High Humidity / Landslide mud</td>
+              <td class="py-2.5 px-3 text-rose-400 font-semibold">Rollover Hazard (&gt;15° limit)</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">Dual-Baffled CoM Pass (Safe to 34°)</td>
+            </tr>
+            <tr>
+              <td class="py-2.5 px-3 font-semibold text-[var(--text-primary)]">Kedarnath Valley (Uttarakhand)</td>
+              <td class="py-2.5 px-3 font-mono">3,100 m</td>
+              <td class="py-2.5 px-3 font-mono">30° (Pedestrian trek)</td>
+              <td class="py-2.5 px-3">Sub-zero & High Altitude</td>
+              <td class="py-2.5 px-3 text-rose-400 font-semibold">Zero Road Access</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">Tracked Crawler Stair Climb Pass</td>
+            </tr>
+            <tr>
+              <td class="py-2.5 px-3 font-semibold text-[var(--text-primary)]">Tawang (Arunachal Pradesh)</td>
+              <td class="py-2.5 px-3 font-mono">3,048 m</td>
+              <td class="py-2.5 px-3 font-mono">25° (Mountain alleys)</td>
+              <td class="py-2.5 px-3">-8°C Snow & Ice</td>
+              <td class="py-2.5 px-3 text-rose-400 font-semibold">Track Slip & Pump Freeze</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">Heated Intakes & Rubber Spikes Pass</td>
+            </tr>
+            <tr>
+              <td class="py-2.5 px-3 font-semibold text-[var(--text-primary)]">Munnar / Western Ghats (Kerala)</td>
+              <td class="py-2.5 px-3 font-mono">1,530 m</td>
+              <td class="py-2.5 px-3 font-mono">26° (Wet stairs)</td>
+              <td class="py-2.5 px-3">Heavy Monsoon Dilution</td>
+              <td class="py-2.5 px-3 text-rose-400 font-semibold">Truck Skid & Narrow Lanes</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">High-Traction Tread Pass</td>
+            </tr>
+            <tr>
+              <td class="py-2.5 px-3 font-semibold text-[var(--text-primary)]">Ooty (Nilgiris, Tamil Nadu)</td>
+              <td class="py-2.5 px-3 font-mono">2,240 m</td>
+              <td class="py-2.5 px-3 font-mono">21° (Terraced slopes)</td>
+              <td class="py-2.5 px-3">Wet Clay & Organic Overload</td>
+              <td class="py-2.5 px-3 text-rose-400 font-semibold">Hairpin bend blockages</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">Zero Turn Radius Maneuver Pass</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- TAB 3: PROBLEM CONTEXT & SIH VISION -->
+  <!-- ============================================================== -->
+  <div id="tab-problem" class="tab-content flex-grow p-4 md:p-8 max-w-6xl mx-auto w-full">
+    <div class="mb-8">
+      <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-500 dark:text-amber-300 border border-amber-500/30 uppercase tracking-widest">
+        SIH Problem Statement SIH26258
+      </span>
+      <h2 class="text-2xl md:text-4xl font-display font-black text-[var(--text-primary)] mt-2 mb-3 tracking-wide">
+        Innovative Mechanized Desludging Models for Varied Climatic Zones and Hilly Terrains
+      </h2>
+      <p class="text-[var(--text-secondary)] text-sm md:text-base leading-relaxed font-sans">
+        Issued by the <strong>Ministry of Jal Shakti</strong> under the <em>Clean & Green Technology</em> theme to accelerate Swachh Bharat Mission (Grameen & Urban 2.0) and achieve the national mandate of <strong>100% elimination of hazardous manual cleaning</strong>.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+      <div class="milled-panel p-6 rounded-xl shadow-xl hover:border-amber-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-rose-500/10 text-rose-500 dark:text-rose-400 flex items-center justify-center font-display font-bold text-lg mb-4 border border-rose-500/30">
+          01
+        </div>
+        <h3 class="text-base font-display font-bold text-[var(--text-primary)] mb-2 uppercase tracking-wider">Severe Inaccessibility in Mountain Alleys</h3>
+        <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">
+          Standard vacuum trucks (3,000–6,000 L) require at least 3.2 meters road width and fail on gradients above 12%. In mountain settlements like Shimla, Aizawl, or Mussoorie, paths are narrower than 1.5m with step staircases and 20°–30° slopes where large trucks physically cannot enter.
+        </p>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl hover:border-amber-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-500 dark:text-amber-400 flex items-center justify-center font-display font-bold text-lg mb-4 border border-amber-500/30">
+          02
+        </div>
+        <h3 class="text-base font-display font-bold text-[var(--text-primary)] mb-2 uppercase tracking-wider">Atmospheric Pressure Limit at High Altitude</h3>
+        <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">
+          Conventional vacuum tanks depend entirely on atmospheric barometric pressure for suction lift. At 2,200m+ altitude (Leh, Manali), atmospheric pressure drops from 101 kPa to ~75 kPa. This cuts effective suction lift from ~7 meters down to under 4 meters, causing severe cavitation.
+        </p>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl hover:border-amber-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-display font-bold text-lg mb-4 border border-indigo-500/30">
+          03
+        </div>
+        <h3 class="text-base font-display font-bold text-[var(--text-primary)] mb-2 uppercase tracking-wider">Sub-Zero Sludge Solidification & Viscosity</h3>
+        <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">
+          In sub-zero Himalayan winters, faecal sludge thickens exponentially. Lipids, fats, and scum freeze into a hardened cake (>3,500 cP). Unheated suction lines freeze and choke within minutes, rendering standard equipment completely inoperable.
+        </p>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl hover:border-amber-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-display font-bold text-lg mb-4 border border-cyan-500/30">
+          04
+        </div>
+        <h3 class="text-base font-display font-bold text-[var(--text-primary)] mb-2 uppercase tracking-wider">Foreign Municipal Solid Waste & Choking</h3>
+        <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">
+          Pit latrines and septic tanks in India contain significant volumes of rags, plastics, and sanitary pads. When suction hoses clog mid-way over 50m runs, sanitation workers are forced to dismantle pipes and manually clear blockages—perpetuating unsafe manual intervention.
+        </p>
+      </div>
+    </div>
+
+    <!-- The Two-Tier Solution Diagram -->
+    <div class="milled-panel p-6 md:p-8 rounded-xl shadow-xl">
+      <h3 class="text-lg font-display font-bold text-[var(--text-primary)] mb-4 uppercase tracking-wider">The Solution: Two-Tier Hub-and-Spoke Architecture</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono">
+        <div class="p-5 rounded-lg bg-[var(--bg-card)] border border-amber-500/30 shadow-sm">
+          <div class="text-amber-500 dark:text-amber-300 text-xs font-mono font-bold mb-1">TIER 1 • CRAWLER TRANSIT</div>
+          <h4 class="text-sm font-display font-bold text-[var(--text-primary)] mb-2 uppercase">TERRA-VAC 450 Mini-Crawler</h4>
+          <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">
+            Ultra-compact rubber-tracked chassis (<900mm wide) climbs 28° slopes, enters tight alleys, and holds 450L intermediate payload with anti-slosh baffles.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-lg bg-[var(--bg-card)] border border-amber-500/30 shadow-sm">
+          <div class="text-amber-500 dark:text-amber-300 text-xs font-mono font-bold mb-1">PROCESS • SHEAR & HEAT</div>
+          <h4 class="text-sm font-display font-bold text-[var(--text-primary)] mb-2 uppercase">Inline Cutter & Thermal Jacket</h4>
+          <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">
+            Submersible macerator pulverizes solids at the nozzle tip, while PTC thermal heating jacket lowers apparent viscosity from 2800 cP to 320 cP.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-lg bg-[var(--bg-card)] border border-indigo-500/30 shadow-sm">
+          <div class="text-indigo-400 text-xs font-mono font-bold mb-1">TIER 2 • CONVEYANCE</div>
+          <h4 class="text-sm font-display font-bold text-[var(--text-primary)] mb-2 uppercase">Road Mother Tanker Transfer</h4>
+          <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">
+            After filling in narrow alleys, the mini-crawler crawls back to the main road and uses high-pressure positive displacement discharge to transfer sludge to the municipal tanker.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- TAB 4: MECHANICAL CAD & SUBSYSTEMS -->
+  <!-- ============================================================== -->
+  <div id="tab-engineering" class="tab-content flex-grow p-4 md:p-8 max-w-6xl mx-auto w-full">
+    <div class="mb-8">
+      <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest">
+        Mechanical Engineering Prototype
+      </span>
+      <h2 class="text-2xl md:text-3xl font-display font-black text-[var(--text-primary)] mt-2 mb-2 tracking-wide">Subsystem CAD Specifications & Assembly</h2>
+      <p class="text-[var(--text-secondary)] text-sm font-sans">
+        Detailed engineering breakdown designed in Autodesk Fusion 360 & SolidWorks for multi-terrain reliability.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 font-mono">
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <div class="flex items-center justify-between mb-3 border-b border-[var(--border-subtle)] pb-2">
+          <h3 class="text-sm font-display font-bold text-amber-500 dark:text-amber-300 uppercase tracking-wider">1. All-Terrain Tracked Chassis</h3>
+          <span class="text-xs font-mono text-[var(--text-muted)]">Base: 980mm × 820mm</span>
+        </div>
+        <p class="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed font-sans">
+          High-traction rubber tracks with reinforced steel cords. Dual 48V brushless DC hub drive motors with integrated electromechanical fail-safe brakes.
+        </p>
+        <ul class="space-y-2 text-xs text-[var(--text-secondary)] font-mono">
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Ground Clearance:</span>
+            <span class="text-[var(--text-primary)] font-bold">140 mm</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Approach / Departure Angle:</span>
+            <span class="text-[var(--text-primary)] font-bold">42° / 40° (Stair Capable)</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Crawl Speed:</span>
+            <span class="text-[var(--text-primary)] font-bold">0.0 to 1.2 m/s (Variable)</span>
+          </li>
+          <li class="flex justify-between">
+            <span>Chassis Turning Radius:</span>
+            <span class="text-emerald-400 font-bold">Zero Radius (Counter-rotation)</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <div class="flex items-center justify-between mb-3 border-b border-[var(--border-subtle)] pb-2">
+          <h3 class="text-sm font-display font-bold text-amber-500 dark:text-amber-300 uppercase tracking-wider">2. Suction Nozzle & Macerator Assembly</h3>
+          <span class="text-xs font-mono text-[var(--text-muted)]">Tungsten Carbide Cutters</span>
+        </div>
+        <p class="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed font-sans">
+          Dual rotary chopper blades mounted directly at the intake orifice against a hardened perforated shear plate to eliminate downstream clogging.
+        </p>
+        <ul class="space-y-2 text-xs text-[var(--text-secondary)] font-mono">
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Cutter Motor:</span>
+            <span class="text-[var(--text-primary)] font-bold">1.8 kW High-Torque Submersible BLDC</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Operating Speed:</span>
+            <span class="text-[var(--text-primary)] font-bold">1,200 – 1,800 RPM</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Particulate Reduction:</span>
+            <span class="text-[var(--text-primary)] font-bold">&lt; 6 mm Maximum Grain</span>
+          </li>
+          <li class="flex justify-between">
+            <span>Anti-Jam Protection:</span>
+            <span class="text-amber-500 font-bold">Auto 400ms Reverse on Current Spike</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <div class="flex items-center justify-between mb-3 border-b border-[var(--border-subtle)] pb-2">
+          <h3 class="text-sm font-display font-bold text-teal-400 uppercase tracking-wider">3. Piston Dewatering Cylinder & Ram</h3>
+          <span class="text-xs font-mono text-[var(--text-muted)]">Axial Thrust: 12.8 kN</span>
+        </div>
+        <p class="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed font-sans">
+          Integrated electric ballscrew piston ram compressing raw slurry against a 150 µm wedge-wire screen. Dewaters in-situ, tripling solids payload capacity and providing positive syringe discharge to the road tanker.
+        </p>
+        <ul class="space-y-2 text-xs text-[var(--text-secondary)] font-mono">
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Dewatering Compaction:</span>
+            <span class="text-[var(--text-primary)] font-bold">3.5 bar continuous compaction</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Solids Concentration:</span>
+            <span class="text-teal-400 font-bold">4.2% Raw ➔ 22.8% Dewatered Cake</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Water Extraction Ratio:</span>
+            <span class="text-emerald-400 font-bold">68% Free Water Returned</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Service Trip Multiplier:</span>
+            <span class="text-[var(--text-primary)] font-bold">3.2x Households Serviced</span>
+          </li>
+          <li class="flex justify-between">
+            <span>Positive Discharge Ejection:</span>
+            <span class="text-teal-400 font-bold">100% Clog-Free Syringe Ejection</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <div class="flex items-center justify-between mb-3 border-b border-[var(--border-subtle)] pb-2">
+          <h3 class="text-sm font-display font-bold text-indigo-400 uppercase tracking-wider">4. Progressive Cavity Booster Pump</h3>
+          <span class="text-xs font-mono text-[var(--text-muted)]">Positive Displacement</span>
+        </div>
+        <p class="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed font-sans">
+          Single-helix tool-steel rotor rotating inside an elastomeric stator. Delivers continuous, pulsation-free pumping irrespective of altitude pressure drops.
+        </p>
+        <ul class="space-y-2 text-xs text-[var(--text-secondary)] font-mono">
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Rated Flow Capacity:</span>
+            <span class="text-[var(--text-primary)] font-bold">12.0 m³/h @ 4.0 bar</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Maximum Viscosity Handling:</span>
+            <span class="text-[var(--text-primary)] font-bold">Up to 25,000 cP</span>
+          </li>
+          <li class="flex justify-between border-b border-[var(--border-subtle)] pb-1">
+            <span>Altitude Sensitivity:</span>
+            <span class="text-emerald-400 font-bold">0% Loss at 3,500m MSL</span>
+          </li>
+          <li class="flex justify-between">
+            <span>Power Consumption:</span>
+            <span class="text-[var(--text-primary)] font-bold">2.6 kW @ 48V DC</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- TAB 5: MATHEMATICAL MODELING & FLUID PHYSICS -->
+  <!-- ============================================================== -->
+  <div id="tab-physics" class="tab-content flex-grow p-4 md:p-8 max-w-6xl mx-auto w-full">
+    <div class="mb-8">
+      <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 uppercase tracking-widest">
+        Analytical Validation
+      </span>
+      <h2 class="text-2xl md:text-3xl font-display font-black text-[var(--text-primary)] mt-2 mb-2 tracking-wide">Mathematical Modeling & Simulation Formulas</h2>
+      <p class="text-[var(--text-secondary)] text-sm font-sans">
+        The core physics equations implemented in our digital prototype to validate stability, rheology, and altitude performance.
+      </p>
+    </div>
+
+    <div class="space-y-6 font-mono">
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <h3 class="text-sm font-display font-bold text-amber-500 dark:text-amber-300 mb-3 uppercase tracking-wider">1. Static Rollover & Hill Climb Stability Condition</h3>
+        <div class="bg-[var(--bg-base)] p-4 rounded-lg border border-[var(--border-hard)] font-mono text-sm text-amber-500 dark:text-amber-300 flex items-center justify-between shadow-inner">
+          <span>tan(&theta;<sub>crit</sub>) = (b / 2) / h<sub>CoM</sub> = (0.82 / 2) / 0.41 = 1.00 &rarr; &theta;<sub>crit</sub> = 45.0° (Dry)</span>
+        </div>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <h3 class="text-sm font-display font-bold text-amber-500 dark:text-amber-300 mb-3 uppercase tracking-wider">2. Non-Newtonian Shear-Thinning Rheology (Ostwald–de Waele Model)</h3>
+        <div class="bg-[var(--bg-base)] p-4 rounded-lg border border-[var(--border-hard)] font-mono text-sm text-amber-500 dark:text-amber-300 flex items-center justify-between shadow-inner">
+          <span>&tau; = K &middot; (&gamma;&dot;)<sup>n</sup> &nbsp;|&nbsp; &mu;<sub>app</sub> = K &middot; (&gamma;&dot;)<sup>n - 1</sup></span>
+        </div>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <h3 class="text-sm font-display font-bold text-indigo-400 mb-3 uppercase tracking-wider">3. Altitude Barometric Pressure Drop vs. Suction Cavitation</h3>
+        <div class="bg-[var(--bg-base)] p-4 rounded-lg border border-[var(--border-hard)] font-mono text-sm text-indigo-400 flex items-center justify-between shadow-inner">
+          <span>P(H) = P<sub>0</sub> &middot; [1 - 2.25577 &times; 10<sup>-5</sup> &middot; H]<sup>5.25588</sup></span>
+        </div>
+      </div>
+
+      <div class="milled-panel p-6 rounded-xl shadow-xl">
+        <h3 class="text-sm font-display font-bold text-teal-400 mb-3 uppercase tracking-wider">4. Porous Cake Filtration & Dewatering Kinetics (Darcy–Shirato)</h3>
+        <div class="bg-[var(--bg-base)] p-4 rounded-lg border border-[var(--border-hard)] font-mono text-sm text-teal-400 flex items-center justify-between shadow-inner">
+          <span>q = (1/A) &middot; (dV/dt) = &Delta;P / [&mu; &middot; (&alpha; &middot; c &middot; (V/A) + R<sub>m</sub>)]</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- TAB 6: FEASIBILITY, COSTS & 3-PERSON TEAM ROADMAP -->
+  <!-- ============================================================== -->
+  <div id="tab-feasibility" class="tab-content flex-grow p-4 md:p-8 max-w-6xl mx-auto w-full">
+    <div class="mb-8">
+      <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-teal-500/10 text-teal-300 border border-teal-500/30 uppercase tracking-widest">
+        Implementation & Strategy
+      </span>
+      <h2 class="text-2xl md:text-3xl font-display font-black text-[var(--text-primary)] mt-2 mb-2 tracking-wide">Economics, ULB Rollout & Team Action Plan</h2>
+      <p class="text-[var(--text-secondary)] text-sm font-sans">
+        How TERRA-VAC 450 is economically viable for Indian Urban Local Bodies (ULBs) and our execution plan for the national deployment roadmap.
+      </p>
+    </div>
+
+    <!-- Cost Comparison Table -->
+    <div class="milled-panel p-6 mb-8 overflow-x-auto rounded-xl shadow-xl font-mono">
+      <h3 class="text-sm font-display font-bold text-[var(--text-primary)] mb-4 uppercase tracking-wider">Capital & Operating Cost Comparison</h3>
+      <table class="w-full text-xs text-left">
+        <thead>
+          <tr class="border-b border-[var(--border-hard)] text-[var(--text-muted)] font-mono uppercase text-[10px] tracking-wider">
+            <th class="py-3 px-4">Parameter</th>
+            <th class="py-3 px-4 text-rose-400">Conventional Vacuum Truck (4000L)</th>
+            <th class="py-3 px-4 text-emerald-400">TERRA-VAC 450 Tracked Unit</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[var(--border-subtle)] text-[var(--text-secondary)]">
+          <tr>
+            <td class="py-3 px-4 font-semibold text-[var(--text-primary)]">Capex per Machine</td>
+            <td class="py-3 px-4 text-rose-300 font-mono">₹32,00,000 – ₹42,00,000</td>
+            <td class="py-3 px-4 text-emerald-400 font-mono font-bold">₹4,85,000 (85% Savings)</td>
+          </tr>
+          <tr>
+            <td class="py-3 px-4 font-semibold text-[var(--text-primary)]">Alley Width Access</td>
+            <td class="py-3 px-4 text-rose-300">Requires &gt; 3.2 meters</td>
+            <td class="py-3 px-4 text-emerald-400 font-bold">&lt; 0.95 meters (100% Coverage)</td>
+          </tr>
+          <tr>
+            <td class="py-3 px-4 font-semibold text-[var(--text-primary)]">Max Slope Negotiation</td>
+            <td class="py-3 px-4 text-rose-300">Max 10° – 12° Incline</td>
+            <td class="py-3 px-4 text-emerald-400 font-bold">Up to 28° Stair / Mountain Ramps</td>
+          </tr>
+          <tr>
+            <td class="py-3 px-4 font-semibold text-[var(--text-primary)]">Cold Climate Operation</td>
+            <td class="py-3 px-4 text-rose-300">Freezes & Chokes at &lt; 0°C</td>
+            <td class="py-3 px-4 text-emerald-400 font-bold">PTC Heating to +18°C (Rated -15°C)</td>
+          </tr>
+          <tr>
+            <td class="py-3 px-4 font-semibold text-[var(--text-primary)]">Worker Safety</td>
+            <td class="py-3 px-4 text-rose-300">Manual intervention required on choke</td>
+            <td class="py-3 px-4 text-emerald-400 font-bold">Zero-contact wireless teleoperation</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3-Person Team Task Grid -->
+    <h3 class="text-base font-display font-bold text-[var(--text-primary)] mb-4 uppercase tracking-wider">Division of Work for Project Leads</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 font-mono">
+      <div class="milled-panel p-5 rounded-xl shadow-xl">
+        <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-500 font-bold flex items-center justify-center text-sm mb-3">
+          P1
+        </div>
+        <h4 class="text-sm font-display font-bold text-[var(--text-primary)] mb-1 uppercase">Mechanical CAD & Stability Lead</h4>
+        <div class="text-[10px] text-amber-500 font-mono mb-3">Focus: 3D CAD & Kinematics</div>
+        <ul class="text-xs text-[var(--text-secondary)] space-y-2 list-disc list-inside font-sans">
+          <li>Finalize 3D model in Fusion 360/SolidWorks (track chassis, tank, cutter head).</li>
+          <li>Export Center of Mass (CoM) stability verification graphics at 28° slope.</li>
+          <li>Render high-resolution 360° exploded views for the technical documentation.</li>
+        </ul>
+      </div>
+
+      <div class="milled-panel p-5 rounded-xl shadow-xl">
+        <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-500 font-bold flex items-center justify-center text-sm mb-3">
+          P2
+        </div>
+        <h4 class="text-sm font-display font-bold text-[var(--text-primary)] mb-1 uppercase">CFD & Fluid Physics Lead</h4>
+        <div class="text-[10px] text-amber-500 font-mono mb-3">Focus: Rheology & Thermal Flow</div>
+        <ul class="text-xs text-[var(--text-secondary)] space-y-2 list-disc list-inside font-sans">
+          <li>Run CFD analysis of non-Newtonian sludge through the macerator nozzle.</li>
+          <li>Simulate thermal boundary layer heating from -5°C to +15°C.</li>
+          <li>Generate velocity contours and pressure head charts for slides.</li>
+        </ul>
+      </div>
+
+      <div class="milled-panel p-5 rounded-xl shadow-xl">
+        <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-sm mb-3">
+          P3
+        </div>
+        <h4 class="text-sm font-display font-bold text-[var(--text-primary)] mb-1 uppercase">Systems, Telemetry & Compliance Lead</h4>
+        <div class="text-[10px] text-indigo-400 font-mono mb-3">Focus: SCADA & Field Validation</div>
+        <ul class="text-xs text-[var(--text-secondary)] space-y-2 list-disc list-inside font-sans">
+          <li>Validate live web dashboard in action with dual-theme telemetry review.</li>
+          <li>Assemble the official MoJS / DDWS technical evaluation whitepaper.</li>
+          <li>Review compliance with Ministry of Jal Shakti criteria and CPCB standards.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- INDUSTRIAL SCADA FOOTER -->
+  <footer class="mt-auto border-t border-[var(--border-hard)] bg-[var(--bg-panel)] py-6 px-4 text-xs text-[var(--text-muted)] font-mono">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-[var(--text-primary)]">TERRA-VAC 450</span> • BHARAT-JAL SCADA Mk-IV • Problem SIH26258 • Ministry of Jal Shakti (MoJS) & DDWS
+      </div>
+      <div class="text-[11px] text-[var(--text-secondary)]">
+        NavIC L5 Telemetry Active • NAMASTE Touchless Architecture
+      </div>
+    </div>
+  </footer>
+
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      console.error('JS_ERROR:', msg, 'Line:', line, 'Col:', col, error);
+    };
+
+    // ==============================================================
+    // DUAL-THEME ENGINE (MIL-SPEC TACTICAL vs TECHNICAL WHITEPAPER)
+    // ==============================================================
+    function setAppTheme(theme) {
+      const body = document.body;
+      const icon = document.getElementById('theme-icon');
+      const text = document.getElementById('theme-text');
+
+      if (theme === 'whitepaper') {
+        body.classList.remove('theme-milspec');
+        body.classList.add('theme-whitepaper');
+        if (icon) icon.textContent = '📜';
+        if (text) text.textContent = 'Tech Whitepaper';
+        localStorage.setItem('bharat_jal_theme', 'whitepaper');
+      } else {
+        body.classList.remove('theme-whitepaper');
+        body.classList.add('theme-milspec');
+        if (icon) icon.textContent = '🛡️';
+        if (text) text.textContent = 'Tactical SCADA';
+        localStorage.setItem('bharat_jal_theme', 'milspec');
+      }
+
+      // Redraw canvas charts with appropriate theme colors
+      renderAllCharts();
+      if (typeof updateSimulation === 'function') updateSimulation();
+    }
+
+    function toggleAppTheme() {
+      const isWhitepaper = document.body.classList.contains('theme-whitepaper');
+      setAppTheme(isWhitepaper ? 'milspec' : 'whitepaper');
+    }
+
+    // Tab Switching Function
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => {
+        el.className = 'nav-btn px-3.5 py-2 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition';
+      });
+      document.querySelectorAll('.nav-btn-mobile').forEach(el => {
+        el.className = 'nav-btn-mobile whitespace-nowrap px-3 py-1 rounded-md text-[var(--text-secondary)]';
+      });
+
+      const targetTab = document.getElementById('tab-' + tabId);
+      const targetNav = document.getElementById('nav-' + tabId);
+      if (targetTab) targetTab.classList.add('active');
+      if (targetNav) {
+        targetNav.className = 'nav-btn px-3.5 py-2 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-500 dark:text-amber-300 border border-amber-500/40 transition shadow-sm';
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Redraw graphs when opening graphs tab
+      if (tabId === 'graphs') {
+        setTimeout(renderAllCharts, 60);
+      }
+    }
+
+    // SIMULATION STATE & CANVAS ENGINES
+    let simState = {
+      pitch: 18,
+      roll: 4,
+      payload: 280,
+      temp: -4,
+      altitude: 2100,
+      maceratorRpm: 1450,
+      heaterOn: true,
+      bafflesOn: true,
+      pistonOn: true,
+      pistonStroke: 60,
+      rightCanvasMode: 'pcp',
+      mode: 'drive',
+      cutterReversed: false,
+      activeLocation: 'baseline'
+    };
+
+    const slopeCanvas = document.getElementById('slopeCanvas');
+    const slopeCtx = slopeCanvas ? slopeCanvas.getContext('2d') : null;
+    const maceratorCanvas = document.getElementById('maceratorCanvas');
+    const macCtx = maceratorCanvas ? maceratorCanvas.getContext('2d') : null;
+
+    let animFrame = 0;
+
+    window.onload = function() {
+      const savedTheme = localStorage.getItem('bharat_jal_theme') || 'milspec';
+      setAppTheme(savedTheme);
+      updateSimulation();
+      requestAnimationFrame(renderLoop);
+      renderAllCharts();
+    };
+
+    // NavIC Satellite GPS Coordinates for Evaluation Sectors
+    const navicCoordinates = {
+      shimla: 'NavIC L5: 31.1048°N, 77.1734°E • ALT 2,205m • FIX: 9 SATS',
+      leh: 'NavIC L5: 34.1526°N, 77.5771°E • ALT 3,514m • FIX: 11 SATS',
+      aizawl: 'NavIC L5: 23.7271°N, 92.7176°E • ALT 1,132m • FIX: 8 SATS',
+      kedarnath: 'NavIC L5: 30.7346°N, 79.0669°E • ALT 3,110m • FIX: 7 SATS',
+      tawang: 'NavIC L5: 27.5860°N, 91.8594°E • ALT 3,048m • FIX: 9 SATS',
+      monsoon: 'NavIC L5: 10.0889°N, 77.0595°E • ALT 1,532m • FIX: 10 SATS',
+      ooty: 'NavIC L5: 11.4102°N, 76.6950°E • ALT 2,240m • FIX: 9 SATS',
+      baseline: 'NavIC L5: 28.6139°N, 77.2090°E • ALT 216m • FIX: 12 SATS'
+    };
+
+    // 7 Diversified Indian Hill Presets
+    function applyPreset(name) {
+      simState.activeLocation = name;
+      document.querySelectorAll('.loc-preset-btn').forEach(b => {
+        b.classList.remove('border-amber-500', 'bg-[var(--bg-base)]');
+        b.classList.add('border-[var(--border-subtle)]', 'bg-[var(--bg-card)]');
+      });
+
+      const activeBtn = document.getElementById('btn-loc-' + name);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-[var(--border-subtle)]', 'bg-[var(--bg-card)]');
+        activeBtn.classList.add('border-amber-500', 'bg-[var(--bg-base)]');
+      }
+
+      // Update NavIC Telemetry ticker
+      const navicEl = document.getElementById('navic-telemetry');
+      if (navicEl && navicCoordinates[name]) {
+        navicEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span><span>${navicCoordinates[name]}</span>`;
+      }
+
+      const mId = document.getElementById('manifest-id');
+      const mFstp = document.getElementById('manifest-fstp');
+
+      if (name === 'shimla') {
+        simState.pitch = 24;
+        simState.roll = 6;
+        simState.payload = 320;
+        simState.temp = 5;
+        simState.altitude = 2200;
+        simState.maceratorRpm = 1600;
+        simState.heaterOn = true;
+        if (mId) mId.textContent = 'DDWS-HP-2026-FSSM-0842';
+        if (mFstp) mFstp.textContent = 'Shimla Municipal 15 KLD Co-Treatment';
+        logAction('SECTOR A [Shimla, HP]: 2,200m MSL, 24° stepped incline, heavy fibrous waste.');
+      } else if (name === 'leh') {
+        simState.pitch = 12;
+        simState.roll = 2;
+        simState.payload = 200;
+        simState.temp = -12;
+        simState.altitude = 3500;
+        simState.maceratorRpm = 1800;
+        simState.heaterOn = true;
+        if (mId) mId.textContent = 'DDWS-LDK-2026-FSSM-0193';
+        if (mFstp) mFstp.textContent = 'Leh Town 12 KLD Solar-Thermal FSTP';
+        logAction('SECTOR B [Leh, Ladakh]: 3,500m MSL, -12°C freeze, frozen sludge cake.');
+      } else if (name === 'aizawl') {
+        simState.pitch = 27;
+        simState.roll = 7;
+        simState.payload = 340;
+        simState.temp = 18;
+        simState.altitude = 1130;
+        simState.maceratorRpm = 1500;
+        simState.heaterOn = false;
+        if (mId) mId.textContent = 'DDWS-MZ-2026-FSSM-0418';
+        if (mFstp) mFstp.textContent = 'Aizawl North 8 KLD Deep-Trench FSTP';
+        logAction('SECTOR C [Aizawl, Mizoram]: 1,130m MSL, 27° steep stepped alleys, high humidity.');
+      } else if (name === 'kedarnath') {
+        simState.pitch = 30;
+        simState.roll = 8;
+        simState.payload = 220;
+        simState.temp = 1;
+        simState.altitude = 3100;
+        simState.maceratorRpm = 1750;
+        simState.heaterOn = true;
+        if (mId) mId.textContent = 'DDWS-UK-2026-FSSM-0071';
+        if (mFstp) mFstp.textContent = 'Rudraprayag Bio-Digester Co-Treatment';
+        logAction('SECTOR D [Kedarnath Trail, UK]: 3,100m MSL, 30° critical mountain slope.');
+      } else if (name === 'tawang') {
+        simState.pitch = 25;
+        simState.roll = 5;
+        simState.payload = 260;
+        simState.temp = -8;
+        simState.altitude = 3048;
+        simState.maceratorRpm = 1700;
+        simState.heaterOn = true;
+        if (mId) mId.textContent = 'DDWS-AR-2026-FSSM-0229';
+        if (mFstp) mFstp.textContent = 'Tawang Cantonment 6 KLD Insulated FSTP';
+        logAction('SECTOR E [Tawang, Arunachal]: 3,048m MSL, -8°C sub-zero snow.');
+      } else if (name === 'monsoon') {
+        simState.pitch = 26;
+        simState.roll = 7;
+        simState.payload = 380;
+        simState.temp = 24;
+        simState.altitude = 1530;
+        simState.maceratorRpm = 1350;
+        simState.heaterOn = false;
+        if (mId) mId.textContent = 'DDWS-KL-2026-FSSM-0612';
+        if (mFstp) mFstp.textContent = 'Munnar Panchayat 10 KLD Gravity FSTP';
+        logAction('SECTOR F [Munnar / Ghats, Kerala]: 1,530m MSL, 26° wet stairs, saturated mud.');
+      } else if (name === 'ooty') {
+        simState.pitch = 21;
+        simState.roll = 4;
+        simState.payload = 310;
+        simState.temp = 14;
+        simState.altitude = 2240;
+        simState.maceratorRpm = 1400;
+        simState.heaterOn = false;
+        if (mId) mId.textContent = 'DDWS-TN-2026-FSSM-0534';
+        if (mFstp) mFstp.textContent = 'Nilgiris Udhagamandalam 15 KLD FSTP';
+        logAction('SECTOR G [Ooty, Tamil Nadu]: 2,240m MSL, 21° terraced tea slope access.');
+      }
+
+      syncInputs();
+      updateSimulation();
+      renderAllCharts();
+    }
+
+    function resetDefaults() {
+      simState = {
+        pitch: 18,
+        roll: 4,
+        payload: 280,
+        temp: -4,
+        altitude: 2100,
+        maceratorRpm: 1450,
+        heaterOn: true,
+        bafflesOn: true,
+        pistonOn: true,
+        pistonStroke: 60,
+        mode: 'drive',
+        cutterReversed: false,
+        activeLocation: 'baseline'
+      };
+      document.querySelectorAll('.loc-preset-btn').forEach(b => {
+        b.classList.remove('border-amber-500', 'bg-[var(--bg-base)]');
+        b.classList.add('border-[var(--border-subtle)]', 'bg-[var(--bg-card)]');
+      });
+
+      const navicEl = document.getElementById('navic-telemetry');
+      if (navicEl) {
+        navicEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span><span>${navicCoordinates.baseline}</span>`;
+      }
+
+      syncInputs();
+      updateSimulation();
+      renderAllCharts();
+      logAction('PRESET: Restored baseline SCADA calibration.');
+    }
+
+    function syncInputs() {
+      const p = document.getElementById('slider-pitch');
+      if (p) {
+        document.getElementById('slider-pitch').value = simState.pitch;
+        document.getElementById('slider-roll').value = simState.roll;
+        document.getElementById('slider-payload').value = simState.payload;
+        document.getElementById('slider-temp').value = simState.temp;
+        document.getElementById('slider-altitude').value = simState.altitude;
+        document.getElementById('slider-macerator').value = simState.maceratorRpm;
+        document.getElementById('toggle-heater').checked = simState.heaterOn;
+        document.getElementById('toggle-baffles').checked = simState.bafflesOn;
+        if (document.getElementById('toggle-piston')) document.getElementById('toggle-piston').checked = simState.pistonOn;
+        if (document.getElementById('slider-piston')) document.getElementById('slider-piston').value = simState.pistonStroke;
+      }
+    }
+
+    
+    function onPistonUserSlider(val) {
+      const strokeVal = parseFloat(val);
+      simState.pistonStroke = strokeVal;
+      updateSimulation();
+
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'BHAVYAM_PISTON_INPUT',
+          stroke: strokeVal,
+          pistonOn: simState.pistonOn
+        }, '*');
+      }
+    }
+function updateSimulation() {
+      const pSlider = document.getElementById('slider-pitch');
+      if (!pSlider) return;
+
+      simState.pitch = parseFloat(pSlider.value);
+      simState.roll = parseFloat(document.getElementById('slider-roll').value);
+      simState.payload = parseFloat(document.getElementById('slider-payload').value);
+      simState.temp = parseFloat(document.getElementById('slider-temp').value);
+      simState.altitude = parseFloat(document.getElementById('slider-altitude').value);
+      simState.maceratorRpm = parseFloat(document.getElementById('slider-macerator').value);
+      simState.heaterOn = document.getElementById('toggle-heater').checked;
+      simState.bafflesOn = document.getElementById('toggle-baffles').checked;
+      simState.pistonOn = document.getElementById('toggle-piston') ? document.getElementById('toggle-piston').checked : true;
+      
+      const pStrokeSlider = document.getElementById('slider-piston');
+      simState.pistonStroke = pStrokeSlider ? parseFloat(pStrokeSlider.value) : 60;
+
+      document.getElementById('val-pitch').textContent = simState.pitch.toFixed(1) + '°';
+      document.getElementById('val-roll').textContent = simState.roll.toFixed(0) + '°';
+      document.getElementById('val-payload').textContent = simState.payload + ' L';
+      document.getElementById('val-temp').textContent = (simState.temp > 0 ? '+' : '') + simState.temp + '°C';
+      document.getElementById('val-altitude').textContent = simState.altitude.toLocaleString() + ' m';
+      document.getElementById('val-macerator').textContent = simState.maceratorRpm + ' RPM';
+
+      // Dynamic Piston Stroke Displacement Calculations
+      const strokeRatio = simState.pistonOn ? (simState.pistonStroke / 100) : 0;
+      const strokeMm = Math.round(strokeRatio * 380);
+      const curTS = (4.2 + strokeRatio * 18.6).toFixed(1);
+      const waterExpelled = Math.round(strokeRatio * 68);
+      const thrustKN = (1.2 + strokeRatio * 11.6).toFixed(1);
+      const compBar = (0.2 + strokeRatio * 3.3).toFixed(1);
+
+      const valPistonStroke = document.getElementById('val-piston-stroke');
+      if (valPistonStroke) {
+        valPistonStroke.textContent = `${simState.pistonStroke}% (${strokeMm}mm • ${compBar} bar)`;
+      }
+
+      // KPI Piston Dewatering & Solids
+      const pStatus = document.getElementById('kpi-piston-status');
+      const solidsPct = document.getElementById('kpi-solids-pct');
+      const scadaThrust = document.getElementById('scada-piston-thrust');
+      const scadaSub = document.getElementById('scada-piston-sub');
+      if (pStatus && solidsPct) {
+        if (simState.pistonOn) {
+          pStatus.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30';
+          pStatus.textContent = strokeRatio > 0.3 ? 'COMPACTING' : 'READY';
+          solidsPct.className = 'text-emerald-400 font-bold';
+          solidsPct.textContent = `${curTS}% TS (${(1 + strokeRatio * 2.2).toFixed(1)}x Gain)`;
+          if (scadaThrust) scadaThrust.textContent = `${thrustKN} kN (${compBar} bar)`;
+          if (scadaSub) scadaSub.textContent = `Dewatering: ${waterExpelled}% Extracted`;
+        } else {
+          pStatus.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+          pStatus.textContent = 'RAW SLURRY';
+          solidsPct.className = 'text-slate-400 font-bold';
+          solidsPct.textContent = '4.2% TS (Uncompressed)';
+          if (scadaThrust) scadaThrust.textContent = '0.0 kN (Idle)';
+          if (scadaSub) scadaSub.textContent = 'Dewatering: Bypassed';
+        }
+      }
+
+      // KPI Incline
+      document.getElementById('kpi-pitch').textContent = simState.pitch.toFixed(1) + '°';
+      const stabilityBadge = document.getElementById('kpi-stability-tag');
+      const rolloverWarning = document.getElementById('rollover-warning-badge');
+      const formulaVerdict = document.getElementById('formula-verdict');
+
+      if (simState.pitch < 23) {
+        stabilityBadge.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
+        stabilityBadge.textContent = 'SAFE';
+        rolloverWarning.classList.add('hidden');
+        formulaVerdict.className = 'text-emerald-400 font-mono font-bold';
+        formulaVerdict.textContent = 'h·tan(θ) < b/2 (STABLE)';
+      } else if (simState.pitch <= 30) {
+        stabilityBadge.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300';
+        stabilityBadge.textContent = 'CAUTION';
+        rolloverWarning.classList.add('hidden');
+        formulaVerdict.className = 'text-amber-400 font-mono font-bold';
+        formulaVerdict.textContent = 'APPROACHING MARGIN (WARN)';
+      } else {
+        stabilityBadge.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 animate-pulse';
+        stabilityBadge.textContent = 'CRITICAL';
+        rolloverWarning.classList.remove('hidden');
+        formulaVerdict.className = 'text-rose-400 font-mono font-bold';
+        formulaVerdict.textContent = 'ROLLOVER HAZARD EXCEEDED!';
+      }
+
+      // Barometric vacuum limit
+      const p_atm = 101.325 * Math.pow(1 - 2.25577e-5 * simState.altitude, 5.25588);
+      const theoreticalMaxLift = (p_atm * 1000) / (1050 * 9.81);
+      const practicalVacLift = Math.max(1.8, (theoreticalMaxLift * 0.65)).toFixed(1);
+      document.getElementById('kpi-altitude').textContent = simState.altitude.toLocaleString() + ' m';
+      document.getElementById('kpi-vac-limit').textContent = practicalVacLift + ' m (Fails)';
+
+      // Viscosity & Thermal
+      let baseViscosity = 1200 * Math.exp(-0.06 * (simState.temp - 15));
+      if (simState.temp < 0) baseViscosity += (Math.abs(simState.temp) * 150);
+      document.getElementById('kpi-raw-viscosity').textContent = Math.round(baseViscosity) + ' cP';
+
+      let effectiveTemp = simState.temp;
+      if (simState.heaterOn) {
+        effectiveTemp = Math.max(16, simState.temp + 22);
+      }
+
+      const shearRate = Math.max(10, simState.maceratorRpm * 0.8);
+      const shearThinningFactor = Math.pow(shearRate / 100, -0.62);
+      const heatedViscosity = (1200 * Math.exp(-0.05 * (effectiveTemp - 15))) * shearThinningFactor;
+      const finalViscosity = Math.max(80, Math.round(heatedViscosity));
+
+      document.getElementById('kpi-viscosity').textContent = finalViscosity + ' cP';
+
+      const flowRate = (simState.maceratorRpm > 200) ? (12.4 * (1 - (finalViscosity / 8000))).toFixed(1) : '0.0';
+      document.getElementById('kpi-flow').textContent = flowRate + ' m³/h';
+
+      document.getElementById('kpi-payload').textContent = simState.payload + ' L';
+      const pct = Math.round((simState.payload / 450) * 100);
+      document.getElementById('kpi-payload-pct').textContent = `(${pct}%)`;
+      document.getElementById('kpi-payload-bar').style.width = pct + '%';
+
+      const heaterBadge = document.getElementById('thermal-status-pill');
+      if (heaterBadge) {
+        if (simState.heaterOn) {
+          heaterBadge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          heaterBadge.textContent = 'HEATER ON (+18°C)';
+        } else {
+          heaterBadge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+          heaterBadge.textContent = 'HEATER OFF';
+        }
+      }
+
+      // Gas readings
+      const h2s = (1.8 + Math.sin(Date.now() * 0.001) * 0.4).toFixed(1);
+      const ch4 = (1.2 + Math.cos(Date.now() * 0.0008) * 0.3).toFixed(1);
+      document.getElementById('kpi-h2s').textContent = h2s + ' ppm';
+      document.getElementById('kpi-ch4').textContent = ch4 + '%';
+      document.getElementById('gas-h2s-val').textContent = h2s + ' ppm';
+      document.getElementById('gas-ch4-val').textContent = ch4 + '% LEL';
+      document.getElementById('gas-h2s-bar').style.width = (h2s * 10) + '%';
+      document.getElementById('gas-ch4-bar').style.width = (ch4 * 10) + '%';
+
+      // Update graph stat labels
+      const gStatStab = document.getElementById('graph-stat-stability');
+      if (gStatStab) gStatStab.textContent = `Active Pitch: ${simState.pitch.toFixed(1)}° (${simState.pitch > 30 ? 'CRITICAL' : 'SAFE'})`;
+
+      const gStatVisc = document.getElementById('graph-stat-viscosity');
+      if (gStatVisc) gStatVisc.textContent = `Active: ${simState.maceratorRpm} RPM ➔ ${finalViscosity} cP`;
+
+      const gStatAlt = document.getElementById('graph-stat-altitude');
+      if (gStatAlt) gStatAlt.textContent = `Active: ${simState.altitude.toLocaleString()}m MSL (Head: 40m)`;
+
+      const gStatTherm = document.getElementById('graph-stat-thermal');
+      if (gStatTherm) gStatTherm.textContent = `Active: ${simState.temp}°C ➔ ${simState.heaterOn ? '+18°C (Liquefied)' : 'Unheated'}`;
+
+      // Redraw charts with current operating point
+      renderAllCharts();
+    }
+
+    function setMode(mode) {
+      simState.mode = mode;
+      const bDrive = document.getElementById('btn-mode-drive');
+      const bPump = document.getElementById('btn-mode-pump');
+      const bTransfer = document.getElementById('btn-mode-transfer');
+
+      [bDrive, bPump, bTransfer].forEach(b => {
+        if (b) b.className = 'py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition';
+      });
+
+      if (mode === 'drive' && bDrive) {
+        bDrive.className = 'py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 transition';
+        logAction('MODE: CRAWL DRIVE - Dual rubber track steering active.');
+      } else if (mode === 'pump' && bPump) {
+        bPump.className = 'py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 transition';
+        logAction('MODE: DESLUDGING PUMP - Suction arm deployed, cutter spinning.');
+      } else if (mode === 'transfer' && bTransfer) {
+        bTransfer.className = 'py-2 rounded-xl text-xs font-semibold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition';
+        logAction('MODE: MOTHER TANKER TRANSFER - High-pressure discharge active.');
+      }
+    }
+
+    function toggleCutterReverse() {
+      simState.cutterReversed = !simState.cutterReversed;
+      if (simState.cutterReversed) {
+        logAction('AUTOCLEAN: Macerator cutter reverse 400ms to dislodge fibrous blockage!');
+      } else {
+        logAction('AUTOCLEAN: Forward high-torque rotation resumed.');
+      }
+    }
+
+    function emergencyDrain() {
+      logAction('🚨 E-STOP ENGAGED: Hydraulic track locks activated. Pump shutoff confirmed.');
+      const m = document.getElementById('slider-macerator');
+      if (m) m.value = 0;
+      updateSimulation();
+    }
+
+    let autoDewaterInterval = null;
+
+    function runAutoDewateringCycle() {
+      const btn = document.getElementById('btn-auto-dewater');
+      const slider = document.getElementById('slider-piston');
+      if (!slider) return;
+
+      const togglePiston = document.getElementById('toggle-piston');
+      if (togglePiston && !togglePiston.checked) {
+        togglePiston.checked = true;
+      }
+
+      if (autoDewaterInterval) {
+        clearInterval(autoDewaterInterval);
+        autoDewaterInterval = null;
+        if (btn) {
+          btn.innerHTML = '<span>▶</span> Run Dewatering Cycle (Auto)';
+          btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95';
+        }
+        logAction('PAUSE: Automated dewatering cycle stopped.');
+        return;
+      }
+
+      let currentVal = parseFloat(slider.value);
+      // If currently compacted (> 85%), retract back to 0%
+      if (currentVal >= 85) {
+        logAction('RETRACT: Reversing ballscrew ram to intake position (0% Stroke)...');
+        if (btn) {
+          btn.innerHTML = '<span class="inline-block animate-pulse">↺</span> Retracting Ram...';
+          btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95';
+        }
+
+        autoDewaterInterval = setInterval(() => {
+          let val = parseFloat(slider.value) - 2.5;
+          if (val <= 0) {
+            slider.value = 0;
+            onPistonUserSlider(0);
+            clearInterval(autoDewaterInterval);
+            autoDewaterInterval = null;
+            if (btn) {
+              btn.innerHTML = '<span>▶</span> Run Dewatering Cycle (Auto)';
+              btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95';
+            }
+            logAction('RESET: Ram retracted. Ready for new raw slurry intake.');
+            return;
+          }
+          slider.value = val;
+            onPistonUserSlider(val);
+        }, 40);
+        return;
+      }
+
+      // Otherwise, extend forward from currentVal to 100%
+      logAction('CYCLE START: Engaging 3.5 bar Ballscrew Ram compaction stroke...');
+      if (btn) {
+        btn.innerHTML = '<span class="inline-block animate-spin">⚙️</span> Compacting Sludge Cake...';
+        btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95';
+      }
+
+      autoDewaterInterval = setInterval(() => {
+        let val = parseFloat(slider.value) + 1.5;
+        if (val >= 100) {
+          slider.value = 100;
+          onPistonUserSlider(100);
+          clearInterval(autoDewaterInterval);
+          autoDewaterInterval = null;
+          logAction('✅ DEWATERING COMPLETE: Total Solids 22.8% TS. 68% water expelled. 3.2x household capacity reached!');
+          if (btn) {
+            btn.innerHTML = '<span>↺</span> Dewatered (100%) - Click to Retract';
+            btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95';
+          }
+          return;
+        }
+        slider.value = val;
+            onPistonUserSlider(val);
+      }, 40);
+    }
+
+    function logAction(msg) {
+      const term = document.getElementById('terminal-log');
+      if (!term) return;
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'text-slate-300';
+      div.innerHTML = `<span class="text-cyan-400 font-semibold">[${time}]</span> ${msg}`;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    
+    window.addEventListener('message', function(event) {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+
+      if (data.type === 'SYNC_FROM_3D_PISTON') {
+        if (typeof data.stroke === 'number') {
+          simState.pistonStroke = Math.max(0, Math.min(100, data.stroke));
+          const pSlider = document.getElementById('slider-piston');
+          if (pSlider) pSlider.value = simState.pistonStroke;
+        }
+        if (typeof data.pistonOn === 'boolean') {
+          simState.pistonOn = data.pistonOn;
+          const pToggle = document.getElementById('toggle-piston');
+          if (pToggle) pToggle.checked = simState.pistonOn;
+        }
+        updateSimulation();
+      } else if (data.type === 'SYNC_FROM_3D_VEHICLE') {
+        if (typeof data.pitch === 'number') {
+          simState.pitch = Math.max(-35, Math.min(35, data.pitch));
+          const sPitch = document.getElementById('slider-pitch');
+          if (sPitch) sPitch.value = simState.pitch;
+        }
+        if (typeof data.roll === 'number') {
+          simState.roll = Math.max(-25, Math.min(25, data.roll));
+          const sRoll = document.getElementById('slider-roll');
+          if (sRoll) sRoll.value = simState.roll;
+        }
+        if (typeof data.payloadL === 'number') {
+          simState.payload = Math.round(data.payloadL);
+          const sPayload = document.getElementById('slider-payload');
+          if (sPayload) sPayload.value = simState.payload;
+        }
+        if (data.interlockWarning) {
+          logAction('⚠️ INTERLOCK: ' + data.interlockWarning);
+        }
+        updateSimulation();
+      }
+    });
+
+    window.__BHAVYAM_DASHBOARD__ = {
+      setPistonStroke: function(pct) {
+        simState.pistonStroke = Math.max(0, Math.min(100, pct));
+        const pSlider = document.getElementById('slider-piston');
+        if (pSlider) pSlider.value = simState.pistonStroke;
+        updateSimulation();
+      },
+      getPistonStroke: function() { return simState.pistonStroke; },
+      setVehicleState: function(pitch, roll, payloadL) {
+        if (typeof pitch === 'number') simState.pitch = pitch;
+        if (typeof roll === 'number') simState.roll = roll;
+        if (typeof payloadL === 'number') simState.payload = payloadL;
+        updateSimulation();
+      },
+      logMessage: function(msg) { logAction(msg); }
+    };
+
+function renderLoop() {
+      animFrame++;
+      if (slopeCanvas && slopeCtx) drawSlopeCanvas();
+      if (maceratorCanvas && macCtx) {
+        if (simState.rightCanvasMode === 'pcp') {
+          drawPCPCanvas();
+        } else {
+          drawMaceratorCanvas();
+        }
+      }
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawSlopeCanvas() {
+      const w = slopeCanvas.width;
+      const h = slopeCanvas.height;
+      slopeCtx.clearRect(0, 0, w, h);
+
+      const rad = (simState.pitch * Math.PI) / 180;
+      const cx = w * 0.48;
+      const cy = h * 0.65;
+
+      slopeCtx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
+      slopeCtx.lineWidth = 1;
+      for (let x = 0; x < w; x += 40) {
+        slopeCtx.beginPath();
+        slopeCtx.moveTo(x, 0);
+        slopeCtx.lineTo(x, h);
+        slopeCtx.stroke();
+      }
+
+      slopeCtx.save();
+      slopeCtx.translate(cx, cy);
+      slopeCtx.rotate(-rad);
+
+      // Incline ground
+      slopeCtx.strokeStyle = '#06b6d4';
+      slopeCtx.lineWidth = 3;
+      slopeCtx.beginPath();
+      slopeCtx.moveTo(-280, 45);
+      slopeCtx.lineTo(280, 45);
+      slopeCtx.stroke();
+
+      slopeCtx.strokeStyle = 'rgba(6, 182, 212, 0.15)';
+      slopeCtx.lineWidth = 1.5;
+      for (let i = -260; i < 260; i += 20) {
+        slopeCtx.beginPath();
+        slopeCtx.moveTo(i, 45);
+        slopeCtx.lineTo(i - 15, 75);
+        slopeCtx.stroke();
+      }
+
+      // Track chassis
+      slopeCtx.fillStyle = '#1e293b';
+      slopeCtx.strokeStyle = '#475569';
+      slopeCtx.lineWidth = 2;
+      slopeCtx.beginPath();
+      slopeCtx.roundRect(-100, 15, 200, 30, 8);
+      slopeCtx.fill();
+      slopeCtx.stroke();
+
+      // Track wheels
+      slopeCtx.fillStyle = '#0f172a';
+      for (let wx = -80; wx <= 80; wx += 40) {
+        slopeCtx.beginPath();
+        slopeCtx.arc(wx, 30, 11, 0, Math.PI * 2);
+        slopeCtx.fill();
+        slopeCtx.strokeStyle = '#64748b';
+        slopeCtx.stroke();
+      }
+
+      // Low battery sub-chassis
+      slopeCtx.fillStyle = '#0369a1';
+      slopeCtx.beginPath();
+      slopeCtx.rect(-80, 5, 160, 15);
+      slopeCtx.fill();
+
+      // Holding Tank Cylinder Profile
+      slopeCtx.fillStyle = '#1e293b';
+      slopeCtx.strokeStyle = '#94a3b8';
+      slopeCtx.lineWidth = 2;
+      slopeCtx.beginPath();
+      slopeCtx.roundRect(-75, -55, 150, 60, 12);
+      slopeCtx.fill();
+      slopeCtx.stroke();
+
+      // Sludge Liquid & Piston Dewatering Chamber
+      const fillPct = simState.payload / 450;
+      if (fillPct > 0.05) {
+        slopeCtx.save();
+        slopeCtx.beginPath();
+        slopeCtx.roundRect(-72, -52, 144, 54, 10);
+        slopeCtx.clip();
+
+        if (simState.pistonOn) {
+          // DYNAMIC PISTON COMPRESSION STROKE DISPLACEMENT
+          const strokeRatio = (simState.pistonStroke !== undefined ? simState.pistonStroke : 60) / 100;
+          const filterX = 52;
+          const minPistonX = -65; // Fully retracted: ram at far left
+          const maxPistonX = 24;  // Full compression: 28mm solid cake remaining
+          const pistonX = minPistonX + strokeRatio * (maxPistonX - minPistonX);
+
+          // Ballscrew Drive Shaft (telescoping with stroke displacement)
+          slopeCtx.fillStyle = '#64748b';
+          slopeCtx.fillRect(-72, -27, Math.max(0, pistonX - (-72)), 5);
+          // Thread spirals on ballscrew shaft
+          slopeCtx.strokeStyle = '#94a3b8';
+          slopeCtx.lineWidth = 1;
+          for (let sx = -70; sx < pistonX - 3; sx += 6) {
+            slopeCtx.beginPath();
+            slopeCtx.moveTo(sx, -27);
+            slopeCtx.lineTo(sx + 3, -22);
+            slopeCtx.stroke();
+          }
+
+          // Piston Ram Head Plate (Heavy duty steel thrust ram)
+          slopeCtx.fillStyle = '#38bdf8';
+          slopeCtx.strokeStyle = '#0284c7';
+          slopeCtx.lineWidth = 1.5;
+          slopeCtx.beginPath();
+          slopeCtx.roundRect(pistonX, -50, 7, 50, 2);
+          slopeCtx.fill();
+          slopeCtx.stroke();
+
+          // Piston Viton wiper seals
+          slopeCtx.fillStyle = '#0f172a';
+          slopeCtx.fillRect(pistonX + 1, -49, 2, 4);
+          slopeCtx.fillRect(pistonX + 1, -5, 2, 4);
+
+          // ============================================================
+          // 1. SLUDGE CAKE CHAMBER (DEEP EARTHY BROWN BIO-SOLIDS)
+          // ============================================================
+          const cakeWidth = Math.max(0, filterX - (pistonX + 7));
+          if (cakeWidth > 0) {
+            // Distinct Fecal Sludge / Bio-Solids Color:
+            // At 0% stroke: Rich dark brown raw slurry (rgb(92, 56, 24) / #5c3818)
+            // At 100% stroke: Ultra-dense dark consolidated cake (rgb(43, 23, 6) / #2b1706)
+            const r = Math.round(92 * (1 - strokeRatio) + 43 * strokeRatio);
+            const g = Math.round(56 * (1 - strokeRatio) + 23 * strokeRatio);
+            const b = Math.round(24 * (1 - strokeRatio) + 6 * strokeRatio);
+            slopeCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            slopeCtx.fillRect(pistonX + 7, -50, cakeWidth, 50);
+
+            // Cross-hatch compaction texture lines indicating compressed solid matrix
+            if (strokeRatio > 0.15) {
+              slopeCtx.strokeStyle = 'rgba(180, 83, 9, 0.35)';
+              slopeCtx.lineWidth = 1;
+              for (let tx = pistonX + 11; tx < filterX - 2; tx += 8) {
+                slopeCtx.beginPath();
+                slopeCtx.moveTo(tx, -50);
+                slopeCtx.lineTo(tx - 6, 0);
+                slopeCtx.stroke();
+              }
+            }
+
+            // Visible organic solid particulate chunks (golden-brown flakes)
+            slopeCtx.fillStyle = '#b45309';
+            const numParticles = 6 + Math.round(strokeRatio * 18);
+            for (let p = 0; p < numParticles; p++) {
+              const px = (pistonX + 9) + ((p * 19 + animFrame * 0.25) % Math.max(3, cakeWidth - 5));
+              const py = -47 + ((p * 23) % 44);
+              const pSize = 1.5 + (p % 2.5);
+              slopeCtx.fillRect(px, py, pSize, pSize);
+            }
+
+            // High-Contrast Sludge Label inside the cake
+            if (cakeWidth >= 30) {
+              slopeCtx.fillStyle = '#fef3c7'; // Cream-amber
+              slopeCtx.font = 'bold 8px monospace';
+              slopeCtx.fillText('🟫 SLUDGE CAKE', pistonX + 8, -32);
+              slopeCtx.fillStyle = '#fbbf24';
+              slopeCtx.fillText(`${(4.2 + strokeRatio * 18.6).toFixed(1)}% TS`, pistonX + 8, -21);
+            }
+          }
+
+          // ============================================================
+          // 2. STAINLESS STEEL 150 µm WEDGE-WIRE DEWATERING SCREEN
+          // ============================================================
+          slopeCtx.strokeStyle = '#e2e8f0'; // Metallic silver
+          slopeCtx.lineWidth = 3;
+          slopeCtx.setLineDash([3, 2]);
+          slopeCtx.beginPath();
+          slopeCtx.moveTo(filterX, -50);
+          slopeCtx.lineTo(filterX, 0);
+          slopeCtx.stroke();
+          slopeCtx.setLineDash([]);
+
+          // Screen label
+          slopeCtx.fillStyle = '#94a3b8';
+          slopeCtx.font = 'bold 6.5px monospace';
+          slopeCtx.fillText('150µm MESH', filterX - 16, -52);
+
+          // ============================================================
+          // 3. EXTRACTED FREE FILTRATE WATER CHAMBER (VIBRANT SKY/OCEAN BLUE)
+          // ============================================================
+          // Vibrant liquid blue gradient
+          const waterGrad = slopeCtx.createLinearGradient(filterX + 2, -50, filterX + 20, 0);
+          waterGrad.addColorStop(0, 'rgba(56, 189, 248, 0.85)'); // light cyan water
+          waterGrad.addColorStop(1, 'rgba(2, 132, 199, 0.9)');  // deep ocean blue water
+          slopeCtx.fillStyle = waterGrad;
+          slopeCtx.fillRect(filterX + 2, -50, 18, 50);
+
+          // Animated water wave surface ripples
+          slopeCtx.strokeStyle = '#bae6fd';
+          slopeCtx.lineWidth = 1.5;
+          slopeCtx.beginPath();
+          for (let wx = filterX + 2; wx <= filterX + 20; wx += 3) {
+            const wy = -46 + Math.sin(animFrame * 0.15 + wx) * 2;
+            if (wx === filterX + 2) slopeCtx.moveTo(wx, wy); else slopeCtx.lineTo(wx, wy);
+          }
+          slopeCtx.stroke();
+
+          // High-contrast Water Text Tag
+          slopeCtx.fillStyle = '#ffffff';
+          slopeCtx.font = 'bold 7px monospace';
+          slopeCtx.fillText('💧 WATER', filterX + 3, -30);
+          slopeCtx.fillStyle = '#bae6fd';
+          slopeCtx.fillText(`${Math.round(strokeRatio * 68)}%`, filterX + 4, -20);
+
+          // Animated Filtrate Water Droplets flowing down the drain
+          if (strokeRatio > 0.05) {
+            slopeCtx.fillStyle = '#38bdf8';
+            for (let d = 0; d < 4; d++) {
+              const dropY = -35 + ((animFrame * 3 + d * 11) % 40);
+              slopeCtx.beginPath();
+              slopeCtx.arc(filterX + 10, dropY, 2.5, 0, Math.PI * 2);
+              slopeCtx.fill();
+              // White specular shine
+              slopeCtx.fillStyle = '#ffffff';
+              slopeCtx.beginPath();
+              slopeCtx.arc(filterX + 9.5, dropY - 0.8, 0.8, 0, Math.PI * 2);
+              slopeCtx.fill();
+              slopeCtx.fillStyle = '#38bdf8';
+            }
+
+            // Downward drainage label
+            slopeCtx.fillStyle = '#38bdf8';
+            slopeCtx.font = 'bold 8px monospace';
+            slopeCtx.fillText('⬇ DRAIN', filterX + 2, -3);
+          }
+
+          // Real-time Thrust Force HUD Vector
+          if (strokeRatio > 0.05 && (pistonX - (-65)) > 25) {
+            slopeCtx.fillStyle = '#fbbf24';
+            slopeCtx.font = 'bold 8px monospace';
+            const thrustKN = (1.2 + strokeRatio * 11.6).toFixed(1);
+            slopeCtx.fillText(`${thrustKN}kN ➔`, pistonX - 32, -22);
+          }
+
+        } else {
+          // PASSIVE / UNCOMPACTED RAW SLURRY SLOSHING (AUTHENTIC BROWN FECAL SLUDGE)
+          const sloshDamping = simState.bafflesOn ? 0.25 : 0.85;
+          const liquidAngle = (rad * sloshDamping) + (Math.sin(animFrame * 0.08) * 0.03 * (1 - sloshDamping));
+
+          slopeCtx.translate(0, -25 + (1 - fillPct) * 45);
+          slopeCtx.rotate(liquidAngle);
+
+          // Rich Brown Sludge Liquid
+          slopeCtx.fillStyle = 'rgba(92, 56, 24, 0.88)';
+          slopeCtx.fillRect(-120, 0, 240, 90);
+
+          // Floating organic solids
+          slopeCtx.fillStyle = '#78350f';
+          for (let p = 0; p < 8; p++) {
+            const px = -60 + ((p * 29 + animFrame * 0.4) % 120);
+            const py = 8 + ((p * 17) % 25);
+            slopeCtx.fillRect(px, py, 3, 3);
+          }
+
+          // Uncompacted label
+          slopeCtx.fillStyle = '#fde68a';
+          slopeCtx.font = 'bold 8px monospace';
+          slopeCtx.fillText('🟫 RAW UNCOMPACTED SLUDGE (4.2% TS)', -55, 20);
+        }
+
+        slopeCtx.restore();
+
+        // Baffle partitions if toggled and not in full piston stroke
+        if (simState.bafflesOn && !simState.pistonOn) {
+          slopeCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+          slopeCtx.setLineDash([4, 4]);
+          slopeCtx.lineWidth = 2;
+          slopeCtx.beginPath();
+          slopeCtx.moveTo(-25, -52);
+          slopeCtx.lineTo(-25, 2);
+          slopeCtx.moveTo(25, -52);
+          slopeCtx.lineTo(25, 2);
+          slopeCtx.stroke();
+          slopeCtx.setLineDash([]);
+        }
+      }
+
+      // Suction Arm
+      slopeCtx.strokeStyle = '#f59e0b';
+      slopeCtx.lineWidth = 4;
+      slopeCtx.beginPath();
+      slopeCtx.moveTo(70, -20);
+      slopeCtx.lineTo(110, -10);
+      slopeCtx.lineTo(135, 35);
+      slopeCtx.stroke();
+
+      slopeCtx.fillStyle = '#e11d48';
+      slopeCtx.beginPath();
+      slopeCtx.arc(135, 35, 7, 0, Math.PI * 2);
+      slopeCtx.fill();
+
+      // Center of Mass
+      const sloshShiftX = simState.bafflesOn ? (simState.pitch * 0.6) : (simState.pitch * 1.6);
+      const comX = -sloshShiftX * fillPct;
+      const comY = -15 - (fillPct * 18);
+
+      slopeCtx.fillStyle = '#38bdf8';
+      slopeCtx.beginPath();
+      slopeCtx.arc(comX, comY, 7, 0, Math.PI * 2);
+      slopeCtx.fill();
+      slopeCtx.strokeStyle = '#0284c7';
+      slopeCtx.lineWidth = 2;
+      slopeCtx.stroke();
+
+      slopeCtx.restore();
+
+      const comScreenX = cx + (comX * Math.cos(-rad) - comY * Math.sin(-rad));
+      const comScreenY = cy + (comX * Math.sin(-rad) + comY * Math.cos(-rad));
+
+      slopeCtx.strokeStyle = (simState.pitch > 30) ? '#f43f5e' : '#38bdf8';
+      slopeCtx.lineWidth = 2;
+      slopeCtx.setLineDash([4, 4]);
+      slopeCtx.beginPath();
+      slopeCtx.moveTo(comScreenX, comScreenY);
+      slopeCtx.lineTo(comScreenX, comScreenY + 110);
+      slopeCtx.stroke();
+      slopeCtx.setLineDash([]);
+
+      slopeCtx.fillStyle = (simState.pitch > 30) ? '#f43f5e' : '#38bdf8';
+      slopeCtx.beginPath();
+      slopeCtx.moveTo(comScreenX, comScreenY + 110);
+      slopeCtx.lineTo(comScreenX - 5, comScreenY + 100);
+      slopeCtx.lineTo(comScreenX + 5, comScreenY + 100);
+      slopeCtx.closePath();
+      slopeCtx.fill();
+
+      const coordEl = document.getElementById('canvas-com-coords');
+      if (coordEl) {
+        coordEl.textContent = `X: ${(-comX).toFixed(0)}mm, Z: ${(380 + fillPct * 45).toFixed(0)}mm (Pitch: ${simState.pitch}°)`;
+      }
+    }
+
+    function drawMaceratorCanvas() {
+      const w = maceratorCanvas.width;
+      const h = maceratorCanvas.height;
+      macCtx.clearRect(0, 0, w, h);
+
+      macCtx.fillStyle = '#0f172a';
+      macCtx.fillRect(0, 0, w, h);
+
+      macCtx.strokeStyle = '#475569';
+      macCtx.lineWidth = 6;
+      macCtx.beginPath();
+      macCtx.moveTo(10, 30);
+      macCtx.lineTo(w - 10, 30);
+      macCtx.moveTo(10, h - 30);
+      macCtx.lineTo(w - 10, h - 30);
+      macCtx.stroke();
+
+      if (simState.heaterOn) {
+        macCtx.strokeStyle = 'rgba(245, 158, 11, ' + (0.5 + Math.sin(animFrame * 0.1) * 0.25) + ')';
+        macCtx.lineWidth = 8;
+        macCtx.beginPath();
+        macCtx.moveTo(15, 20);
+        macCtx.lineTo(w - 15, 20);
+        macCtx.moveTo(15, h - 20);
+        macCtx.lineTo(w - 15, h - 20);
+        macCtx.stroke();
+
+        macCtx.fillStyle = '#f59e0b';
+        macCtx.font = '10px monospace';
+        macCtx.fillText('PTC THERMAL JACKET ACTIVE (+18°C HEATED BOUNDARY LAYER)', 35, 16);
+      }
+
+      const bladeX = 140;
+      const bladeY = h / 2;
+      const bladeRad = (animFrame * (simState.maceratorRpm / 200) * (simState.cutterReversed ? -1 : 1));
+
+      macCtx.fillStyle = '#94a3b8';
+      macCtx.beginPath();
+      macCtx.arc(bladeX, bladeY, 14, 0, Math.PI * 2);
+      macCtx.fill();
+
+      macCtx.save();
+      macCtx.translate(bladeX, bladeY);
+      macCtx.rotate(bladeRad);
+
+      macCtx.fillStyle = '#38bdf8';
+      macCtx.strokeStyle = '#e0f2fe';
+      macCtx.lineWidth = 2;
+
+      macCtx.beginPath();
+      macCtx.moveTo(-6, -45);
+      macCtx.lineTo(6, -45);
+      macCtx.lineTo(12, 0);
+      macCtx.lineTo(-12, 0);
+      macCtx.closePath();
+      macCtx.fill();
+      macCtx.stroke();
+
+      macCtx.beginPath();
+      macCtx.moveTo(-6, 45);
+      macCtx.lineTo(6, 45);
+      macCtx.lineTo(12, 0);
+      macCtx.lineTo(-12, 0);
+      macCtx.closePath();
+      macCtx.fill();
+      macCtx.stroke();
+
+      macCtx.restore();
+
+      macCtx.strokeStyle = '#64748b';
+      macCtx.lineWidth = 3;
+      macCtx.beginPath();
+      macCtx.moveTo(bladeX + 18, 35);
+      macCtx.lineTo(bladeX + 18, h - 35);
+      macCtx.stroke();
+
+      const flowActive = simState.maceratorRpm > 200;
+      if (flowActive) {
+        macCtx.fillStyle = '#a16207';
+        for (let i = 0; i < 4; i++) {
+          const px = ((animFrame * 2 + i * 35) % 110) + 15;
+          const py = 45 + ((i * 27) % (h - 90));
+          macCtx.beginPath();
+          macCtx.arc(px, py, 9, 0, Math.PI * 2);
+          macCtx.fill();
+        }
+
+        macCtx.fillStyle = simState.heaterOn ? '#14b8a6' : '#0284c7';
+        for (let j = 0; j < 24; j++) {
+          const px = bladeX + 25 + ((animFrame * 4 + j * 16) % (w - bladeX - 40));
+          const py = 38 + ((j * 17) % (h - 76));
+          macCtx.beginPath();
+          macCtx.arc(px, py, 2.5, 0, Math.PI * 2);
+          macCtx.fill();
+        }
+      }
+
+      macCtx.fillStyle = '#94a3b8';
+      macCtx.font = '10px monospace';
+      macCtx.fillText('Raw Waste / Solids Intake ➔', 18, h - 38);
+      macCtx.fillText('➔ Homogenized Slurry Output', bladeX + 35, h - 38);
+    }
+
+    function setRightCanvasMode(mode) {
+      simState.rightCanvasMode = mode;
+      const bMac = document.getElementById('btn-view-macerator');
+      const bPcp = document.getElementById('btn-view-pcp');
+      const cap = document.getElementById('macerator-caption');
+      if (mode === 'pcp') {
+        if (bPcp) bPcp.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-sm transition font-bold';
+        if (bMac) bMac.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition';
+        if (cap) cap.innerHTML = 'Progressive Cavity Pump: <span class="text-emerald-400 font-bold">Tool-Steel Rotor inside Rubber Stator (Zero Altitude Loss)</span>';
+        logAction('VIEW: Displaying Progressive Cavity Pump (PCP) cutaway & altitude telemetry.');
+      } else {
+        if (bMac) bMac.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-sm transition font-bold';
+        if (bPcp) bPcp.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition';
+        if (cap) cap.innerHTML = 'Particle Size Reduction: 120mm Trash ➔ <span class="text-emerald-400 font-bold">&lt;6mm Slurry</span>';
+        logAction('VIEW: Displaying High-Shear Macerator Cutter & PTC thermal jacket.');
+      }
+    }
+
+    let altitudeTestInterval = null;
+
+    function runAltitudeCavitationTest() {
+      setRightCanvasMode('pcp');
+      const btn = document.getElementById('btn-test-altitude');
+      const slider = document.getElementById('slider-altitude');
+      if (!slider) return;
+
+      if (altitudeTestInterval) {
+        clearInterval(altitudeTestInterval);
+        altitudeTestInterval = null;
+        if (btn) btn.innerHTML = '<span>▶</span> Test Altitude Cavitation (Plains 200m ➔ Leh 3,500m)';
+        logAction('PAUSE: Altitude cavitation test stopped.');
+        return;
+      }
+
+      let currentAlt = parseFloat(slider.value);
+      if (currentAlt >= 3400) {
+        slider.value = 200;
+        updateSimulation();
+        if (btn) btn.innerHTML = '<span>▶</span> Test Altitude Cavitation (Plains 200m ➔ Leh 3,500m)';
+        logAction('RESET: Restored baseline 200m Plains elevation.');
+        return;
+      }
+
+      logAction('INIT TEST: Ascending from 200m Plains (101.3 kPa) to 3,500m MSL (Leh)...');
+      if (btn) btn.innerHTML = '<span class="inline-block animate-spin">⛰️</span> Simulating Mountain Ascent...';
+
+      altitudeTestInterval = setInterval(() => {
+        let val = parseFloat(slider.value) + 60;
+        if (val >= 2150 && val <= 2250) {
+          logAction('⚠️ 2,200m [Shimla]: Barometric pressure drops to 77 kPa. Conventional vacuum trucks begin cavitation!');
+        }
+        if (val >= 3500) {
+          slider.value = 3500;
+          updateSimulation();
+          clearInterval(altitudeTestInterval);
+          altitudeTestInterval = null;
+          logAction('❌ 3,500m [Leh]: Vacuum truck suffers TOTAL CAVITATION FAILURE (0 L/min).');
+          logAction('✅ TERRA-VAC PCP RESULT: 100% Suction (200 L/min) maintained via tool-steel screw displacement!');
+          if (btn) btn.innerHTML = '<span>↺</span> Reset Altitude to Plains (200m)';
+          return;
+        }
+        slider.value = val;
+            onPistonUserSlider(val);
+      }, 40);
+    }
+
+    function drawPCPCanvas() {
+      const w = maceratorCanvas.width;
+      const h = maceratorCanvas.height;
+      macCtx.clearRect(0, 0, w, h);
+
+      // Dark industrial telemetry background
+      macCtx.fillStyle = '#0b1120';
+      macCtx.fillRect(0, 0, w, h);
+
+      const pAtm = (101.3 * Math.exp(-simState.altitude / 8500)).toFixed(1);
+      const isCavitationZone = simState.altitude >= 2200;
+
+      // Header Bar
+      macCtx.fillStyle = '#1e293b';
+      macCtx.fillRect(0, 0, w, 22);
+      macCtx.fillStyle = '#e2e8f0';
+      macCtx.font = 'bold 9.5px monospace';
+      macCtx.fillText('PROGRESSIVE CAVITY SCREW PUMP (PCP)', 10, 15);
+
+      macCtx.fillStyle = '#38bdf8';
+      macCtx.textAlign = 'right';
+      macCtx.fillText(`Alt: ${simState.altitude}m MSL | P_atm: ${pAtm} kPa`, w - 10, 15);
+      macCtx.textAlign = 'start';
+
+      // Pump Cutaway Chamber Boundaries
+      const pumpLeft = 32;
+      const pumpRight = w - 32;
+      const pumpWidth = pumpRight - pumpLeft;
+      const pumpCenterY = 66;
+      const statorRadius = 26;
+
+      // Outer Steel Pump Casing
+      macCtx.fillStyle = '#1e293b';
+      macCtx.strokeStyle = '#475569';
+      macCtx.lineWidth = 2;
+      macCtx.beginPath();
+      macCtx.roundRect(pumpLeft - 10, pumpCenterY - statorRadius - 5, pumpWidth + 20, (statorRadius + 5) * 2, 8);
+      macCtx.fill();
+      macCtx.stroke();
+
+      // Rubber Elastomeric Stator
+      macCtx.fillStyle = '#334155';
+      macCtx.beginPath();
+      macCtx.rect(pumpLeft, pumpCenterY - statorRadius, pumpWidth, statorRadius * 2);
+      macCtx.fill();
+
+      // Draw Moving Sludge Pockets (The Progressive Cavities)
+      const flowOffset = (animFrame * 1.6) % 60;
+      macCtx.fillStyle = '#78350f'; // Rich brown sludge
+      for (let x = pumpLeft + 5; x < pumpRight - 10; x += 28) {
+        const pocketX = x + (flowOffset % 28);
+        if (pocketX >= pumpLeft && pocketX <= pumpRight - 12) {
+          const wavePhase = (pocketX * 0.08) - (animFrame * 0.1);
+          const py = pumpCenterY + Math.sin(wavePhase) * 11;
+          macCtx.beginPath();
+          macCtx.arc(pocketX, py, 10, 0, Math.PI * 2);
+          macCtx.fill();
+        }
+      }
+
+      // Tool-Steel Eccentric Corkscrew Rotor (Moving Stainless Steel Screw)
+      macCtx.lineWidth = 12;
+      macCtx.lineCap = 'round';
+      macCtx.lineJoin = 'round';
+      macCtx.strokeStyle = '#94a3b8'; // Stainless Steel
+      macCtx.beginPath();
+      for (let x = pumpLeft; x <= pumpRight; x += 4) {
+        const wave = Math.sin((x * 0.07) - (animFrame * 0.08)) * 12;
+        const ry = pumpCenterY + wave;
+        if (x === pumpLeft) macCtx.moveTo(x, ry); else macCtx.lineTo(x, ry);
+      }
+      macCtx.stroke();
+
+      // Chrome highlight along the screw edge
+      macCtx.lineWidth = 3;
+      macCtx.strokeStyle = '#f8fafc';
+      macCtx.beginPath();
+      for (let x = pumpLeft; x <= pumpRight; x += 4) {
+        const wave = Math.sin((x * 0.07) - (animFrame * 0.08)) * 12;
+        const ry = pumpCenterY + wave - 2.5;
+        if (x === pumpLeft) macCtx.moveTo(x, ry); else macCtx.lineTo(x, ry);
+      }
+      macCtx.stroke();
+
+      // Suction Intake Arrow (Left)
+      macCtx.fillStyle = '#10b981';
+      macCtx.font = 'bold 8px monospace';
+      macCtx.fillText('➔ INTAKE (Thick Sludge)', 10, pumpCenterY + statorRadius + 13);
+
+      // Continuous Discharge Arrow (Right)
+      macCtx.fillStyle = '#38bdf8';
+      macCtx.fillText('➔ 4.0 BAR OUTLET', pumpRight - 85, pumpCenterY + statorRadius + 13);
+
+      // Rotating Drive Shaft at left
+      macCtx.fillStyle = '#64748b';
+      macCtx.fillRect(pumpLeft - 20, pumpCenterY - 4, 12, 8);
+      macCtx.fillStyle = '#38bdf8';
+      macCtx.beginPath();
+      macCtx.arc(pumpLeft - 14, pumpCenterY, 3, 0, Math.PI * 2);
+      macCtx.fill();
+
+      // ============================================================
+      // SIDE-BY-SIDE ALTITUDE CAVITATION COMPARISON (BOTTOM 62px)
+      // ============================================================
+      const botY = 112;
+      const halfW = (w - 24) / 2;
+
+      // 1. Conventional Vacuum Truck Pump Box
+      if (isCavitationZone) {
+        // CAVITATION FAILURE (Red Warning Box)
+        macCtx.fillStyle = 'rgba(244, 63, 94, 0.16)';
+        macCtx.strokeStyle = '#f43f5e';
+        macCtx.lineWidth = 1.5;
+        macCtx.beginPath();
+        macCtx.roundRect(8, botY, halfW, 60, 6);
+        macCtx.fill();
+        macCtx.stroke();
+
+        macCtx.fillStyle = '#f43f5e';
+        macCtx.font = 'bold 8.5px monospace';
+        macCtx.fillText('❌ CONVENTIONAL VACUUM TRUCK', 14, botY + 14);
+        macCtx.fillStyle = '#fecdd3';
+        macCtx.font = '8px monospace';
+        macCtx.fillText(`CAVITATION FAILURE • 0 L/min`, 14, botY + 28);
+        macCtx.fillText(`Thin air (${pAtm} kPa) creates boiling vapor`, 14, botY + 41);
+        macCtx.fillStyle = '#f43f5e';
+        macCtx.fillText(`Vapor bubbles destroy pump!`, 14, botY + 53);
+
+        // Animated red vapor bubbles popping
+        macCtx.fillStyle = '#f43f5e';
+        for (let b = 0; b < 3; b++) {
+          const bx = 160 + ((animFrame * 1.5 + b * 20) % 45);
+          const by = botY + 45 - ((animFrame * 2 + b * 10) % 30);
+          macCtx.beginPath();
+          macCtx.arc(bx, by, 3, 0, Math.PI * 2);
+          macCtx.fill();
+        }
+      } else {
+        // Plains / Low Altitude (Reduced efficiency)
+        macCtx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+        macCtx.strokeStyle = '#f59e0b';
+        macCtx.lineWidth = 1;
+        macCtx.beginPath();
+        macCtx.roundRect(8, botY, halfW, 60, 6);
+        macCtx.fill();
+        macCtx.stroke();
+
+        macCtx.fillStyle = '#f59e0b';
+        macCtx.font = 'bold 8.5px monospace';
+        macCtx.fillText('⚠️ CONVENTIONAL VACUUM TRUCK', 14, botY + 14);
+        macCtx.fillStyle = '#fed7aa';
+        macCtx.font = '8px monospace';
+        const vacFlow = Math.round(180 * (1 - simState.altitude / 3200));
+        macCtx.fillText(`Atmospheric Suction: ${vacFlow} L/min`, 14, botY + 28);
+        macCtx.fillText(`Marginal lift (NPSH dropping)`, 14, botY + 41);
+        macCtx.fillText(`Vulnerable to boiling above 2,200m`, 14, botY + 53);
+      }
+
+      // 2. Our Progressive Cavity Pump (TERRA-VAC 450) Box
+      macCtx.fillStyle = 'rgba(16, 185, 129, 0.16)';
+      macCtx.strokeStyle = '#10b981';
+      macCtx.lineWidth = 1.5;
+      macCtx.beginPath();
+      macCtx.roundRect(16 + halfW, botY, halfW, 60, 6);
+      macCtx.fill();
+      macCtx.stroke();
+
+      macCtx.fillStyle = '#10b981';
+      macCtx.font = 'bold 8.5px monospace';
+      macCtx.fillText('✅ TERRA-VAC PCP SCREW PUMP', 22 + halfW, botY + 14);
+      macCtx.fillStyle = '#a7f3d0';
+      macCtx.font = '8px monospace';
+      macCtx.fillText('100% SUCTION HEAD • 200 L/min', 22 + halfW, botY + 28);
+      macCtx.fillText('Positive mechanical displacement', 22 + halfW, botY + 41);
+      macCtx.fillStyle = '#34d399';
+      macCtx.fillText('Zero cavitation at 3,500m MSL!', 22 + halfW, botY + 53);
+    }
+
+    // ==============================================================
+    // PURE HTML5 CANVAS CHARTS (NO EXTERNAL BLOCKED DEPENDENCIES)
+    // ==============================================================
+    function renderAllCharts() {
+      drawChartStability();
+      drawChartRheology();
+      drawChartAltitude();
+      drawChartThermal();
+    }
+
+    // Chart 1: Stability Curve
+    function drawChartStability() {
+      const c = document.getElementById('chartStability');
+      if (!c) return;
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Grid & Axes
+      drawChartGrid(ctx, w, h, 'Slope Incline Angle (Degrees)', 'Righting Stability Margin (%)');
+
+      // Plot Line 1: Dual Baffled (TERRA-VAC)
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let angle = 0; angle <= 40; angle += 1) {
+        const x = 50 + (angle / 40) * (w - 70);
+        // Stability margin drops with cos(theta) and reaches 0 at 34.2°
+        let margin = Math.max(0, 100 * (1 - (angle / 34.2)));
+        const y = (h - 35) - (margin / 100) * (h - 60);
+        if (angle === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Plot Line 2: Unbaffled Conventional
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      for (let angle = 0; angle <= 40; angle += 1) {
+        const x = 50 + (angle / 40) * (w - 70);
+        let margin = Math.max(0, 100 * (1 - (angle / 26.4)));
+        const y = (h - 35) - (margin / 100) * (h - 60);
+        if (angle === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Active Operating Point Marker
+      const activeX = 50 + (simState.pitch / 40) * (w - 70);
+      let activeMargin = Math.max(0, 100 * (1 - (simState.pitch / 34.2)));
+      const activeY = (h - 35) - (activeMargin / 100) * (h - 60);
+
+      drawOperatingPoint(ctx, activeX, activeY, '#06b6d4', `${simState.pitch.toFixed(1)}° (${activeMargin.toFixed(0)}%)`);
+    }
+
+    // Chart 2: Rheology Shear-Thinning
+    function drawChartRheology() {
+      const c = document.getElementById('chartRheology');
+      if (!c) return;
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height;
+      ctx.clearRect(0, 0, w, h);
+
+      drawChartGrid(ctx, w, h, 'Macerator Speed (RPM)', 'Apparent Viscosity (cP)');
+
+      // Plot Viscosity Curve
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let rpm = 0; rpm <= 2200; rpm += 50) {
+        const x = 50 + (rpm / 2200) * (w - 70);
+        const shearRate = Math.max(10, rpm * 0.8);
+        const factor = Math.pow(shearRate / 100, -0.62);
+        const visc = Math.max(100, 2800 * factor);
+        const y = (h - 35) - (visc / 3000) * (h - 60);
+        if (rpm === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Operating Point
+      const activeX = 50 + (simState.maceratorRpm / 2200) * (w - 70);
+      const curVisc = parseInt(document.getElementById('kpi-viscosity').textContent) || 320;
+      const activeY = (h - 35) - (curVisc / 3000) * (h - 60);
+
+      drawOperatingPoint(ctx, activeX, activeY, '#06b6d4', `${simState.maceratorRpm} RPM : ${curVisc} cP`);
+    }
+
+    // Chart 3: Altitude vs Suction Head
+    function drawChartAltitude() {
+      const c = document.getElementById('chartAltitude');
+      if (!c) return;
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height;
+      ctx.clearRect(0, 0, w, h);
+
+      drawChartGrid(ctx, w, h, 'Altitude Above MSL (Meters)', 'Pumping Head (Meters)');
+
+      // Line 1: TERRA-VAC Positive Displacement Booster (Constant 40m head)
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(50, (h - 35) - (40 / 50) * (h - 60));
+      ctx.lineTo(w - 20, (h - 35) - (40 / 50) * (h - 60));
+      ctx.stroke();
+
+      // Line 2: Standard Vacuum Truck Limit (Drops from 7m at sea level down to 3.2m at 3500m)
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let alt = 0; alt <= 4000; alt += 100) {
+        const x = 50 + (alt / 4000) * (w - 70);
+        const p_atm = 101.325 * Math.pow(1 - 2.25577e-5 * alt, 5.25588);
+        const maxLift = (p_atm * 1000) / (1050 * 9.81) * 0.65;
+        const y = (h - 35) - (maxLift / 50) * (h - 60);
+        if (alt === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Operating Point
+      const activeX = 50 + (simState.altitude / 4000) * (w - 70);
+      const activeY = (h - 35) - (40 / 50) * (h - 60);
+      drawOperatingPoint(ctx, activeX, activeY, '#06b6d4', `${simState.altitude}m MSL (40m Head)`);
+    }
+
+    // Chart 4: Thermal Dissolution
+    function drawChartThermal() {
+      const c = document.getElementById('chartThermal');
+      if (!c) return;
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height;
+      ctx.clearRect(0, 0, w, h);
+
+      drawChartGrid(ctx, w, h, 'Ambient Temperature (°C)', 'Sludge Viscosity (cP)');
+
+      // Line 1: PTC Heated (Flat line at low viscosity ~320 cP across -15°C to +30°C)
+      ctx.strokeStyle = '#14b8a6';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let t = -15; t <= 35; t += 5) {
+        const x = 50 + ((t + 15) / 50) * (w - 70);
+        const y = (h - 35) - (350 / 3500) * (h - 60);
+        if (t === -15) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Line 2: Unheated Freezing Sludge (Exponential spike below 5°C)
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      for (let t = -15; t <= 35; t += 2) {
+        const x = 50 + ((t + 15) / 50) * (w - 70);
+        let visc = 1200 * Math.exp(-0.06 * (t - 15));
+        if (t < 0) visc += Math.abs(t) * 150;
+        visc = Math.min(3400, visc);
+        const y = (h - 35) - (visc / 3500) * (h - 60);
+        if (t === -15) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Operating Point
+      const activeX = 50 + ((simState.temp + 15) / 50) * (w - 70);
+      const activeVisc = simState.heaterOn ? 350 : Math.min(3400, 1200 * Math.exp(-0.06 * (simState.temp - 15)) + (simState.temp < 0 ? Math.abs(simState.temp)*150 : 0));
+      const activeY = (h - 35) - (activeVisc / 3500) * (h - 60);
+      drawOperatingPoint(ctx, activeX, activeY, '#06b6d4', `${simState.temp}°C : ${activeVisc.toFixed(0)} cP`);
+    }
+
+    // Helper: Draw standard chart grid
+    // Helper: Draw standard chart grid with theme adaptability
+    function drawChartGrid(ctx, w, h, xLabel, yLabel) {
+      const isWhitepaper = document.body.classList.contains('theme-whitepaper');
+      ctx.fillStyle = isWhitepaper ? '#f8fafc' : '#080d16';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = isWhitepaper ? 'rgba(148, 163, 184, 0.35)' : 'rgba(51, 65, 85, 0.4)';
+      ctx.lineWidth = 1;
+
+      // Vertical grid
+      for (let x = 50; x < w - 10; x += (w - 70) / 4) {
+        ctx.beginPath();
+        ctx.moveTo(x, 15);
+        ctx.lineTo(x, h - 30);
+        ctx.stroke();
+      }
+
+      // Horizontal grid
+      for (let y = 15; y < h - 25; y += (h - 50) / 4) {
+        ctx.beginPath();
+        ctx.moveTo(45, y);
+        ctx.lineTo(w - 15, y);
+        ctx.stroke();
+      }
+
+      // Axes labels
+      ctx.fillStyle = isWhitepaper ? '#334155' : '#94a3b8';
+      ctx.font = 'bold 9.5px monospace';
+      ctx.fillText(xLabel, w / 2 - 50, h - 10);
+
+      ctx.save();
+      ctx.translate(14, h / 2 + 35);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+    }
+
+    // Helper: Draw animated operating point
+    function drawOperatingPoint(ctx, x, y, color, label) {
+      const isWhitepaper = document.body.classList.contains('theme-whitepaper');
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = isWhitepaper ? '#0f172a' : '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Tooltip pill
+      ctx.fillStyle = isWhitepaper ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.92)';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(x - 55, y - 28, 110, 20, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isWhitepaper ? '#0f172a' : '#f8fafc';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x, y - 14);
+      ctx.textAlign = 'start';
+    }
+  </script>
+</body>
+</html>

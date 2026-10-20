@@ -16,6 +16,7 @@ import { GuidedDemoTour } from './components/GuidedDemoTour';
 import { CanyonExpedition3D } from './components/canyonSimulation/CanyonExpedition3D';
 import { Simulation3D } from './components/Simulation3D';
 import { SubsurfaceVaultSim3D } from './components/vaultSimulation/SubsurfaceVaultSim3D';
+import { BhavyamDashboardView } from './components/BhavyamDashboardView';
 import { Dashboard } from './components/Dashboard';
 import { SiteAssessmentForm } from './components/SiteAssessmentForm';
 
@@ -179,6 +180,12 @@ export const App: React.FC = () => {
                 onSelectScenario={(sc) => setSite(sc.site_conditions)}
                 onNavigateTab={(tab) => handleSetLegacyView(tab)}
               />
+            </div>
+          )}
+
+          {legacyView === 'bhavyam' && (
+            <div className="max-w-7xl mx-auto p-4 space-y-4">
+              <BhavyamDashboardView />
             </div>
           )}
         </div>

@@ -382,6 +382,7 @@ export interface SimulationStore {
   unlockTransportPosition: () => void;
   resetCompactionOverpressure: () => void;
   updateCompactionParams: (partial: Partial<SludgeCompactionParameters>) => void;
+  setCompactionStrokePct: (pct: number) => { accepted: boolean; reason?: string; strokeMm?: number; strokePct?: number };
 }
 
 function syncEngineParamsFromDigitalTwin(
@@ -1768,6 +1769,50 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           ...partial
         }
       }));
+    },
+
+    setCompactionStrokePct: (pct: number) => {
+      const { compactionTelemetry, compactionParams, mobilityTelemetry, operatingState, alarms, addEvent } = get();
+      const clampedPct = Math.max(0, Math.min(100, pct));
+      const strokeMax = compactionParams?.strokeMaxMm || 600;
+      const strokeMm = Math.round((clampedPct / 100) * strokeMax);
+
+      if (mobilityTelemetry.isMoving) {
+        addEvent('warning', 'COMPACTION_INTERLOCK', 'Vehicle is in motion. Bring crawler tracks to stop before operating compaction piston.');
+        return { accepted: false, reason: 'Vehicle is in motion (crawler tracks active).' };
+      }
+      if (operatingState === 'EXTRACT' || operatingState === 'EXTRACTION' || operatingState === 'DISCHARGE') {
+        addEvent('warning', 'COMPACTION_INTERLOCK', 'Pump active. Stop slurry extraction or discharge before piston compaction.');
+        return { accepted: false, reason: 'Active slurry transfer in progress.' };
+      }
+      if (alarms.emergencyStopActive) {
+        addEvent('critical', 'COMPACTION_FAULT', 'Emergency stop active. Piston movement isolated.');
+        return { accepted: false, reason: 'Emergency Stop active.' };
+      }
+      if (compactionTelemetry.overpressureTrip) {
+        addEvent('critical', 'COMPACTION_FAULT', 'Overpressure trip latched. Reset hydraulic fault before operating cylinder.');
+        return { accepted: false, reason: 'Hydraulic overpressure trip latched.' };
+      }
+
+      const isLocked = strokeMm <= 0 && compactionTelemetry.isTransportLocked;
+      const appliedPressureBar = 0.2 + (clampedPct / 100) * 3.3;
+      const compactionForceKn = 1.2 + (clampedPct / 100) * 11.6;
+
+      set((s) => ({
+        compactionTelemetry: {
+          ...s.compactionTelemetry,
+          strokeMm,
+          strokePct: clampedPct,
+          appliedPressureBar,
+          compactionForceKn,
+          pistonState: strokeMm > 0 ? 'HOLD' : (isLocked ? 'LOCKED' : 'HOME'),
+          isTransportLocked: strokeMm <= 0 ? s.compactionTelemetry.isTransportLocked : false,
+          interlockBlocked: false,
+          interlockBlockReason: null
+        }
+      }));
+
+      return { accepted: true, strokeMm, strokePct: clampedPct };
     }
   };
 });

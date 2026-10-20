@@ -47,6 +47,8 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { SiteConditions, EquipmentRecommendation } from '../types';
+import { useSimulationStore } from '../store/useSimulationStore';
+import { BhavyamDashboardView } from './BhavyamDashboardView';
 import {
   PistonOperatingMode,
   SludgeCompactionParameters,
@@ -271,6 +273,31 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const [maxStrokeLimitMm, setMaxStrokeLimitMm] = useState<number>(600);
   const [reliefPressureLimitBar, setReliefPressureLimitBar] = useState<number>(180);
   const [isReliefValveOpen, setIsReliefValveOpen] = useState<boolean>(false);
+
+  // Bhavyam SCADA Dashboard Unified Layout & Store Integration
+  const storeCompactionTelemetry = useSimulationStore((s) => s.compactionTelemetry);
+  const setStoreCompactionStrokePct = useSimulationStore((s) => s.setCompactionStrokePct);
+  const [displayLayout, setDisplayLayout] = useState<'3d' | 'split' | 'scada'>('split');
+
+  // Synchronize 3D Piston model with unified useSimulationStore / Bhavyam SCADA
+  useEffect(() => {
+    if (storeCompactionTelemetry) {
+      setPistonStrokeMm(storeCompactionTelemetry.strokeMm);
+      pistonStrokeMmRef.current = storeCompactionTelemetry.strokeMm;
+      setPistonMode(storeCompactionTelemetry.pistonState);
+      pistonModeRef.current = storeCompactionTelemetry.pistonState;
+      setIsTransportLocked(storeCompactionTelemetry.isTransportLocked);
+      isTransportLockedRef.current = storeCompactionTelemetry.isTransportLocked;
+      setAppliedPressureBar(storeCompactionTelemetry.appliedPressureBar);
+      setCompactionForceKn(storeCompactionTelemetry.compactionForceKn);
+    }
+  }, [
+    storeCompactionTelemetry?.strokeMm,
+    storeCompactionTelemetry?.pistonState,
+    storeCompactionTelemetry?.isTransportLocked,
+    storeCompactionTelemetry?.appliedPressureBar,
+    storeCompactionTelemetry?.compactionForceKn
+  ]);
 
   // Desludging operation sequence state
   const [desludgeStage, setDesludgeStage] = useState<'idle' | 'deploying' | 'pumping' | 'completed'>('idle');
@@ -5278,7 +5305,45 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
             </p>
           </div>
 
-          {/* Quick Actions: Switch to Canyon Sim, Switch to Vault Sim, Audio, X-Ray, Fullscreen */}
+          {/* View Mode Selector: 3D Only vs Split View (3D + Bhavyam SCADA) vs SCADA Full */}
+            <div className="flex items-center rounded-lg bg-slate-900 p-0.5 border border-slate-700">
+              <button
+                onClick={() => setDisplayLayout('3d')}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition ${
+                  displayLayout === '3d'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Full 3D Mountain Terrain Simulator Viewport"
+              >
+                3D Sim Only
+              </button>
+              <button
+                onClick={() => setDisplayLayout('split')}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition flex items-center space-x-1 ${
+                  displayLayout === 'split'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Synchronized Split View: 3D Mountain Sim + Bhavyam SCADA Mk-IV Multi-Physics Dashboard"
+              >
+                <Sliders className="w-3.5 h-3.5 text-teal-300" />
+                <span>Split: 3D + Bhavyam SCADA</span>
+              </button>
+              <button
+                onClick={() => setDisplayLayout('scada')}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition ${
+                  displayLayout === 'scada'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Dedicated Bharat-Jal SCADA Mk-IV Multi-Physics Dashboard"
+              >
+                Bhavyam SCADA Full
+              </button>
+            </div>
+
+            {/* Quick Actions: Switch to Canyon Sim, Switch to Vault Sim, Audio, X-Ray, Fullscreen */}
           <div className="flex items-center space-x-2 shrink-0">
             {onSwitchToCanyonSim && (
               <button
@@ -5460,7 +5525,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
 
       {/* 3D Viewport & Interactive HUD */}
       <div
-        className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl h-[820px]"
+        className={`relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl transition-all ${displayLayout === "scada" ? "hidden" : displayLayout === "split" ? "h-[560px]" : "h-[820px]"}`}
         ref={containerRef}
       >
         <canvas ref={canvasRef} className="w-full h-full block cursor-grab active:cursor-grabbing" />
@@ -6083,6 +6148,12 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                     return;
                   }
                   const val = parseInt(e.target.value);
+                  const strokePct = Math.round((val / (maxStrokeLimitMm || 600)) * 100);
+                  const res = setStoreCompactionStrokePct(strokePct);
+                  if (!res.accepted) {
+                    setInterlockWarning('INTERLOCK TRIP: ' + (res.reason || 'Cannot move piston.'));
+                    return;
+                  }
                   setPistonStrokeMm(val);
                   pistonStrokeMmRef.current = val;
                   if (val > 0) {
