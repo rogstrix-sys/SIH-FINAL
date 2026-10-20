@@ -27,16 +27,23 @@ export const CollectionTank: React.FC = () => {
   // Internal tank fluid height: max 0.76m
   const internalFluidHeight = Math.max(0.02, 0.76 * fillRatio);
 
-  // Platen kinematics: strokeMm (0 to 600 mm) maps to vertical downward travel
+  // Horizontal Piston kinematics (matching original Bhavyam mechanism):
+  // Longitudinal tank axis is X: Rear = -X, Front = +X
   const pistonStrokeM = Math.min(compactionParams.strokeMaxMm / 1000, Math.max(0, compaction.strokeMm / 1000));
-  // Platen Y in tank coordinate space: Top home = +0.38m; Max travel = -0.22m
-  const platenY = 0.38 - pistonStrokeM;
+  // Platen X in tank coordinate space: Rear home = -0.50m; Max forward travel = +0.10m (+600mm stroke)
+  const platenX = -0.50 + pistonStrokeM;
 
-  // Hydraulic Cylinder rod kinematics
-  const cylinderBaseY = 0.54; // bottom flange of cylinder body
-  const platenTopY = platenY + 0.025;
-  const rodLength = Math.max(0.03, cylinderBaseY - platenTopY);
-  const rodCenterY = cylinderBaseY - rodLength / 2;
+  // Hydraulic Cylinder rod kinematics along horizontal X axis
+  const cylinderGlandX = -0.68; // Stuffing box gland face on rear tank shell
+  const platenRearX = platenX - 0.02;
+  const rodLengthX = Math.max(0.04, platenRearX - cylinderGlandX);
+  const rodCenterX = cylinderGlandX + rodLengthX / 2;
+
+  // Wedge-wire screen at X = +0.22m
+  const wedgeWireScreenX = 0.22;
+  const platenFrontX = platenX + 0.025;
+  const cakeLengthX = Math.max(0.03, wedgeWireScreenX - platenFrontX);
+  const cakeCenterX = platenFrontX + cakeLengthX / 2;
 
   useFrame((state) => {
     if (internalSludgeRef.current && isMaterialFlowing) {
@@ -165,53 +172,56 @@ export const CollectionTank: React.FC = () => {
               </mesh>
             </group>
           ) : (
-            /* ACTIVE COMPACTION PHASE: Distinct Cake Layer below Platen + Separated Filtrate above Platen */
+            /* ACTIVE COMPACTION PHASE: Horizontal Cake Consolidation between Moving Platen & Screen */
             <group>
-              {/* Dense Compacted Sludge Cake Layer underneath Platen */}
-              {(() => {
-                const cakeHeight = Math.max(0.02, (platenY - 0.025) - (-0.38));
-                return (
-                  <mesh position={[0, -0.38 + cakeHeight / 2, 0]}>
-                    <boxGeometry args={[1.06, cakeHeight, 0.64]} />
-                    <meshStandardMaterial
-                      color="#0c0703"
-                      roughness={0.9}
-                      metalness={0.05}
-                      wireframe={wireframe}
-                    />
-                  </mesh>
-                );
-              })()}
+              {/* Dense Compacted Sludge Cake Layer compressed horizontally along X */}
+              <mesh position={[cakeCenterX, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.44, 0.44, cakeLengthX, 24]} />
+                <meshStandardMaterial
+                  color="#140a04"
+                  roughness={0.9}
+                  metalness={0.05}
+                  wireframe={wireframe}
+                />
+              </mesh>
 
-              {/* Separated Liquid Filtrate pooling on top of the Porous Sieve Platen */}
+              {/* Sludge Cake Organic Particulate Aggregates */}
+              {[-0.15, 0.0, 0.15].map((offZ, idx) => (
+                <mesh key={`chunk-${idx}`} position={[cakeCenterX, -0.15 + idx * 0.1, offZ]}>
+                  <boxGeometry args={[Math.min(cakeLengthX * 0.6, 0.08), 0.06, 0.06]} />
+                  <meshStandardMaterial color="#78350f" roughness={0.95} />
+                </mesh>
+              ))}
+
+              {/* Separated Liquid Filtrate in Front Dewatering Compartment (expressed past screen) */}
               {compaction.filtrateVolumeL > 0 && (() => {
-                const maxFiltrateHeight = 0.14;
+                const maxFiltrateHeight = 0.68;
                 const filtrateHeight = Math.min(
                   maxFiltrateHeight,
-                  Math.max(0.015, (compaction.filtrateVolumeL / 800) * maxFiltrateHeight)
+                  Math.max(0.04, (compaction.filtrateVolumeL / 800) * maxFiltrateHeight)
                 );
                 return (
-                  <group position={[0, platenY + 0.025 + filtrateHeight / 2, 0]}>
+                  <group position={[0.44, -0.42 + filtrateHeight / 2, 0]}>
                     <mesh>
-                      <boxGeometry args={[1.02, filtrateHeight, 0.60]} />
+                      <boxGeometry args={[0.40, filtrateHeight, 0.68]} />
                       <meshPhysicalMaterial
                         color="#38bdf8"
                         transparent
-                        opacity={0.65}
-                        roughness={0.1}
-                        transmission={0.8}
+                        opacity={0.75}
+                        roughness={0.08}
+                        transmission={0.85}
                         ior={1.33}
                       />
                     </mesh>
-                    {/* Filtrate surface meniscus sheen */}
+                    {/* Filtrate surface sheen */}
                     <mesh position={[0, filtrateHeight / 2, 0]}>
-                      <boxGeometry args={[1.01, 0.005, 0.59]} />
+                      <boxGeometry args={[0.39, 0.005, 0.67]} />
                       <meshStandardMaterial
                         color="#7dd3fc"
-                        roughness={0.05}
+                        roughness={0.04}
                         metalness={0.2}
                         transparent
-                        opacity={0.8}
+                        opacity={0.85}
                       />
                     </mesh>
                   </group>
@@ -220,11 +230,45 @@ export const CollectionTank: React.FC = () => {
             </group>
           )}
 
-          {/* GUIDED COMPACTION PLATEN INSIDE TANK CUTAWAY */}
-          <group position={[0, platenY, 0]}>
-            {/* Rigid Reinforced Structural Platen Plate */}
-            <mesh castShadow receiveShadow>
-              <boxGeometry args={[1.08, 0.045, 0.66]} />
+          {/* 150 µm TRANSVERSE WEDGE-WIRE DEWATERING SCREEN AT X = +0.22m */}
+          <group position={[wedgeWireScreenX, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            {/* Screen Structural Mounting Flange Ring */}
+            <mesh>
+              <torusGeometry args={[0.46, 0.018, 8, 32]} />
+              <meshStandardMaterial color="#334155" metalness={0.88} roughness={0.25} />
+            </mesh>
+            {/* Sieve Screen Disc */}
+            <mesh>
+              <cylinderGeometry args={[0.455, 0.455, 0.012, 32]} />
+              <meshStandardMaterial
+                color="#94a3b8"
+                metalness={0.92}
+                roughness={0.35}
+                wireframe={wireframe}
+              />
+            </mesh>
+            {/* Vertical Wedge-Wire Indicator Ribs */}
+            {[-0.3, -0.15, 0.0, 0.15, 0.3].map((rx, rIdx) => (
+              <mesh key={`screen-rib-${rIdx}`} position={[rx, 0, 0]}>
+                <boxGeometry args={[0.012, 0.014, 0.82]} />
+                <meshStandardMaterial color="#cbd5e1" metalness={0.95} roughness={0.15} />
+              </mesh>
+            ))}
+          </group>
+
+          {/* DUAL HORIZONTAL CHROME ANTI-TILT GUIDE RAILS (Z = +/-0.30m) */}
+          {[-0.30, 0.30].map((gz, gIdx) => (
+            <mesh key={`guide-rail-${gIdx}`} position={[-0.23, 0, gz]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.018, 0.018, 0.90, 16]} />
+              <meshStandardMaterial color="#f1f5f9" metalness={0.95} roughness={0.10} />
+            </mesh>
+          ))}
+
+          {/* GUIDED HORIZONTAL COMPACTION PLATEN INSIDE TANK CUTAWAY */}
+          <group position={[platenX, 0, 0]}>
+            {/* Rigid Reinforced Structural Platen Circular Disc */}
+            <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.455, 0.455, 0.045, 32]} />
               <meshStandardMaterial
                 color="#e2e8f0"
                 metalness={0.85}
@@ -233,9 +277,9 @@ export const CollectionTank: React.FC = () => {
               />
             </mesh>
 
-            {/* Sieve Drainage Screen Face (Bottom Perforated Surface) */}
-            <mesh position={[0, -0.024, 0]}>
-              <boxGeometry args={[1.06, 0.004, 0.64]} />
+            {/* Sieve Drainage Screen Face (Front Perforated Surface facing +X) */}
+            <mesh position={[0.024, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.445, 0.445, 0.004, 32]} />
               <meshStandardMaterial
                 color="#0284c7"
                 metalness={0.9}
@@ -243,43 +287,45 @@ export const CollectionTank: React.FC = () => {
               />
             </mesh>
 
-            {/* Perforated Filter Mesh Slots Indicator Bars */}
-            {[-0.4, -0.2, 0.0, 0.2, 0.4].map((slotX, sIdx) => (
-              <mesh key={`slot-${sIdx}`} position={[slotX, -0.026, 0]}>
-                <boxGeometry args={[0.08, 0.003, 0.52]} />
+            {/* Perforated Filter Mesh Slots Indicator Bars on Front Face */}
+            {[-0.3, -0.15, 0.0, 0.15, 0.3].map((slotZ, sIdx) => (
+              <mesh key={`slot-${sIdx}`} position={[0.026, 0, slotZ]}>
+                <boxGeometry args={[0.003, 0.68, 0.02]} />
                 <meshBasicMaterial color="#0f172a" />
               </mesh>
             ))}
 
-            {/* Perimeter Polyurethane / Nitrile Wiper Seal Lip */}
-            <mesh position={[0, 0, 0]}>
-              <boxGeometry args={[1.09, 0.02, 0.67]} />
+            {/* Perimeter Polyurethane / Nitrile Wiper Scraper Seal Ring */}
+            <mesh rotation={[0, 0, Math.PI / 2]}>
+              <torusGeometry args={[0.458, 0.009, 8, 32]} />
               <meshStandardMaterial
                 color="#ea580c"
-                roughness={0.6}
+                roughness={0.5}
                 metalness={0.1}
                 wireframe={wireframe}
               />
             </mesh>
 
-            {/* Platen Stiffening Ribs & Central Clevis Boss */}
-            <mesh position={[0, 0.035, 0]}>
-              <boxGeometry args={[0.22, 0.03, 0.22]} />
-              <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.25} />
+            {/* Platen Rear Stiffening Boss connecting to Piston Rod (facing -X) */}
+            <mesh position={[-0.03, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.09, 0.09, 0.04, 20]} />
+              <meshStandardMaterial color="#1e293b" metalness={0.85} roughness={0.25} />
             </mesh>
-            <mesh position={[-0.32, 0.03, 0]}>
-              <boxGeometry args={[0.12, 0.025, 0.12]} />
+
+            {/* Platen Cross-Stiffeners on Rear Face */}
+            <mesh position={[-0.028, 0, 0]}>
+              <boxGeometry args={[0.02, 0.84, 0.03]} />
               <meshStandardMaterial color="#475569" metalness={0.85} roughness={0.25} />
             </mesh>
-            <mesh position={[0.32, 0.03, 0]}>
-              <boxGeometry args={[0.12, 0.025, 0.12]} />
+            <mesh position={[-0.028, 0, 0]}>
+              <boxGeometry args={[0.02, 0.03, 0.84]} />
               <meshStandardMaterial color="#475569" metalness={0.85} roughness={0.25} />
             </mesh>
 
-            {/* Platen Bronze Anti-Tilt Guide Bushings riding on guide columns */}
-            {[-0.32, 0.32].map((gx, gIdx) => (
-              <mesh key={`bushing-${gIdx}`} position={[gx, 0.035, 0]}>
-                <cylinderGeometry args={[0.026, 0.026, 0.06, 16]} />
+            {/* Platen Bronze Anti-Tilt Guide Bushings riding on horizontal guide rails */}
+            {[-0.30, 0.30].map((gz, gIdx) => (
+              <mesh key={`bushing-${gIdx}`} position={[0, 0, gz]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.028, 0.028, 0.07, 16]} />
                 <meshStandardMaterial color="#d97706" metalness={0.9} roughness={0.25} />
               </mesh>
             ))}
@@ -287,82 +333,24 @@ export const CollectionTank: React.FC = () => {
         </group>
       )}
 
-      {/* OVERHEAD STRUCTURAL GANTRY & COMPACTION HYDRAULIC CYLINDER ASSEMBLY */}
+      {/* HORIZONTAL HYDRAULIC COMPACTION CYLINDER & REAR RAM MECHANISM */}
       <group
         onClick={(e) => {
           e.stopPropagation();
           setSelectedComponent('compactor');
         }}
       >
-        {/* Overhead Gantry Welded Box-Section Uprights Bolted to Tank Shell */}
-        {[-0.22, 0.22].map((ux, uIdx) => (
-          <group key={`gantry-upright-${uIdx}`} position={[ux, 0.65, 0]}>
-            <mesh castShadow>
-              <boxGeometry args={[0.07, 0.40, 0.10]} />
-              <meshStandardMaterial color="#0f172a" metalness={0.85} roughness={0.3} wireframe={wireframe} />
-            </mesh>
-            {/* Mounting Gusset Brackets at Tank Base */}
-            <mesh position={[0, -0.16, 0.06]}>
-              <boxGeometry args={[0.06, 0.08, 0.04]} />
-              <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.3} />
-            </mesh>
-          </group>
-        ))}
-
-        {/* Overhead Transverse Bridge Cross-Beam */}
-        <mesh position={[0, 0.84, 0]} castShadow>
-          <boxGeometry args={[0.54, 0.08, 0.12]} />
-          <meshStandardMaterial color="#1e293b" metalness={0.85} roughness={0.3} wireframe={wireframe} />
+        {/* Rear Mounting Flange Bolted to Rear Door at X = -0.70m */}
+        <mesh position={[-0.72, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.15, 0.15, 0.04, 24]} />
+          <meshStandardMaterial color="#0f172a" metalness={0.88} roughness={0.25} wireframe={wireframe} />
         </mesh>
 
-        {/* Heavy-Duty Cylinder Upper Trunnion Mount & Pin */}
-        <mesh position={[0, 0.81, 0]}>
-          <boxGeometry args={[0.16, 0.06, 0.16]} />
-          <meshStandardMaterial color="#0284c7" metalness={0.8} roughness={0.3} />
-        </mesh>
-        <mesh position={[0, 0.81, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.025, 0.025, 0.18, 16]} />
-          <meshStandardMaterial color="#cbd5e1" metalness={0.95} roughness={0.15} />
-        </mesh>
-
-        {/* DUAL PARALLEL CHROME ANTI-TILT GUIDE COLUMNS */}
-        {[-0.32, 0.32].map((gx, gIdx) => (
-          <group key={`column-${gIdx}`} position={[gx, 0.35, 0]}>
-            <mesh>
-              <cylinderGeometry args={[0.018, 0.018, 0.95, 16]} />
-              <meshStandardMaterial color="#f1f5f9" metalness={0.95} roughness={0.12} />
-            </mesh>
-            {/* Top Anchor Socket on Bridge */}
-            <mesh position={[0, 0.48, 0]}>
-              <cylinderGeometry args={[0.026, 0.026, 0.04, 16]} />
-              <meshStandardMaterial color="#1e293b" metalness={0.85} roughness={0.3} />
-            </mesh>
-            {/* Bottom Flange Anchor on Tank Saddle */}
-            <mesh position={[0, -0.48, 0]}>
-              <cylinderGeometry args={[0.028, 0.028, 0.04, 16]} />
-              <meshStandardMaterial color="#1e293b" metalness={0.85} roughness={0.3} />
-            </mesh>
-          </group>
-        ))}
-
-        {/* Magnetostrictive LVDT Piston Position Sensor Mounted on Right Guide Column */}
-        <group position={[0.34, 0.45, 0.03]}>
-          <mesh>
-            <boxGeometry args={[0.015, 0.65, 0.015]} />
-            <meshStandardMaterial color="#f59e0b" metalness={0.6} roughness={0.3} />
-          </mesh>
-          {/* Signal Transmitter Head at Top */}
-          <mesh position={[0, 0.34, 0]}>
-            <cylinderGeometry args={[0.022, 0.022, 0.06, 14]} />
-            <meshStandardMaterial color="#0284c7" metalness={0.7} roughness={0.3} />
-          </mesh>
-        </group>
-
-        {/* VERTICAL HYDRAULIC COMPACTION CYLINDER BARREL */}
-        <group position={[0, 0.67, 0]}>
-          {/* Outer Cylinder Body */}
-          <mesh castShadow receiveShadow>
-            <cylinderGeometry args={[0.065, 0.065, 0.26, 24]} />
+        {/* HORIZONTAL DOUBLE-ACTING HYDRAULIC COMPACTION CYLINDER BARREL */}
+        <group position={[-0.82, 0, 0]}>
+          {/* Outer Cylinder Body (Horizontal along X) */}
+          <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.065, 0.065, 0.28, 24]} />
             <meshStandardMaterial
               color="#0284c7"
               metalness={0.8}
@@ -371,63 +359,63 @@ export const CollectionTank: React.FC = () => {
             />
           </mesh>
 
-          {/* Structural Tie Rods (4x high-tensile steel tie bolts) */}
+          {/* Structural Tie Rods (4x high-tensile steel tie bolts along X) */}
           {[
             [0.05, 0.05],
             [-0.05, 0.05],
             [0.05, -0.05],
             [-0.05, -0.05]
-          ].map(([tx, tz], tIdx) => (
-            <mesh key={`tie-${tIdx}`} position={[tx, 0, tz]}>
-              <cylinderGeometry args={[0.007, 0.007, 0.28, 10]} />
+          ].map(([ty, tz], tIdx) => (
+            <mesh key={`tie-${tIdx}`} position={[0, ty, tz]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.007, 0.007, 0.30, 10]} />
               <meshStandardMaterial color="#cbd5e1" metalness={0.95} roughness={0.15} />
             </mesh>
           ))}
 
-          {/* Top Cylinder Head Cap */}
-          <mesh position={[0, 0.135, 0]}>
+          {/* Rear Cylinder End Cap */}
+          <mesh position={[-0.145, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.075, 0.075, 0.03, 24]} />
             <meshStandardMaterial color="#0f172a" metalness={0.85} roughness={0.3} />
           </mesh>
 
-          {/* Bottom Gland Cap */}
-          <mesh position={[0, -0.135, 0]}>
+          {/* Front Gland Head Cap */}
+          <mesh position={[0.145, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.075, 0.075, 0.03, 24]} />
             <meshStandardMaterial color="#0f172a" metalness={0.85} roughness={0.3} />
           </mesh>
 
           {/* Integrated Hydraulic Pressure Transducer & 180 Bar Relief Valve Manifold Block */}
-          <group position={[0.08, 0.02, 0]}>
+          <group position={[0, 0.11, 0]}>
             <mesh castShadow>
-              <boxGeometry args={[0.06, 0.11, 0.06]} />
+              <boxGeometry args={[0.10, 0.06, 0.06]} />
               <meshStandardMaterial color="#dc2626" metalness={0.75} roughness={0.3} />
             </mesh>
             {/* Stainless Digital Pressure Sensor Transmitter */}
-            <mesh position={[0.035, 0.03, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <mesh position={[0.02, 0.045, 0]}>
               <cylinderGeometry args={[0.016, 0.016, 0.04, 14]} />
               <meshStandardMaterial color="#e2e8f0" metalness={0.95} roughness={0.15} />
             </mesh>
             {/* Relief Valve Adjusting Knob / Spool */}
-            <mesh position={[0, -0.065, 0]}>
+            <mesh position={[-0.03, 0.04, 0]}>
               <cylinderGeometry args={[0.014, 0.014, 0.03, 14]} />
               <meshStandardMaterial color="#eab308" metalness={0.8} roughness={0.3} />
             </mesh>
           </group>
 
           {/* Flexible High-Pressure Braided Hydraulic Lines (A-Port & B-Port) */}
-          <mesh position={[-0.07, 0.06, 0]} rotation={[0, 0, -Math.PI / 4]}>
+          <mesh position={[-0.06, 0.08, 0.05]} rotation={[0, Math.PI / 4, 0]}>
             <cylinderGeometry args={[0.009, 0.009, 0.12, 10]} />
             <meshStandardMaterial color="#1e293b" roughness={0.6} />
           </mesh>
-          <mesh position={[-0.07, -0.06, 0]} rotation={[0, 0, -Math.PI / 4]}>
+          <mesh position={[0.06, 0.08, 0.05]} rotation={[0, -Math.PI / 4, 0]}>
             <cylinderGeometry args={[0.009, 0.009, 0.12, 10]} />
             <meshStandardMaterial color="#1e293b" roughness={0.6} />
           </mesh>
         </group>
 
-        {/* PRECISION HARD CHROME HYDRAULIC PISTON ROD */}
-        <mesh position={[0, rodCenterY, 0]} castShadow>
-          <cylinderGeometry args={[0.03, 0.03, rodLength, 20]} />
+        {/* PRECISION HARD CHROME HORIZONTAL HYDRAULIC PISTON ROD */}
+        <mesh position={[rodCenterX, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.03, 0.03, rodLengthX, 20]} />
           <meshStandardMaterial
             color="#ffffff"
             metalness={0.98}
@@ -436,22 +424,22 @@ export const CollectionTank: React.FC = () => {
         </mesh>
 
         {/* Tank Entry Stuffing Box Gland Seal with Polyurethane Wiper Ring */}
-        <group position={[0, 0.48, 0]}>
-          <mesh>
+        <group position={[-0.68, 0, 0]}>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.048, 0.048, 0.045, 20]} />
             <meshStandardMaterial color="#0f172a" metalness={0.85} roughness={0.3} />
           </mesh>
-          <mesh position={[0, 0.024, 0]}>
+          <mesh position={[0.024, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <torusGeometry args={[0.032, 0.006, 8, 20]} />
             <meshStandardMaterial color="#ea580c" roughness={0.4} />
           </mesh>
         </group>
 
-        {/* MECHANICAL TRANSPORT LOCK MECHANISM */}
-        <group position={[0, 0.58, 0]}>
+        {/* MECHANICAL TRANSPORT LOCK MECHANISM (Engages at X = -0.52m home) */}
+        <group position={[-0.52, 0.44, 0]}>
           {/* Lock Pin Guide Sleeve Bracket */}
           <mesh>
-            <boxGeometry args={[0.16, 0.035, 0.04]} />
+            <boxGeometry args={[0.05, 0.04, 0.16]} />
             <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.3} />
           </mesh>
           {/* Dual Red Transport Lock Pins (Slide inward when locked, outward when armed) */}
@@ -459,19 +447,32 @@ export const CollectionTank: React.FC = () => {
             const isLocked = compaction.isTransportLocked;
             const pinOffset = isLocked ? dir * 0.045 : dir * 0.11;
             return (
-              <group key={`pin-${pIdx}`} position={[pinOffset, 0, 0]}>
-                <mesh rotation={[0, 0, Math.PI / 2]}>
+              <group key={`pin-${pIdx}`} position={[0, 0, pinOffset]}>
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
                   <cylinderGeometry args={[0.012, 0.012, 0.07, 14]} />
                   <meshStandardMaterial color="#dc2626" metalness={0.6} roughness={0.3} />
                 </mesh>
                 {/* Red T-Handle Pull Ring */}
-                <mesh position={[dir * 0.035, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[0, 0, dir * 0.035]} rotation={[Math.PI / 2, 0, 0]}>
                   <torusGeometry args={[0.018, 0.004, 8, 16]} />
                   <meshStandardMaterial color="#ef4444" metalness={0.5} roughness={0.3} />
                 </mesh>
               </group>
             );
           })}
+        </group>
+
+        {/* Magnetostrictive LVDT Linear Displacement Piston Position Sensor */}
+        <group position={[-0.20, 0.42, 0.18]}>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.010, 0.010, 0.70, 12]} />
+            <meshStandardMaterial color="#f59e0b" metalness={0.6} roughness={0.3} />
+          </mesh>
+          {/* Signal Transmitter Head at Rear */}
+          <mesh position={[-0.36, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.022, 0.022, 0.06, 14]} />
+            <meshStandardMaterial color="#0284c7" metalness={0.7} roughness={0.3} />
+          </mesh>
         </group>
       </group>
 

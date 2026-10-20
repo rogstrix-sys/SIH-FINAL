@@ -3,6 +3,8 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import {
   pctToStrokeMm,
   strokeMmToPct,
+  strokeMmToPlatenX,
+  platenXToStrokeMm,
   strokeMmToPlatenY,
   platenYToStrokeMm,
   calculatePistonKinematics,
@@ -66,7 +68,46 @@ describe('Bhavyam Dashboard & 3D Sludge Compaction Piston Integration', () => {
   });
 
   describe('2. 3D Model Coordinate Mapping & Kinematic Transforms', () => {
-    it('maps normalized stroke ratio to exact 3D compression platen vertical travel', () => {
+    it('maps normalized stroke ratio to exact horizontal compression platen travel matching Bhavyam mechanism', () => {
+      // Tank longitudinal axis is horizontal (X-axis in CollectionTank: -0.50m rear home to +0.10m compressed)
+      expect(strokeMmToPlatenX(0)).toBeCloseTo(-0.50, 3);   // 0 mm: rear home against gland seal
+      expect(strokeMmToPlatenX(300)).toBeCloseTo(-0.20, 3); // 300 mm: halfway compaction
+      expect(strokeMmToPlatenX(600)).toBeCloseTo(0.10, 3);  // 600 mm: maximum compression before screen at +0.22m
+
+      expect(platenXToStrokeMm(-0.50)).toBe(0);
+      expect(platenXToStrokeMm(-0.20)).toBe(300);
+      expect(platenXToStrokeMm(0.10)).toBe(600);
+
+      // Simulation3D horizontal Z-axis travel: -0.50m (home) to +0.10m (max compaction)
+      const calculatePlatenZ = (strokeRatio: number) => -0.50 + strokeRatio * 0.60;
+      expect(calculatePlatenZ(0.0)).toBeCloseTo(-0.50, 3);
+      expect(calculatePlatenZ(0.5)).toBeCloseTo(-0.20, 3);
+      expect(calculatePlatenZ(1.0)).toBeCloseTo(0.10, 3);
+    });
+
+    it('computes dynamic horizontal piston rod extension along cylinder axis', () => {
+      // Cylinder gland face is at -0.68m
+      const calculateRodLength = (strokeRatio: number) => {
+        const platenPos = -0.50 + strokeRatio * 0.60;
+        return Math.max(0.04, (platenPos - 0.02) - (-0.68));
+      };
+      expect(calculateRodLength(0.0)).toBeCloseTo(0.16, 3); // 160 mm initial stub at home
+      expect(calculateRodLength(0.5)).toBeCloseTo(0.46, 3); // 460 mm at mid-stroke
+      expect(calculateRodLength(1.0)).toBeCloseTo(0.76, 3); // 760 mm at full extension
+    });
+
+    it('calculates horizontal sludge cake thickness between advancing platen and wedge-wire screen', () => {
+      // Wedge-wire screen is fixed at +0.22m
+      const calculateCakeThickness = (strokeRatio: number) => {
+        const platenFront = (-0.50 + strokeRatio * 0.60) + 0.025;
+        return Math.max(0.03, 0.22 - platenFront);
+      };
+      expect(calculateCakeThickness(0.0)).toBeCloseTo(0.695, 3); // 695 mm uncompacted bed
+      expect(calculateCakeThickness(0.5)).toBeCloseTo(0.395, 3); // 395 mm consolidating cake
+      expect(calculateCakeThickness(1.0)).toBeCloseTo(0.095, 3); // 95 mm dense consolidated cake
+    });
+
+    it('maps normalized stroke ratio to exact 3D compression platen vertical travel (Legacy reference)', () => {
       const calculatePlatenY = (strokeRatio: number) => 0.72 - strokeRatio * 0.47;
 
       expect(calculatePlatenY(0.0)).toBeCloseTo(0.72, 3); // Fully retracted top home
@@ -74,7 +115,7 @@ describe('Bhavyam Dashboard & 3D Sludge Compaction Piston Integration', () => {
       expect(calculatePlatenY(1.0)).toBeCloseTo(0.25, 3); // Maximum downward cake compression
     });
 
-    it('maps normalized stroke ratio to guided chrome piston rod extension and scale', () => {
+    it('maps normalized stroke ratio to guided chrome piston rod extension and scale (Legacy reference)', () => {
       const calculateRodY = (strokeRatio: number) => 0.92 - strokeRatio * 0.235;
       const calculateRodScaleY = (strokeRatio: number) => 1.0 + strokeRatio * 0.75;
 

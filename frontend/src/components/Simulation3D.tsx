@@ -2749,51 +2749,75 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
     // Vertical double-acting cylinder, chrome piston rod, anti-tilt guide columns,
     // perforated platen, perimeter scraper seal, and mechanical retention lock pins.
     // =========================================================================
+    // HYDRAULIC SLUDGE-COMPACTION PISTON & DEWATERING MECHANISM (HORIZONTAL RAM)
+    // Coaxial with horizontal cylindrical tank along Z-axis (matching Bhavyam SCADA)
+    // Rear = -Z, Front = +Z, Tank Center = (0, 0.46, -0.28), Tank Length = 1.35m
+    // =========================================================================
     const compactionGroup = new THREE.Group();
-    compactionGroup.position.set(0, 0, -0.28);
+    compactionGroup.position.set(0, 0.46, -0.28);
     chassisGroup.add(compactionGroup);
 
-    // 1. Structural Overhead Mounting Truss / Saddle
-    const bridgeYoke = new THREE.Mesh(
-      new THREE.BoxGeometry(0.72, 0.05, 0.18),
-      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3 })
+    // 1. Rear Structural Cylinder Mounting Flange bolted to Rear Tank Dished Head (Z = -0.675m)
+    const rearMountFlange = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.035, 24),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.25 })
     );
-    bridgeYoke.position.set(0, 0.90, 0);
-    compactionGroup.add(bridgeYoke);
+    rearMountFlange.rotation.x = Math.PI / 2;
+    rearMountFlange.position.set(0, 0, -0.68);
+    compactionGroup.add(rearMountFlange);
 
-    // High-Pressure Compaction Warning Decal Plate
+    // High-Pressure Compaction Warning Decal Plate mounted on rear bracket
     const compWarnDecal = createDecalTexture('compaction_warning');
     const compWarnPlate = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.52, 0.13),
+      new THREE.PlaneGeometry(0.24, 0.09),
       new THREE.MeshStandardMaterial({ map: compWarnDecal, transparent: true, roughness: 0.3 })
     );
-    compWarnPlate.position.set(0, 0.90, 0.095);
+    compWarnPlate.position.set(0, 0.16, -0.68);
     compactionGroup.add(compWarnPlate);
 
-    [-0.34, 0.34].forEach((rx) => {
-      const yokeRiser = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.44, 0.16),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85 })
-      );
-      yokeRiser.position.set(rx, 0.68, 0);
-      compactionGroup.add(yokeRiser);
-    });
-
-    // 2. Heavy-Duty Hydraulic Cylinder Barrel (Ø120 mm Bore Class)
+    // 2. Heavy-Duty Hydraulic Compaction Cylinder Barrel (Ø120 mm Bore Class)
+    // Mounted horizontally along Z at rear head (-0.96m to -0.68m)
     const hydCylBarrel = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.065, 0.065, 0.36, 24),
+      new THREE.CylinderGeometry(0.065, 0.065, 0.28, 24),
       new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.88, roughness: 0.22 })
     );
-    hydCylBarrel.position.set(0, 1.08, 0);
+    hydCylBarrel.rotation.x = Math.PI / 2;
+    hydCylBarrel.position.set(0, 0, -0.82);
     compactionGroup.add(hydCylBarrel);
 
-    // Cylinder End Gland Cap with High-Pressure Seal
+    // Cylinder End Gland Cap with High-Pressure Seal (facing into tank at Z = -0.68m)
     const glandCap = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.075, 0.075, 0.05, 24),
+      new THREE.CylinderGeometry(0.075, 0.075, 0.04, 24),
       new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9 })
     );
-    glandCap.position.set(0, 0.91, 0);
+    glandCap.rotation.x = Math.PI / 2;
+    glandCap.position.set(0, 0, -0.68);
     compactionGroup.add(glandCap);
+
+    // Cylinder Rear End Cap at Z = -0.96m
+    const rearCylCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075, 0.075, 0.04, 24),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85 })
+    );
+    rearCylCap.rotation.x = Math.PI / 2;
+    rearCylCap.position.set(0, 0, -0.96);
+    compactionGroup.add(rearCylCap);
+
+    // 4x High-Tensile Steel Tie Rods along Z
+    [
+      [0.05, 0.05],
+      [-0.05, 0.05],
+      [0.05, -0.05],
+      [-0.05, -0.05]
+    ].forEach(([tx, ty]) => {
+      const tieRod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.007, 0.007, 0.30, 10),
+        new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.95, roughness: 0.15 })
+      );
+      tieRod.rotation.x = Math.PI / 2;
+      tieRod.position.set(tx, ty, -0.82);
+      compactionGroup.add(tieRod);
+    });
 
     // High-Pressure Hydraulic Fluid Ports & Steel Braided Lines
     [-0.07, 0.07].forEach((px) => {
@@ -2801,137 +2825,171 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         new THREE.CylinderGeometry(0.015, 0.015, 0.04, 12),
         new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.95 })
       );
-      portFitting.rotation.z = Math.PI / 2;
-      portFitting.position.set(px, 1.14, 0);
+      portFitting.position.set(px, 0.08, -0.82);
       compactionGroup.add(portFitting);
 
       const hydLine = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.008, 0.008, 0.42, 8),
+        new THREE.CylinderGeometry(0.008, 0.008, 0.35, 8),
         new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 })
       );
-      hydLine.position.set(px * 1.5, 0.92, 0.08);
+      hydLine.position.set(px * 1.4, 0.12, -0.82);
       compactionGroup.add(hydLine);
     });
 
-    // 3. Dual Vertical Chrome Guide Columns (Ø45 mm Class, Anti-Tilt Mechanism)
+    // Integrated Hydraulic Pressure Transducer & 180 Bar Relief Valve Manifold Block
+    const manifoldBlock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.06, 0.10),
+      new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.75, roughness: 0.3 })
+    );
+    manifoldBlock.position.set(0, 0.10, -0.82);
+    compactionGroup.add(manifoldBlock);
+
+    // 3. Dual Horizontal Chrome Guide Columns (Ø45 mm Class, Anti-Tilt Mechanism)
     [-0.24, 0.24].forEach((gx) => {
       const guideRod = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.020, 0.020, 0.70, 16),
+        new THREE.CylinderGeometry(0.018, 0.018, 0.86, 16),
         new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.98, roughness: 0.08 })
       );
-      guideRod.position.set(gx, 0.60, 0);
+      guideRod.rotation.x = Math.PI / 2;
+      guideRod.position.set(gx, 0, -0.22);
       compactionGroup.add(guideRod);
     });
 
-    // 4. Moving Compaction Platen Assembly (moves from y=0.72 down to y=0.25)
+    // 4. Fixed Transverse 150 µm Wedge-Wire Dewatering Screen at Z = +0.20m
+    const wedgeWireScreen = new THREE.Mesh(
+      new THREE.CylinderGeometry(tankRadius * 0.94, tankRadius * 0.94, 0.014, 32),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.92, roughness: 0.35 })
+    );
+    wedgeWireScreen.rotation.x = Math.PI / 2;
+    wedgeWireScreen.position.set(0, 0, 0.20);
+    compactionGroup.add(wedgeWireScreen);
+
+    const screenClampRing = new THREE.Mesh(
+      new THREE.TorusGeometry(tankRadius * 0.95, 0.012, 8, 32),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.88, roughness: 0.25 })
+    );
+    screenClampRing.position.set(0, 0, 0.20);
+    compactionGroup.add(screenClampRing);
+
+    // 5. Moving Compaction Platen Assembly (Horizontal movement from Z = -0.50m forward to Z = +0.10m)
     const platenGroup = new THREE.Group();
-    platenGroup.position.set(0, 0.72, 0);
+    platenGroup.position.set(0, 0, -0.50);
     compactionGroup.add(platenGroup);
     compactionPlatenRef.current = platenGroup;
 
-    // Rigid Structural Platen Plate (1.15m x 0.56m)
+    // Rigid Structural Platen Disc (circular disc perpendicular to Z)
     const platenMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.56, 0.035, 1.15),
+      new THREE.CylinderGeometry(tankRadius * 0.94, tankRadius * 0.94, 0.035, 32),
       new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.25 })
     );
-    platenMesh.position.y = 0;
+    platenMesh.rotation.x = Math.PI / 2;
     platenGroup.add(platenMesh);
 
-    // Heavy-Duty Structural Stiffening Cross-Ribs on Platen Upper Surface
-    [-0.35, 0, 0.35].forEach((rz) => {
-      const rib = new THREE.Mesh(
-        new THREE.BoxGeometry(0.52, 0.024, 0.035),
-        galvanizedMat
-      );
-      rib.position.set(0, 0.026, rz);
-      platenGroup.add(rib);
-    });
-
-    // Perforated Filter Mesh Underside
+    // Perforated Filter Mesh Sieve on Front Face (Z = +0.018m facing forward towards screen)
     const perforatedMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.55, 0.006, 1.14),
-      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.92, roughness: 0.4 })
+      new THREE.CylinderGeometry(tankRadius * 0.93, tankRadius * 0.93, 0.005, 32),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.92, roughness: 0.3 })
     );
-    perforatedMesh.position.y = -0.018;
+    perforatedMesh.rotation.x = Math.PI / 2;
+    perforatedMesh.position.z = 0.018;
     platenGroup.add(perforatedMesh);
 
     // Polyurethane Perimeter Scraper / Wiper Seal Ring
     const wiperSeal = new THREE.Mesh(
-      new THREE.BoxGeometry(0.575, 0.018, 1.165),
+      new THREE.TorusGeometry(tankRadius * 0.95, 0.010, 8, 32),
       new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.5 })
     );
-    wiperSeal.position.y = -0.005;
     platenGroup.add(wiperSeal);
 
-    // Dual Bronze Guide Sleeve Bushings
+    // Heavy-Duty Structural Stiffening Cross-Ribs & Clevis Boss on Rear Face (Z = -0.018m)
+    const clevisBoss = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 0.03, 16),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85 })
+    );
+    clevisBoss.rotation.x = Math.PI / 2;
+    clevisBoss.position.z = -0.018;
+    platenGroup.add(clevisBoss);
+
+    [-0.20, 0, 0.20].forEach((rx) => {
+      const rib = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, 0.54, 0.02),
+        galvanizedMat
+      );
+      rib.position.set(rx, 0, -0.018);
+      platenGroup.add(rib);
+    });
+
+    // Dual Bronze Guide Sleeve Bushings sliding along horizontal guide rods
     [-0.24, 0.24].forEach((bx) => {
       const bushing = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.032, 0.032, 0.08, 16),
+        new THREE.CylinderGeometry(0.028, 0.028, 0.07, 16),
         new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9, roughness: 0.2 })
       );
-      bushing.position.set(bx, 0.035, 0);
+      bushing.rotation.x = Math.PI / 2;
+      bushing.position.set(bx, 0, 0);
       platenGroup.add(bushing);
     });
 
     // Twin Mechanical Retention Pin Locking Ear Brackets (for transport lock)
-    [-0.26, 0.26].forEach((lx) => {
+    [-0.20, 0.20].forEach((lx) => {
       const ear = new THREE.Mesh(
-        new THREE.BoxGeometry(0.03, 0.09, 0.08),
+        new THREE.BoxGeometry(0.03, 0.08, 0.05),
         galvanizedMat
       );
-      ear.position.set(lx, 0.05, 0);
+      ear.position.set(lx, 0.25, -0.02);
       platenGroup.add(ear);
 
       const earHole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.018, 0.018, 0.032, 12),
+        new THREE.CylinderGeometry(0.015, 0.015, 0.032, 12),
         new THREE.MeshBasicMaterial({ color: 0x020617 })
       );
       earHole.rotation.z = Math.PI / 2;
-      earHole.position.set(lx, 0.065, 0);
+      earHole.position.set(lx, 0.265, -0.02);
       platenGroup.add(earHole);
     });
 
-    // 5. Guided Chrome Piston Rod (Ø60 mm Rod Class)
+    // 6. Guided Chrome Horizontal Piston Rod (Ø60 mm Rod Class)
     const hydPistonRod = new THREE.Mesh(
       new THREE.CylinderGeometry(0.028, 0.028, 0.65, 20),
       new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.98, roughness: 0.04 })
     );
-    hydPistonRod.position.set(0, 0.92, 0);
+    hydPistonRod.rotation.x = Math.PI / 2;
+    hydPistonRod.position.set(0, 0, -0.59);
     compactionGroup.add(hydPistonRod);
     pistonRodRef.current = hydPistonRod;
 
-    // 6. Mechanical Retention Lock Pins (Engage at Top Home Position)
+    // 7. Mechanical Retention Lock Pins (Engage at Rear Home Position Z = -0.50m)
     pistonLockPinsRef.current = [];
-    [-0.32, 0.32].forEach((px, pIdx) => {
+    [-0.26, 0.26].forEach((px, pIdx) => {
       const pinHousing = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.06, 0.08),
+        new THREE.BoxGeometry(0.06, 0.06, 0.06),
         new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
       );
-      pinHousing.position.set(px, 0.785, 0);
+      pinHousing.position.set(px, 0.265, -0.50);
       compactionGroup.add(pinHousing);
 
       const lockPin = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.015, 0.015, 0.09, 12),
+        new THREE.CylinderGeometry(0.012, 0.012, 0.08, 12),
         new THREE.MeshStandardMaterial({ color: 0x22c55e, metalness: 0.95, roughness: 0.1 })
       );
       lockPin.rotation.z = Math.PI / 2;
-      lockPin.position.set(pIdx === 0 ? -0.27 : 0.27, 0.785, 0);
+      lockPin.position.set(pIdx === 0 ? -0.22 : 0.22, 0.265, -0.50);
       compactionGroup.add(lockPin);
       pistonLockPinsRef.current.push(lockPin);
     });
 
-    // Safety Lock Status Dual Indicator LED Lamps on Overhead Bridge
+    // Safety Lock Status Dual Indicator LED Lamp
     const lockLed = new THREE.Mesh(
-      new THREE.SphereGeometry(0.022, 12, 12),
+      new THREE.SphereGeometry(0.020, 12, 12),
       new THREE.MeshBasicMaterial({ color: 0x22c55e })
     );
-    lockLed.position.set(0, 0.94, 0.10);
+    lockLed.position.set(0, 0.15, -0.68);
     compactionGroup.add(lockLed);
     pistonStatusLedRef.current = lockLed;
 
-    // 7. Dynamic Liquid Filtrate Pool Layer (Appears directly above platen during dewatering)
-    const filtrateGeo = new THREE.PlaneGeometry(0.53, 1.12);
-    filtrateGeo.rotateX(-Math.PI / 2);
+    // 8. Dynamic Liquid Filtrate Pool Layer in Front Chamber (Z in [+0.20m, +0.62m])
+    const filtrateGeo = new THREE.CylinderGeometry(tankRadius * 0.88, tankRadius * 0.88, 0.38, 24);
+    filtrateGeo.rotateX(Math.PI / 2);
     const filtrateMat = new THREE.MeshPhysicalMaterial({
       color: 0x38bdf8,
       transparent: true,
@@ -2941,7 +2999,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
       ior: 1.33
     });
     const filtrateMesh = new THREE.Mesh(filtrateGeo, filtrateMat);
-    filtrateMesh.position.set(0, 0.74, 0);
+    filtrateMesh.position.set(0, -0.05, 0.40);
     compactionGroup.add(filtrateMesh);
     filtrateMeshRef.current = filtrateMesh;
 
@@ -4125,25 +4183,31 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           dynamicCompactionParams
         );
 
-        // Update Compaction Platen Vertical Position (y: 0.72 -> 0.25)
+        // Update Compaction Platen Horizontal Position along Z (from Z = -0.50m forward to Z = +0.10m)
+        const currentPlatenZ = -0.50 + strokeRatio * 0.60;
         if (compactionPlatenRef.current) {
-          compactionPlatenRef.current.position.y = 0.72 - strokeRatio * 0.47;
+          compactionPlatenRef.current.position.z = currentPlatenZ;
         }
 
-        // Update Guided Chrome Piston Rod Extension
+        // Update Guided Chrome Piston Rod Extension along Z
         if (pistonRodRef.current) {
-          pistonRodRef.current.position.y = 0.92 - strokeRatio * 0.235;
-          pistonRodRef.current.scale.y = 1.0 + strokeRatio * 0.75;
+          const rodLength = Math.max(0.04, (currentPlatenZ - 0.02) - (-0.68));
+          pistonRodRef.current.position.z = -0.68 + rodLength / 2;
+          pistonRodRef.current.scale.set(1, rodLength / 0.65, 1);
         }
 
-        // Update Expressed Translucent Liquid Filtrate Layer
+        // Update Expressed Translucent Liquid Filtrate Layer in Front Chamber
         if (filtrateMeshRef.current) {
           if (strokeMm > 25) {
             filtrateMeshRef.current.visible = true;
-            filtrateMeshRef.current.position.y = 0.72 - strokeRatio * 0.47 + 0.025;
             (filtrateMeshRef.current.material as THREE.MeshPhysicalMaterial).opacity = Math.min(
               0.85,
               0.25 + strokeRatio * 0.60
+            );
+            filtrateMeshRef.current.scale.set(
+              Math.min(1.0, 0.35 + strokeRatio * 0.65),
+              1.0,
+              Math.min(1.0, 0.35 + strokeRatio * 0.65)
             );
           } else {
             filtrateMeshRef.current.visible = false;
@@ -4151,18 +4215,18 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           }
         }
 
-        // Update Sludge Bed Compression underneath platen
+        // Update Sludge Bed Compression against wedge-wire screen
         if (vehicleTankLiquidRef.current && currentDrive !== 'desludge') {
-          const compScale = Math.max(0.40, 1.0 - strokeRatio * 0.42);
-          vehicleTankLiquidRef.current.scale.y = compScale;
-          vehicleTankLiquidRef.current.position.y = -(strokeRatio * 0.12);
+          const compScale = Math.max(0.38, 1.0 - strokeRatio * 0.52);
+          vehicleTankLiquidRef.current.scale.z = compScale;
+          vehicleTankLiquidRef.current.position.z = -0.28 + strokeRatio * 0.12;
         }
 
         // Update Mechanical Transport Retention Lock Pins
         if (pistonLockPinsRef.current.length === 2) {
           const isLocked = isTransportLockedRef.current;
-          const targetL = isLocked ? -0.25 : -0.32;
-          const targetR = isLocked ? 0.25 : 0.32;
+          const targetL = isLocked ? -0.22 : -0.27;
+          const targetR = isLocked ? 0.22 : 0.27;
           pistonLockPinsRef.current[0].position.x = THREE.MathUtils.lerp(
             pistonLockPinsRef.current[0].position.x,
             targetL,
@@ -6893,7 +6957,7 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
                 <div>
                   <span className="text-slate-400 block font-sans font-bold text-white mb-0.5">Hydraulic Cylinder &amp; Bore</span>
                   <span className="text-emerald-400 font-bold">Ø120mm Bore · Ø60mm Rod · 600mm Stroke</span>
-                  <p className="text-slate-400 text-[10px] font-sans mt-0.5">Double-acting chrome cylinder mounted to rigid overhead bridge yoke across tank chassis rails.</p>
+                  <p className="text-slate-400 text-[10px] font-sans mt-0.5">Horizontal double-acting chrome cylinder mounted coaxially to rear tank dished head.</p>
                 </div>
                 <div>
                   <span className="text-slate-400 block font-sans font-bold text-white mb-0.5">Pressure &amp; Dewatering Thrust</span>
