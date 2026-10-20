@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import {
+  pctToStrokeMm,
+  strokeMmToPct,
+  strokeMmToPlatenY,
+  platenYToStrokeMm,
+  calculatePistonKinematics,
+  PISTON_CONFIG
+} from '../../utils/pistonUnitConversions';
 
 describe('Bhavyam Dashboard & 3D Sludge Compaction Piston Integration', () => {
   beforeEach(() => {
@@ -193,6 +201,39 @@ describe('Bhavyam Dashboard & 3D Sludge Compaction Piston Integration', () => {
       store.setCompactionStrokePct(20);
 
       expect(useSimulationStore.getState().compactionTelemetry.isTransportLocked).toBe(false);
+    });
+  });
+
+  describe('5. Explicit Piston Unit Conversions & Kinematic Formulas', () => {
+    it('converts percentages to millimeters and round-trips exactly', () => {
+      expect(pctToStrokeMm(0)).toBe(0);
+      expect(pctToStrokeMm(50)).toBe(300);
+      expect(pctToStrokeMm(100)).toBe(600);
+
+      expect(strokeMmToPct(0)).toBe(0);
+      expect(strokeMmToPct(300)).toBe(50);
+      expect(strokeMmToPct(600)).toBe(100);
+    });
+
+    it('maps millimeter stroke to Three.js platen Y coordinate and round-trips', () => {
+      // At stroke = 0 mm, platen is at top home (+0.38 m)
+      expect(strokeMmToPlatenY(0)).toBeCloseTo(0.38, 3);
+      // At stroke = 600 mm, platen is at max depth (-0.22 m)
+      expect(strokeMmToPlatenY(600)).toBeCloseTo(-0.22, 3);
+
+      expect(platenYToStrokeMm(0.38)).toBe(0);
+      expect(platenYToStrokeMm(-0.22)).toBe(600);
+    });
+
+    it('calculates full multi-physics kinematics for 75% compaction stroke', () => {
+      const k = calculatePistonKinematics({ strokePct: 75 });
+      expect(k.strokeMm).toBe(450);
+      expect(k.strokeM).toBe(0.45);
+      expect(k.platenY).toBeCloseTo(-0.07, 3);
+      expect(k.appliedPressureBar).toBeCloseTo(2.7, 1);
+      expect(k.compactionForceKn).toBeCloseTo(9.9, 1);
+      expect(k.solidsConcentrationPct).toBeCloseTo(18.2, 1);
+      expect(k.volumeReductionPct).toBeCloseTo(51.0, 1);
     });
   });
 });

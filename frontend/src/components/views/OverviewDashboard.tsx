@@ -72,6 +72,7 @@ import { HYDRAULIC_MODEL_LIMITATIONS } from '../../simulation/deterministicEngin
 import { TerrainComparisonPanel } from '../TerrainComparisonPanel';
 import { formatDuration } from '../../utils/units';
 import { downloadTelemetryCsv, downloadEventsCsv } from '../../utils/csvExport';
+import { BhavyamSCADAPanel } from '../BhavyamSCADAPanel';
 
 export const OverviewDashboard: React.FC = () => {
   // Store state
@@ -145,7 +146,7 @@ export const OverviewDashboard: React.FC = () => {
 
   // Local UI State
   const [activeChartTab, setActiveChartTab] = useState<'flowRate' | 'tankBalance' | 'powerEnergy' | 'eventTimeline'>('flowRate');
-  const [paramPanelTab, setParamPanelTab] = useState<'machine' | 'terrain'>('machine');
+  const [paramPanelTab, setParamPanelTab] = useState<'machine' | 'terrain' | 'bhavyam'>('bhavyam');
   const [showComparisonPanel, setShowComparisonPanel] = useState(false);
   const [showModelLimitations, setShowModelLimitations] = useState(false);
 
@@ -1136,18 +1137,29 @@ export const OverviewDashboard: React.FC = () => {
               <Filter className="w-3.5 h-3.5 text-cyan-400" />
               3. Hydraulic Dewatering Piston
             </span>
-            <Badge
-              variant={
-                compactionTelemetry.pistonState === 'EXTENDING' || compactionTelemetry.pistonState === 'RETRACTING'
-                  ? 'safety'
-                  : compactionTelemetry.pistonState === 'LOCKED'
-                  ? 'success'
-                  : 'slate'
-              }
-              size="sm"
-            >
-              {compactionTelemetry.pistonState}
-            </Badge>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setParamPanelTab('bhavyam')}
+                className="text-[10px] text-teal-400 hover:text-teal-300 flex items-center gap-1 font-mono uppercase bg-teal-950/60 hover:bg-teal-900/60 px-2 py-0.5 rounded border border-teal-500/30 transition"
+                title="Open Bhavyam SCADA Dewatering Controls"
+              >
+                <Sliders className="w-3 h-3 text-teal-400" />
+                <span>SCADA</span>
+              </button>
+              <Badge
+                variant={
+                  compactionTelemetry.pistonState === 'EXTENDING' || compactionTelemetry.pistonState === 'RETRACTING'
+                    ? 'safety'
+                    : compactionTelemetry.pistonState === 'LOCKED'
+                    ? 'success'
+                    : 'slate'
+                }
+                size="sm"
+              >
+                {compactionTelemetry.pistonState}
+              </Badge>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
             <div className="bg-graphite-950/80 p-2 rounded-lg border border-slate-800/80">
@@ -1340,6 +1352,16 @@ export const OverviewDashboard: React.FC = () => {
                 Mesh
               </Button>
               <Button
+                variant={paramPanelTab === 'bhavyam' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setParamPanelTab(paramPanelTab === 'bhavyam' ? 'machine' : 'bhavyam')}
+                title="Toggle Bhavyam SCADA Dewatering Controls"
+                className="text-[10px] py-1 px-2 font-mono flex items-center gap-1"
+              >
+                <Sliders className="w-3 h-3 text-teal-400" />
+                SCADA Piston
+              </Button>
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setActiveView('simulation3d')}
@@ -1393,18 +1415,39 @@ export const OverviewDashboard: React.FC = () => {
 
         {/* Right Column: Parameters Panel & Terrain Feasibility */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          {/* Card with Tab Switcher: Machine Actuators vs Terrain Feasibility */}
+          {/* Card with Tab Switcher: Bhavyam SCADA vs Machine Actuators vs Terrain Feasibility */}
           <Card
-            title={paramPanelTab === 'machine' ? 'Machine Parameters' : 'Terrain Feasibility Model'}
+            title={
+              paramPanelTab === 'bhavyam'
+                ? 'Bhavyam SCADA Mk-IV Dewatering'
+                : paramPanelTab === 'machine'
+                ? 'Machine Parameters'
+                : 'Terrain Feasibility Model'
+            }
             subtitle={
-              paramPanelTab === 'machine'
+              paramPanelTab === 'bhavyam'
+                ? 'In-situ compaction ram & multi-physics telemetry'
+                : paramPanelTab === 'machine'
                 ? 'Actuator setpoints & fluid properties'
                 : 'Kinematic inclination & route losses'
             }
-            icon={<Sliders className="w-4 h-4 text-safety-500" />}
+            icon={<Sliders className={`w-4 h-4 ${paramPanelTab === 'bhavyam' ? 'text-teal-400' : 'text-safety-500'}`} />}
             headerAction={
               <div className="flex items-center bg-graphite-950 p-0.5 rounded-lg border border-slate-800 font-mono text-[10px]">
                 <button
+                  type="button"
+                  onClick={() => setParamPanelTab('bhavyam')}
+                  className={`px-2 py-0.5 rounded font-semibold transition-colors flex items-center gap-1 ${
+                    paramPanelTab === 'bhavyam'
+                      ? 'bg-teal-500 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+                  SCADA Dewater
+                </button>
+                <button
+                  type="button"
                   onClick={() => setParamPanelTab('machine')}
                   className={`px-2 py-0.5 rounded font-semibold transition-colors ${
                     paramPanelTab === 'machine'
@@ -1415,6 +1458,7 @@ export const OverviewDashboard: React.FC = () => {
                   Machine
                 </button>
                 <button
+                  type="button"
                   onClick={() => setParamPanelTab('terrain')}
                   className={`px-2 py-0.5 rounded font-semibold transition-colors ${
                     paramPanelTab === 'terrain'
@@ -1427,7 +1471,9 @@ export const OverviewDashboard: React.FC = () => {
               </div>
             }
           >
-            {paramPanelTab === 'machine' ? (
+            {paramPanelTab === 'bhavyam' ? (
+              <BhavyamSCADAPanel />
+            ) : paramPanelTab === 'machine' ? (
               <div className="space-y-3.5 text-xs">
                 {/* 1. Pump Speed (RPM) */}
                 <Slider
@@ -1776,6 +1822,17 @@ export const OverviewDashboard: React.FC = () => {
                     </div>
                   ))}
                 </div>
+
+                {selectedComponentId === 'compaction' && (
+                  <button
+                    type="button"
+                    onClick={() => setParamPanelTab('bhavyam')}
+                    className="w-full mt-2 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-teal-400" />
+                    <span>Control in Bhavyam SCADA Mk-IV</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="py-6 text-center text-slate-400 font-mono text-xs flex flex-col items-center gap-1.5">
