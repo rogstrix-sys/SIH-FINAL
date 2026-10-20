@@ -227,7 +227,7 @@ export const BhavyamDashboardView: React.FC<BhavyamDashboardViewProps> = ({
       )}
 
       {/* Embedded Bhavyam SCADA Mk-IV Dashboard Frame */}
-      <div className={`w-full relative ${isCompact ? 'h-[640px]' : 'h-[920px]'}`}>
+      <div className={`w-full relative ${isCompact ? 'h-[640px]' : 'h-[1400px] min-h-[1000px]'}`}>
         <iframe
           ref={iframeRef}
           src="/dashboard.html"
