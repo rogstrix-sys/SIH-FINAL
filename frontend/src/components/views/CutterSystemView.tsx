@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Zap,
   RotateCw,
@@ -14,9 +14,7 @@ import {
   RefreshCw,
   Layers,
   Flame,
-  ArrowRight,
-  Box,
-  Waves
+  ArrowRight
 } from 'lucide-react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { Card } from '../ui/Card';
@@ -24,8 +22,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Slider } from '../ui/Slider';
 import { CutterOperatingMode } from '../../types/cutterSystem';
-import { Cutter3DMechanicalViewer } from '../Cutter3DMechanicalViewer';
-import { CutterConduitCutawayViewer } from '../CutterConduitCutawayViewer';
+import { OriginalCutterViewer } from '../OriginalCutterViewer';
 
 export const CutterSystemView: React.FC = () => {
   const cutterTelemetry = useSimulationStore((s) => s.cutterTelemetry);
@@ -39,9 +36,6 @@ export const CutterSystemView: React.FC = () => {
   const alarms = useSimulationStore((s) => s.alarms);
   const operatingState = useSimulationStore((s) => s.operatingState);
   const setSelectedComponent = useSimulationStore((s) => s.setSelectedComponent);
-
-  // Visualizer View Mode: 3D Mechanical Twin (Default) or Conduit Slurry Rheology Cutaway
-  const [visualizerMode, setVisualizerMode] = useState<'3d_mechanical' | 'conduit_rheology'>('3d_mechanical');
 
   const modes: { id: CutterOperatingMode; label: string; desc: string }[] = [
     { id: 'standby', label: 'Standby', desc: '0 RPM - Cutter isolated for travel or maintenance' },
@@ -221,47 +215,14 @@ export const CutterSystemView: React.FC = () => {
 
         {/* Right Column: Dynamic Visualizer & Multi-Physics Telemetry */}
         <div className="lg:col-span-7 space-y-5">
-          {/* Authentic High-Fidelity Cutter Visualizer */}
+          {/* Original Bhavyam Cutter & Progressive Cavity Pump Assembly */}
           <Card
-            title="Tungsten-Carbide Cutter & Macerator Assembly"
-            subtitle="Closed-loop mechanical twin with 12 helical teeth, stationary anvil, and non-Newtonian shear stream"
+            title="Cold-Climate & High-Altitude Pumping"
+            subtitle="Inline Cutter Rheology & Progressive Cavity Screw Pump"
             icon={<Activity className="w-4 h-4 text-cyan-400" />}
-            headerAction={
-              <div className="flex items-center gap-1 bg-graphite-950 p-1 rounded-lg border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setVisualizerMode('3d_mechanical')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition ${
-                    visualizerMode === '3d_mechanical'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-bold'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Box className="w-3.5 h-3.5" />
-                  <span>3D Mechanical Twin</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setVisualizerMode('conduit_rheology')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition ${
-                    visualizerMode === 'conduit_rheology'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Waves className="w-3.5 h-3.5" />
-                  <span>Rheology Conduit</span>
-                </button>
-              </div>
-            }
           >
             <div className="space-y-4 pt-1">
-              {visualizerMode === '3d_mechanical' ? (
-                <Cutter3DMechanicalViewer className="h-[320px] sm:h-[360px]" />
-              ) : (
-                <CutterConduitCutawayViewer className="h-[320px] sm:h-[360px]" />
-              )}
+              <OriginalCutterViewer />
 
               {/* Primary Telemetry Metrics Strip */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">

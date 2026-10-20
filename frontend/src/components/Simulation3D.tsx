@@ -278,6 +278,10 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
   const storeCompactionTelemetry = useSimulationStore((s) => s.compactionTelemetry);
   const setStoreCompactionStrokePct = useSimulationStore((s) => s.setCompactionStrokePct);
   const storeCutterTelemetry = useSimulationStore((s) => s.cutterTelemetry);
+  const cutterTelemetryRef = useRef(storeCutterTelemetry);
+  useEffect(() => {
+    cutterTelemetryRef.current = storeCutterTelemetry;
+  }, [storeCutterTelemetry]);
   const storeThermalTelemetry = useSimulationStore((s) => s.thermalTelemetry);
   const [displayLayout, setDisplayLayout] = useState<'3d' | 'split' | 'scada'>('split');
 
@@ -3955,9 +3959,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           vehicleSpeedKmhRef.current = 0;
           driveModeRef.current = 'parked';
           isTransportReadyRef.current = false;
-          if (maceratorBladesRef.current) {
-            maceratorBladesRef.current.rotation.z += delta * 20;
-          }
           suctionVacuumKpaRef.current = THREE.MathUtils.lerp(suctionVacuumKpaRef.current, -48.0, delta * 2.0);
           extractionRateLpmRef.current = THREE.MathUtils.lerp(extractionRateLpmRef.current, 60.0, delta * 2.0);
           if (isAutoWorkflowRunningRef.current) {
@@ -3973,12 +3974,6 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
           isTransportReadyRef.current = false;
           suctionVacuumKpaRef.current = -68.5;
           extractionRateLpmRef.current = 150.0;
-          if (maceratorBladesRef.current) {
-            const rpm = storeCutterTelemetry?.enabled ? storeCutterTelemetry.rpm : 1450;
-            const dir = storeCutterTelemetry?.isReversed ? -1 : 1;
-            const spinSpeed = (rpm / 60) * Math.PI * 2 * dir;
-            maceratorBladesRef.current.rotation.z += delta * spinSpeed;
-          }
 
           // Transfer sludge from source vault into vehicle collection tank (Strict conservation: V_source + V_tank = 1200L)
           const transferRateLps = 48.0; // Scaled simulation speed (fills 400L in ~8.3s)
@@ -4102,6 +4097,27 @@ export const Simulation3D: React.FC<Simulation3DProps> = ({
         // Hide flow particles & tube when not in stage 5
         if (curStage !== '5_EXTRACT_SLUDGE') {
           if (suctionFlowPointsRef.current) suctionFlowPointsRef.current.visible = false;
+        }
+
+        // Rotary Macerator Chopper Blade 3D Real-Time Rotation Sync
+        if (maceratorBladesRef.current) {
+          const cTelem = cutterTelemetryRef.current;
+          const isEnabled = cTelem?.enabled ?? false;
+          const isBlocked = isEStopActiveRef.current || (cTelem?.overloadTrip ?? false);
+          let curRpm = 0;
+          if (isEnabled && !isBlocked) {
+            curRpm = cTelem?.rpm ?? 0;
+          } else if (curStage === '5_EXTRACT_SLUDGE' && !isBlocked) {
+            curRpm = 1450;
+          } else if (curStage === '4_PRIME_PUMP' && !isBlocked) {
+            curRpm = 600;
+          }
+
+          if (curRpm > 0) {
+            const dir = cTelem?.isReversed ? -1 : 1;
+            const spinSpeed = (curRpm / 60) * Math.PI * 2 * dir;
+            maceratorBladesRef.current.rotation.z += delta * spinSpeed;
+          }
         }
 
         // Manual Piston Mode Execution (Outside Auto Mission Sequence)
